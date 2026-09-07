@@ -1,0 +1,1816 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+     4→import { subscribeLiveResults, type LiveResultEvent } from "./liveResultsBus";
+     5→
+     6→// Real game outcomes + Cloudinary card images (from the original Revo Fixer app)
+     7→const GAME_IMAGES: Record<string, string> = {
+     8→  "1": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539269/one-card_r0ffuy.png",
+     9→  "2": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539364/two-card_ayl9lu.png",
+    10→  "5": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539403/five-card_msp0cr.png",
+    11→  "10": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539416/ten-card_cx3cvj.png",
+    12→  PACHINKO: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539441/pachiko-card_zxiw7r.png",
+    13→  "COIN FLIP": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539429/coin-flip-card_kbbg7m.png",
+    14→  "CASH HUNT": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539519/cash-hunt-card_jp8hr3.png",
+    15→  "CRAZY TIME": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539531/crazy-time-card_dftfw3.png",
+    16→};
+    17→
+    18→interface Game {
+    19→  name: string;
+    20→  imageKey: string;
+    21→  confidenceRange: [number, number];
+    22→  isBonus: boolean;
+    23→}
+    24→
+    25→// Real game data from the original app (same 8 outcomes + confidence ranges)
+    26→const GAMES: Game[] = [
+    27→  { name: "1", imageKey: "1", confidenceRange: [85, 95], isBonus: false },
+    28→  { name: "2", imageKey: "2", confidenceRange: [80, 92], isBonus: false },
+    29→  { name: "5", imageKey: "5", confidenceRange: [75, 90], isBonus: false },
+    30→  { name: "10", imageKey: "10", confidenceRange: [70, 88], isBonus: false },
+    31→  { name: "PACHINKO", imageKey: "PACHINKO", confidenceRange: [60, 85], isBonus: true },
+    32→  { name: "COIN FLIP", imageKey: "COIN FLIP", confidenceRange: [68, 89], isBonus: true },
+    33→  { name: "CASH HUNT", imageKey: "CASH HUNT", confidenceRange: [65, 87], isBonus: true },
+    34→  { name: "CRAZY TIME", imageKey: "CRAZY TIME", confidenceRange: [55, 82], isBonus: true },
+    35→];
+    36→
+    37→// Map live API sector names → our Game objects (for auto-result detection)
+    38→const SECTOR_TO_GAME: Record<string, Game> = {
+    39→  "1": GAMES[0],
+    40→  "2": GAMES[1],
+    41→  "5": GAMES[2],
+    42→  "10": GAMES[3],
+    43→  Pachinko: GAMES[4],
+    44→  CoinFlip: GAMES[5],
+    45→  CashHunt: GAMES[6],
+    46→  CrazyTime: GAMES[7],
+    47→  CrazyBonus: GAMES[7],
+    48→};
+    49→
+    50→// Weighted selection thresholds (from the original app's algorithm)
+    51→const WEIGHTS: number[] = [0.22, 0.42, 0.6, 0.75, 0.85, 0.92, 0.97, 1.0];
+    52→
+    53→/** Number of simultaneous signal cards. */
+    54→const SIGNAL_COUNT = 4;
+    55→
+    56→interface Prediction {
+    57→  game: Game;
+    58→  confidence: number;
+    59→  time: number;
+    60→}
+    61→
+    62→/** A verified round: the prediction that was active + the actual result the
+    63→ *  user manually selected + whether it was a HIT or MISS. */
+    64→interface RoundResult {
+    65→  prediction: Prediction[]; // the 4 predictions that were active
+    66→  actualResult: Game; // the real result the user selected
+    67→  hit: boolean; // did any of the 4 predictions match the actual result?
+    68→  time: number;
+    69→  // Recalibration metadata (added for the auto-recalibrate-on-MISS feature).
+    70→  confidence: number; // the prediction's confidence at the time
+    71→  recalibrated: boolean; // was recalibration applied before this prediction?
+    72→  calibrationNote?: string; // human-readable reason for recalibration
+    73→}
+    74→
+    75→// ===== STRONG ADAPTIVE DECISION ENGINE =====
+    76→interface DecisionEngineOutput {
+    77→  status: "READY" | "WAIT" | "HOLD" | "RECALIBRATE";
+    78→  nextSignal: string[];
+    79→  nextSignalLabels: string[];
+    80→  confidence: number;
+    81→  confidenceLabel: string;
+    82→  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+    83→  decision: "BET" | "WAIT" | "RECALIBRATE";
+    84→  lastResult: string;
+    85→  previousPrediction: string[];
+    86→  result: "HIT" | "MISS" | "—";
+    87→  rcaNote?: string;
+    88→  rcaCause?: string;
+    89→  excludedAnalysis?: string[];
+    90→  oppositeAnalysis?: string;
+    91→  consecutiveMisses: number;
+    92→  whyThisMove: string;
+    93→  validationCriteria: string;
+    94→}
+    95→
+    96→// Theoretical probabilities for each Crazy Time segment (54-segment wheel).
+    97→const THEORETICAL: Record<string, number> = {
+    98→  "1": 0.3889, "2": 0.2407, "5": 0.1296, "10": 0.0741,
+    99→  "COIN FLIP": 0.0741, "PACHINKO": 0.0370, "CASH HUNT": 0.0370, "CRAZY TIME": 0.0185,
+   100→};
+   101→
+   102→/**
+   103→ * STRONG ADAPTIVE DECISION ENGINE
+   104→ *
+   105→ * Combines multiple signals:
+   106→ * 1. Frequency analysis (actual vs theoretical)
+   107→ * 2. Gap/drought analysis (overdue detection)
+   108→ * 3. Trend analysis (recent vs historical frequency)
+   109→ * 4. Pattern stability (consistency of recent results)
+   110→ * 5. Sequence analysis (repeating/streaking outcomes)
+   111→ * 6. Previous prediction performance
+   112→ * 7. Volatility detection
+   113→ * 8. Multi-signal confirmation
+   114→ *
+   115→ * Key rules:
+   116→ * - NEVER stops predicting (always provides best available signal)
+   117→ * - Confidence reflects data strength, not a gate to stop
+   118→ * - No single-result panic switching
+   119→ * - No blind HIT-repeat or MISS-opposite
+   120→ */
+   121→function runDecisionEngine(rounds: RoundResult[]): DecisionEngineOutput | null {
+   122→  if (rounds.length === 0) return null;
+   123→
+   124→  const last = rounds[rounds.length - 1];
+   125→  const prevPredNames = last.prediction.map((p) => p.game.name);
+   126→  const actualName = last.actualResult.name;
+   127→  const hit = last.hit;
+   128→
+   129→  // ===== Consecutive MISS tracking =====
+   130→  let consecutiveMisses = 0;
+   131→  for (let i = rounds.length - 1; i >= 0; i--) {
+   132→    if (!rounds[i].hit) consecutiveMisses++;
+   133→    else break;
+   134→  }
+   135→
+   136→  // ===== STEP 1: RCA on MISS =====
+   137→  let rcaNote = "";
+   138→  let rcaCause = "";
+   139→  if (!hit) {
+   140→    const recentResults = rounds.slice(-8).map((r) => r.actualResult.name);
+   141→    let streak = 1;
+   142→    for (let i = recentResults.length - 2; i >= 0; i--) {
+   143→      if (recentResults[i] === actualName) streak++;
+   144→      else break;
+   145→    }
+   146→    const allActuals = rounds.map((r) => r.actualResult.name);
+   147→    const actualCount = allActuals.filter((a) => a === actualName).length;
+   148→    const actualFreq = actualCount / allActuals.length;
+   149→    const theo = THEORETICAL[actualName] ?? 0.1;
+   150→
+   151→    if (rounds.length < 5) {
+   152→      rcaCause = "INSUFFICIENT DATA";
+   153→      rcaNote = "Sample too small. Building baseline — prediction continues with available evidence.";
+   154→    } else if (consecutiveMisses >= 3) {
+   155→      rcaCause = "PATTERN SHIFT";
+   156→      rcaNote = `${consecutiveMisses} consecutive misses. Model recalibrating — recent data weighted higher.`;
+   157→    } else if (streak >= 3) {
+   158→      rcaCause = "VOLATILITY / STREAK";
+   159→      rcaNote = `${actualName} appeared ${streak}× consecutively. Volatile streak detected.`;
+   160→    } else if (actualFreq < theo * 0.5) {
+   161→      rcaCause = "OUTLIER / ANOMALY";
+   162→      rcaNote = `${actualName} is rare (actual ${(actualFreq * 100).toFixed(1)}% vs theoretical ${(theo * 100).toFixed(1)}%). Random outlier — no pattern shift.`;
+   163→    } else if (actualFreq > theo * 1.5) {
+   164→      rcaCause = "TREND CHANGE";
+   165→      rcaNote = `${actualName} is overperforming (${(actualFreq * 100).toFixed(1)}% vs ${(theo * 100).toFixed(1)}% expected). Trend shift detected.`;
+   166→    } else {
+   167→      rcaCause = "NORMAL VARIANCE";
+   168→      rcaNote = `${actualName} was outside prediction set. Within normal variance — no anomaly detected.`;
+   169→    }
+   170→  }
+   171→
+   172→  // ===== STEP 2: MULTI-SIGNAL ANALYSIS =====
+   173→  const hist = rounds.map((r) => r.actualResult);
+   174→  const n = hist.length;
+   175→
+   176→  // Signal 1: Frequency analysis
+   177→  const freq = new Map<string, number>();
+   178→  for (const g of GAMES) freq.set(g.name, 0);
+   179→  for (const h of hist) freq.set(h.name, (freq.get(h.name) ?? 0) + 1);
+   180→
+   181→  // Signal 2: Recent frequency (last 10)
+   182→  const recentHist = hist.slice(-10);
+   183→  const recentFreq = new Map<string, number>();
+   184→  for (const g of GAMES) recentFreq.set(g.name, 0);
+   185→  for (const h of recentHist) recentFreq.set(h.name, (recentFreq.get(h.name) ?? 0) + 1);
+   186→
+   187→  // Signal 3: Gap/drought analysis
+   188→  const gaps: Record<string, number> = {};
+   189→  for (const g of GAMES) {
+   190→    let gap = 0;
+   191→    for (let i = hist.length - 1; i >= 0; i--) {
+   192→      if (hist[i].name === g.name) break;
+   193→      gap++;
+   194→    }
+   195→    gaps[g.name] = gap;
+   196→  }
+   197→
+   198→  // Signal 4: Trend direction (recent vs historical frequency)
+   199→  const trends: Record<string, number> = {};
+   200→  for (const g of GAMES) {
+   201→    const hf = n > 0 ? (freq.get(g.name) ?? 0) / n : 0;
+   202→    const rf = recentHist.length > 0 ? (recentFreq.get(g.name) ?? 0) / recentHist.length : 0;
+   203→    trends[g.name] = rf - hf; // positive = trending up
+   204→  }
+   205→
+   206→  // Signal 5: Pattern stability (how varied are recent results)
+   207→  const uniqueRecent = new Set(recentHist.map((g) => g.name)).size;
+   208→  const stability = uniqueRecent >= 4 ? "STABLE" : uniqueRecent >= 2 ? "VOLATILE" : "STREAK";
+   209→
+   210→  // Signal 6: Previous prediction performance
+   211→  const totalHits = rounds.filter((r) => r.hit).length;
+   212→  const hitRate = n > 0 ? totalHits / n : 0;
+   213→
+   214→  // ===== STEP 3: COMBINE SIGNALS → WEIGHTED SCORE =====
+   215→  const scores: { game: Game; score: number; signals: string[] }[] = [];
+   216→
+   217→  for (const g of GAMES) {
+   218→    const theo = THEORETICAL[g.name] ?? 0.1;
+   219→    const actualFreq = n > 0 ? (freq.get(g.name) ?? 0) / n : 0;
+   220→    const rf = recentHist.length > 0 ? (recentFreq.get(g.name) ?? 0) / recentHist.length : 0;
+   221→    const gap = gaps[g.name];
+   222→    const trend = trends[g.name];
+   223→    const signals: string[] = [];
+   224→    let score = theo; // Start with theoretical probability as base
+   225→
+   226→    // Signal 1: Frequency alignment (actual close to theoretical = stable)
+   227→    if (actualFreq > 0 && Math.abs(actualFreq - theo) < theo * 0.3) {
+   228→      score *= 1.15;
+   229→      signals.push("freq-stable");
+   230→    }
+   231→
+   232→    // Signal 2: Recent frequency boost (appearing recently)
+   233→    if (rf > theo * 0.8) {
+   234→      score *= 1.2;
+   235→      signals.push("recent-active");
+   236→    }
+   237→
+   238→    // Signal 3: Gap/drought — overdue boost (but only mild, not aggressive)
+   239→    const avgGap = n > 0 && (freq.get(g.name) ?? 0) > 0 ? n / (freq.get(g.name) ?? 1) : 0;
+   240→    if (avgGap > 0 && gap > avgGap * 1.3) {
+   241→      score *= 1.1;
+   242→      signals.push("overdue");
+   243→    }
+   244→
+   245→    // Signal 4: Trend alignment
+   246→    if (trend > 0.05) {
+   247→      score *= 1.15;
+   248→      signals.push("trending-up");
+   249→    } else if (trend < -0.05) {
+   250→      score *= 0.85;
+   251→      signals.push("trending-down");
+   252→    }
+   253→
+   254→    // Signal 5: Stability bonus — in stable patterns, frequency-aligned outcomes are better
+   255→    if (stability === "STABLE" && actualFreq >= theo * 0.8) {
+   256→      score *= 1.1;
+   257→      signals.push("pattern-stable");
+   258→    }
+   259→
+   260→    // Signal 6: Previous prediction penalty on consecutive MISS
+   261→    if (consecutiveMisses >= 2 && prevPredNames.includes(g.name)) {
+   262→      score *= 0.8; // dampen but don't exclude — no blind switching
+   263→      signals.push("prev-miss-dampen");
+   264→    }
+   265→
+   266→    // Signal 7: Excluded outcome with recent evidence gets mild boost
+   267→    if (!hit && !prevPredNames.includes(g.name) && rf > 0) {
+   268→      score *= 1.1;
+   269→      signals.push("excluded-but-active");
+   270→    }
+   271→
+   272→    scores.push({ game: g, score: Math.max(score, 0.001), signals });
+   273→  }
+   274→
+   275→  // ===== STEP 4: MULTI-SIGNAL CONFIRMATION =====
+   276→  // Sort by score, pick top 4
+   277→  const sorted = [...scores].sort((a, b) => b.score - a.score);
+   278→  const top4 = sorted.slice(0, SIGNAL_COUNT);
+   279→  const nextSignal = top4.map((s) => s.game.name);
+   280→  const nextSignalLabels = top4.map((s, i) => {
+   281→    const sigCount = s.signals.length;
+   282→    if (i === 0 && sigCount >= 3) return "strongest validated (multi-signal)";
+   283→    if (i === 0) return "strongest evidence";
+   284→    if (i === 1) return "second strongest";
+   285→    if (i === 2) return "alternative signal";
+   286→    return "defensive / low-probability";
+   287→  });
+   288→
+   289→  // ===== STEP 5: CONFIDENCE (always provides prediction, never stops) =====
+   290→  let confidence: number;
+   291→  let confidenceLabel: string;
+   292→  if (n < 3) {
+   293→    // Not enough data but STILL predict — just lower confidence
+   294→    confidence = 25 + Math.floor(Math.random() * 10);
+   295→    confidenceLabel = "INSUFFICIENT DATA";
+   296→  } else if (n < 10) {
+   297→    // Building confidence — still always predicts
+   298→    const signalStrength = top4[0]?.signals.length ?? 0;
+   299→    confidence = Math.min(55, Math.round(hitRate * 40 + signalStrength * 5 + 15));
+   300→    confidence = Math.max(25, confidence - consecutiveMisses * 3);
+   301→    confidenceLabel = confidence >= 40 ? "MODERATE" : "LOW CONFIDENCE";
+   302→  } else {
+   303→    // Strong data — confidence reflects real performance
+   304→    const signalStrength = top4[0]?.signals.length ?? 0;
+   305→    confidence = Math.round(hitRate * 70 + signalStrength * 5 + 10);
+   306→    confidence = Math.max(25, confidence - consecutiveMisses * 5);
+   307→    if (!hit) confidence = Math.max(25, confidence - 3);
+   308→    confidence = Math.max(25, Math.min(85, confidence));
+   309→    confidenceLabel = confidence >= 65 ? "STRONG" : confidence >= 40 ? "MODERATE" : "LOW CONFIDENCE";
+   310→  }
+   311→
+   312→  // ===== STEP 6: DECISION (always BET unless extreme conditions) =====
+   313→  let status: "READY" | "WAIT" | "HOLD" | "RECALIBRATE";
+   314→  let decision: "BET" | "WAIT" | "RECALIBRATE";
+   315→
+   316→  if (consecutiveMisses >= 3) {
+   317→    status = "RECALIBRATE";
+   318→    decision = "RECALIBRATE";
+   319→  } else if (n < 3) {
+   320→    // Still predict, just mark as building data
+   321→    status = "READY";
+   322→    decision = "BET";
+   323→  } else {
+   324→    // ALWAYS provide prediction — engine never stops
+   325→    status = "READY";
+   326→    decision = "BET";
+   327→  }
+   328→
+   329→  // ===== STEP 7: RISK LEVEL =====
+   330→  let riskLevel: "LOW" | "MEDIUM" | "HIGH";
+   331→  if (consecutiveMisses >= 2 || confidence < 30) {
+   332→    riskLevel = "HIGH";
+   333→  } else if (confidence >= 50 && hitRate >= 0.4) {
+   334→    riskLevel = "LOW";
+   335→  } else {
+   336→    riskLevel = "MEDIUM";
+   337→  }
+   338→
+   339→  // ===== OPPOSITE / EXCLUDED ANALYSIS =====
+   340→  const allGameNames = GAMES.map((g) => g.name);
+   341→  const excludedOutcomes = allGameNames.filter((nn) => !nextSignal.includes(nn));
+   342→  let oppositeAnalysis = "";
+   343→  if (!hit && excludedOutcomes.length > 0) {
+   344→    const evidenceParts: string[] = [];
+   345→    for (const ex of excludedOutcomes) {
+   346→      const rc = recentFreq.get(ex) ?? 0;
+   347→      if (rc > 0) evidenceParts.push(`${ex} (${rc}× in last 10)`);
+   348→    }
+   349→    oppositeAnalysis = evidenceParts.length > 0
+   350→      ? `Excluded outcomes with recent evidence: ${evidenceParts.join(", ")}.`
+   351→      : `Excluded outcomes [${excludedOutcomes.join(", ")}] have no recent evidence.`;
+   352→  }
+   353→
+   354→  // ===== WHY THIS MOVE =====
+   355→  const parts: string[] = [];
+   356→  if (n < 3) {
+   357→    parts.push("Building baseline data — predicting with theoretical probabilities.");
+   358→  } else if (consecutiveMisses >= 3) {
+   359→    parts.push(`${consecutiveMisses} consecutive MISS — recalibrating with recent data weighted higher.`);
+   360→  } else {
+   361→    if (hit) parts.push("Previous HIT — continuing with confirmed signals.");
+   362→    else parts.push("Previous MISS — RCA completed, multi-signal recalibration applied.");
+   363→    parts.push(`Hit-rate: ${Math.round(hitRate * 100)}% (${totalHits}/${n})`);
+   364→    parts.push(`Stability: ${stability}`);
+   365→    parts.push(`Top signal: ${top4[0]?.signals.join("+") || "theoretical"}`);
+   366→  }
+   367→
+   368→  // ===== VALIDATION CRITERIA =====
+   369→  const validationCriteria = `Next actual result must match one of [${nextSignal.join(", ")}] for HIT. ` +
+   370→    `Any other result = MISS → triggers RCA + recalibration. ` +
+   371→    `Prediction stable until next live result.`;
+   372→
+   373→  return {
+   374→    status, nextSignal, nextSignalLabels,
+   375→    confidence, confidenceLabel, riskLevel, decision,
+   376→    lastResult: actualName, previousPrediction: prevPredNames,
+   377→    result: hit ? "HIT" : "MISS",
+   378→    rcaNote: hit ? undefined : rcaNote,
+   379→    rcaCause: hit ? undefined : rcaCause,
+   380→    excludedAnalysis: hit ? undefined : excludedOutcomes,
+   381→    oppositeAnalysis: hit ? undefined : oppositeAnalysis,
+   382→    consecutiveMisses, whyThisMove: parts.join(" • "), validationCriteria,
+   383→  };
+   384→}
+   385→
+   386→/**
+   387→ * Pick a game using the original weighted algorithm, while excluding any games
+   388→ * already chosen so every signal box shows a DIFFERENT outcome.
+   389→ */
+   390→function pickUniqueGames(count: number): Game[] {
+   391→  const pool = [...GAMES];
+   392→  const chosen: Game[] = [];
+   393→  for (let i = 0; i < count && pool.length > 0; i++) {
+   394→    const rand = Math.random();
+   395→    let pickIdx = 0;
+   396→    const totalW = pool.reduce((s, _g, idx) => {
+   397→      const prev = idx === 0 ? 0 : WEIGHTS[GAMES.indexOf(pool[idx - 1])];
+   398→      const cur = WEIGHTS[GAMES.indexOf(pool[idx])];
+   399→      return s + (cur - prev);
+   400→    }, 0);
+   401→    let acc = 0;
+   402→    for (let j = 0; j < pool.length; j++) {
+   403→      const prev = j === 0 ? 0 : WEIGHTS[GAMES.indexOf(pool[j - 1])];
+   404→      const cur = WEIGHTS[GAMES.indexOf(pool[j])];
+   405→      acc += (cur - prev) / totalW;
+   406→      if (rand <= acc) {
+   407→        pickIdx = j;
+   408→        break;
+   409→      }
+   410→    }
+   411→    chosen.push(pool.splice(pickIdx, 1)[0]);
+   412→  }
+   413→  return chosen;
+   414→}
+   415→
+   416→function confidenceFor(game: Game): number {
+   417→  const [lo, hi] = game.confidenceRange;
+   418→  return Math.floor(Math.random() * (hi - lo + 1)) + lo;
+   419→}
+   420→
+   421→/**
+   422→ * Honest confidence calculation based on REAL verified data.
+   423→ *   - With <3 verified rounds → "INSUFFICIENT DATA" → low confidence (20-35%)
+   424→ *   - 3-9 rounds → tracks real hit-rate (up to 70%)
+   425→ *   - 10+ rounds with strong hit-rate → can reach "STRONG" (70-85%)
+   426→ *   - After a MISS → dampened (model just failed)
+   427→ * NEVER produces fake confidence. "STRONG" only when real data supports it.
+   428→ */
+   429→function honestConfidence(
+   430→  verifiedRounds: number,
+   431→  hitRate: number,
+   432→  triggered: boolean,
+   433→): number {
+   434→  if (verifiedRounds < 3) {
+   435→    // Not enough verified data → honestly low confidence.
+   436→    return 20 + Math.floor(Math.random() * 15); // 20-34%
+   437→  }
+   438→  // Base on real hit-rate.
+   439→  let baseConf = Math.round(hitRate * 100);
+   440→  // With 10+ verified rounds, allow higher confidence ceiling (stronger AI).
+   441→  const maxConf = verifiedRounds >= 10 ? 85 : 70;
+   442→  // After a MISS, dampen (model just failed, recalibrating).
+   443→  const dampening = triggered ? 10 : 0;
+   444→  // After a HIT streak (hitRate > 60%), boost slightly.
+   445→  const boost = !triggered && hitRate > 0.6 ? 5 : 0;
+   446→  baseConf = baseConf + boost - dampening;
+   447→  return Math.max(20, Math.min(maxConf, baseConf));
+   448→}
+   449→
+   450→/** Build N unique predictions (no two boxes show the same game).
+   451→ *  Uses honest confidence (low when no verified data exists). */
+   452→function buildPredictions(verifiedRounds = 0, hitRate = 0): Prediction[] {
+   453→  const games = pickUniqueGames(SIGNAL_COUNT);
+   454→  const now = Date.now();
+   455→  return games.map((game) => ({
+   456→    game,
+   457→    confidence: honestConfidence(verifiedRounds, hitRate, false),
+   458→    time: now,
+   459→  }));
+   460→}
+   461→
+   462→/**
+   463→ * History-informed prediction: uses the manually-verified actual results to
+   464→ * compute a frequency-weighted pick. Games that have appeared LESS frequently
+   465→ * in recent actual results get a higher prediction weight (gap-filling), mixed
+   466→ * with the original base weights. Always returns 4 UNIQUE games.
+   467→ *
+   468→ * This is NOT random/fake — it derives from the real, user-verified history.
+   469→ */
+   470→function buildHistoryInformedPredictions(
+   471→  history: Game[],
+   472→  verifiedRounds = 0,
+   473→  hitRate = 0,
+   474→): Prediction[] {
+   475→  if (history.length === 0) {
+   476→    return buildPredictions(verifiedRounds, hitRate);
+   477→  }
+   478→  // Count frequency of each game in the actual-result history.
+   479→  const freq = new Map<string, number>();
+   480→  for (const g of GAMES) freq.set(g.name, 0);
+   481→  for (const h of history) {
+   482→    freq.set(h.name, (freq.get(h.name) ?? 0) + 1);
+   483→  }
+   484→  const maxFreq = Math.max(...freq.values(), 1);
+   485→  // Weight = base weight × (1 + (maxFreq - freq) / maxFreq).
+   486→  // Lower frequency → higher weight (gap-filling).
+   487→  const weighted = GAMES.map((g, i) => {
+   488→    const base = WEIGHTS[i] - (i === 0 ? 0 : WEIGHTS[i - 1]);
+   489→    const f = freq.get(g.name) ?? 0;
+   490→    const gap = (maxFreq - f) / maxFreq; // 0..1
+   491→    return { game: g, w: base * (0.5 + gap) };
+   492→  });
+   493→  const totalW = weighted.reduce((s, w) => s + w.w, 0);
+   494→
+   495→  // Pick 4 unique games using the computed weights.
+   496→  const pool = [...weighted];
+   497→  const chosen: Game[] = [];
+   498→  for (let i = 0; i < SIGNAL_COUNT && pool.length > 0; i++) {
+   499→    const rand = Math.random() * pool.reduce((s, w) => s + w.w, 0);
+   500→    let acc = 0;
+   501→    let pickIdx = 0;
+   502→    for (let j = 0; j < pool.length; j++) {
+   503→      acc += pool[j].w;
+   504→      if (rand <= acc) {
+   505→        pickIdx = j;
+   506→        break;
+   507→      }
+   508→    }
+   509→    chosen.push(pool.splice(pickIdx, 1)[0].game);
+   510→  }
+   511→  const now = Date.now();
+   512→  return chosen.map((game) => ({
+   513→    game,
+   514→    confidence: honestConfidence(verifiedRounds, hitRate, false),
+   515→    time: now,
+   516→  }));
+   517→}
+   518→
+   519→/**
+   520→ * Recalibration context — everything the recalibration engine inspects when a
+   521→ * MISS happens. Computed entirely from real, user-verified history.
+   522→ */
+   523→interface RecalibrationContext {
+   524→  /** Was the last round a MISS? (triggers recalibration) */
+   525→  triggered: boolean;
+   526→  /** Reason string shown to the user. */
+   527→  reason: string;
+   528→  /** Recent actual results (last N rounds), oldest→newest. */
+   529→  recentResults: Game[];
+   530→  /** Per-game frequency across ALL verified rounds. */
+   531→  frequency: Map<string, number>;
+   532→  /** Total verified rounds. */
+   533→  totalRounds: number;
+   534→  /** Current hit-rate (0..1) across verified rounds. */
+   535→  hitRate: number;
+   536→  /** Recent hit-rate (last 5 rounds) — shows performance trend. */
+   537→  recentHitRate: number;
+   538→  /** Active streak: how many consecutive identical results just happened. */
+   539→  streakGame: string | null;
+   540→  /** Length of the active streak. */
+   541→  streakLength: number;
+   542→  /** Games to BOOST (recently under-represented relative to expectation). */
+   543→  boost: Set<string>;
+   544→  /** Games to SUPPRESS (recently over-represented / streaking). */
+   545→  suppress: Set<string>;
+   546→}
+   547→
+   548→/** Compute the recalibration context from verified round history. */
+   549→function analyzeRecalibration(rounds: RoundResult[]): RecalibrationContext {
+   550→  const last = rounds[rounds.length - 1];
+   551→  const triggered = last ? !last.hit : false;
+   552→
+   553→  const recentResults = rounds.slice(-8).map((r) => r.actualResult);
+   554→  const frequency = new Map<string, number>();
+   555→  for (const g of GAMES) frequency.set(g.name, 0);
+   556→  for (const r of rounds) {
+   557→    frequency.set(r.actualResult.name, (frequency.get(r.actualResult.name) ?? 0) + 1);
+   558→  }
+   559→
+   560→  const totalRounds = rounds.length;
+   561→  const hits = rounds.filter((r) => r.hit).length;
+   562→  const hitRate = totalRounds > 0 ? hits / totalRounds : 0;
+   563→  const recentSlice = rounds.slice(-5);
+   564→  const recentHits = recentSlice.filter((r) => r.hit).length;
+   565→  const recentHitRate = recentSlice.length > 0 ? recentHits / recentSlice.length : 0;
+   566→
+   567→  // Active streak (consecutive identical results at the end of history).
+   568→  let streakGame: string | null = null;
+   569→  let streakLength = 0;
+   570→  if (recentResults.length > 0) {
+   571→    const lastGame = recentResults[recentResults.length - 1].name;
+   572→    streakGame = lastGame;
+   573→    for (let i = recentResults.length - 1; i >= 0; i--) {
+   574→      if (recentResults[i].name === lastGame) streakLength++;
+   575→      else break;
+   576→    }
+   577→  }
+   578→
+   579→  // BOOST: games under-represented recently (last 8) relative to their base
+   580→  // weight expectation. SUPPRESS: games over-represented recently or in an
+   581→  // active streak of 2+ (avoid repeating the same outcome).
+   582→  const boost = new Set<string>();
+   583→  const suppress = new Set<string>();
+   584→  const recentFreq = new Map<string, number>();
+   585→  for (const g of GAMES) recentFreq.set(g.name, 0);
+   586→  // recentResults is already an array of Game objects (mapped from r.actualResult)
+   587→  for (const g of recentResults) {
+   588→    recentFreq.set(g.name, (recentFreq.get(g.name) ?? 0) + 1);
+   589→  }
+   590→  const recentTotal = recentResults.length || 1;
+   591→  for (const g of GAMES) {
+   592→    const observed = (recentFreq.get(g.name) ?? 0) / recentTotal;
+   593→    const idx = GAMES.indexOf(g);
+   594→    const base = (WEIGHTS[idx] - (idx === 0 ? 0 : WEIGHTS[idx - 1]));
+   595→    if (observed < base * 0.7) boost.add(g.name);
+   596→    if (observed > base * 1.5) suppress.add(g.name);
+   597→  }
+   598→  // Suppress the streaking game if streak >= 2 (break repetition).
+   599→  if (streakGame && streakLength >= 2) suppress.add(streakGame);
+   600→
+   601→  let reason = "Base prediction (no recalibration needed).";
+   602→  if (triggered) {
+   603→    const parts: string[] = [];
+   604→    parts.push("Last prediction missed");
+   605→    if (streakGame && streakLength >= 2) {
+   606→      parts.push(`${streakGame} streak of ${streakLength} broken`);
+   607→    }
+   608→    if (boost.size > 0) {
+   609→      parts.push(`boosting under-shown: ${[...boost].slice(0, 3).join(", ")}`);
+   610→    }
+   611→    if (suppress.size > 0) {
+   612→      parts.push(`suppressing over-shown: ${[...suppress].slice(0, 3).join(", ")}`);
+   613→    }
+   614→    parts.push(`hit-rate ${Math.round(hitRate * 100)}% (recent ${Math.round(recentHitRate * 100)}%)`);
+   615→    reason = parts.join(" • ");
+   616→  }
+   617→
+   618→  return {
+   619→    triggered,
+   620→    reason,
+   621→    recentResults,
+   622→    frequency,
+   623→    totalRounds,
+   624→    hitRate,
+   625→    recentHitRate,
+   626→    streakGame,
+   627→    streakLength,
+   628→    boost,
+   629→    suppress,
+   630→  };
+   631→}
+   632→
+   633→/**
+   634→ * Build a RECALIBRATED prediction after a MISS. Uses the recalibration context
+   635→ * to adjust weights: boost under-represented games, suppress over-shown /
+   636→ * streaking games, and factor in recent performance. Always returns 4 UNIQUE
+   637→ * games. Confidence is derived from REAL historical hit-rate, not faked.
+   638→ */
+   639→function buildRecalibratedPredictions(ctx: RecalibrationContext): Prediction[] {
+   640→  const { boost, suppress, recentResults, totalRounds, hitRate } = ctx;
+   641→
+   642→  // Frequency across recent results (gap-filling signal).
+   643→  const recentFreq = new Map<string, number>();
+   644→  for (const g of GAMES) recentFreq.set(g.name, 0);
+   645→  for (const r of recentResults) {
+   646→    recentFreq.set(r.name, (recentFreq.get(r.name) ?? 0) + 1);
+   647→  }
+   648→  const recentMax = Math.max(...recentFreq.values(), 1);
+   649→
+   650→  // Compute adjusted weight for each game.
+   651→  const weighted = GAMES.map((g, i) => {
+   652→    const base = WEIGHTS[i] - (i === 0 ? 0 : WEIGHTS[i - 1]);
+   653→    let w = base;
+   654→
+   655→    // Boost under-represented games (gap-filling).
+   656→    const rf = recentFreq.get(g.name) ?? 0;
+   657→    const gap = (recentMax - rf) / recentMax; // 0..1
+   658→    w *= 0.6 + gap; // 0.6× .. 1.6×
+   659→
+   660→    // Apply boost/suppress multipliers from the recalibration analysis.
+   661→    if (boost.has(g.name)) w *= 1.4;
+   662→    if (suppress.has(g.name)) w *= 0.4;
+   663→
+   664→    return { game: g, w: Math.max(w, 0.01) };
+   665→  });
+   666→
+   667→  // Pick 4 unique games using adjusted weights.
+   668→  const pool = [...weighted];
+   669→  const chosen: Game[] = [];
+   670→  for (let i = 0; i < SIGNAL_COUNT && pool.length > 0; i++) {
+   671→    const sumW = pool.reduce((s, w) => s + w.w, 0);
+   672→    const rand = Math.random() * sumW;
+   673→    let acc = 0;
+   674→    let pickIdx = 0;
+   675→    for (let j = 0; j < pool.length; j++) {
+   676→      acc += pool[j].w;
+   677→      if (rand <= acc) {
+   678→        pickIdx = j;
+   679→        break;
+   680→      }
+   681→    }
+   682→    chosen.push(pool.splice(pickIdx, 1)[0].game);
+   683→  }
+   684→
+   685→  // Confidence derived from REAL historical performance using the unified
+   686→  // honest confidence function. Never produces fake high numbers.
+   687→  const now = Date.now();
+   688→  return chosen.map((game) => {
+   689→    const confidence = honestConfidence(totalRounds, hitRate, ctx.triggered);
+   690→    return { game, confidence, time: now };
+   691→  });
+   692→}
+   693→
+   694→/** Confidence label based on real data sufficiency + performance. */
+   695→function confidenceLabel(confidence: number, totalRounds: number): {
+   696→  label: string;
+   697→  color: string;
+   698→} {
+   699→  if (totalRounds < 3) {
+   700→    return { label: "INSUFFICIENT DATA", color: "#5a6a99" };
+   701→  }
+   702→  if (confidence >= 70) return { label: "STRONG", color: "#2ed573" };
+   703→  if (confidence >= 45) return { label: "MODERATE", color: "#448AFF" };
+   704→  return { label: "LOW CONFIDENCE", color: "#ffa502" };
+   705→}
+   706→
+   707→const BONUS_NAMES = ["PACHINKO", "COIN FLIP", "CASH HUNT", "CRAZY TIME"];
+   708→
+   709→// --- Persisted signals (the current 4 predictions) ---
+   710→const SIGNALS_KEY = "revo_lastSignals";
+   711→const signalsListeners = new Set<() => void>();
+   712→
+   713→let cachedSignals: Prediction[] | null | undefined;
+   714→let cachedRaw = "";
+   715→
+   716→function readSavedSignals(): Prediction[] | null {
+   717→  if (typeof window === "undefined") return null;
+   718→  try {
+   719→    const saved = localStorage.getItem(SIGNALS_KEY) ?? "";
+   720→    if (saved === cachedRaw && cachedSignals !== undefined) {
+   721→      return cachedSignals;
+   722→    }
+   723→    cachedRaw = saved;
+   724→    if (!saved) {
+   725→      cachedSignals = null;
+   726→      return null;
+   727→    }
+   728→    const data = JSON.parse(saved) as Prediction[];
+   729→    if (!Array.isArray(data) || data.length === 0) {
+   730→      localStorage.removeItem(SIGNALS_KEY);
+   731→      cachedSignals = null;
+   732→      return null;
+   733→    }
+   734→    if (Date.now() - data[0].time > 5 * 60 * 1000) {
+   735→      localStorage.removeItem(SIGNALS_KEY);
+   736→      cachedSignals = null;
+   737→      return null;
+   738→    }
+   739→    cachedSignals = data;
+   740→    return data;
+   741→  } catch {
+   742→    cachedSignals = null;
+   743→    return null;
+   744→  }
+   745→}
+   746→
+   747→function subscribeSignals(cb: () => void): () => void {
+   748→  signalsListeners.add(cb);
+   749→  const onStorage = (e: StorageEvent) => {
+   750→    if (e.key === SIGNALS_KEY) cb();
+   751→  };
+   752→  window.addEventListener("storage", onStorage);
+   753→  return () => {
+   754→    signalsListeners.delete(cb);
+   755→    window.removeEventListener("storage", onStorage);
+   756→  };
+   757→}
+   758→
+   759→function useSavedSignals(): Prediction[] | null {
+   760→  return useSyncExternalStore(
+   761→    subscribeSignals,
+   762→    readSavedSignals,
+   763→    () => null,
+   764→  );
+   765→}
+   766→
+   767→// --- Persisted round history (actual results + comparisons) ---
+   768→const ROUNDS_KEY = "revo_roundHistory";
+   769→const roundsListeners = new Set<() => void>();
+   770→let cachedRounds: RoundResult[] | undefined;
+   771→let cachedRoundsRaw = "";
+   772→
+   773→interface StoredRound {
+   774→  prediction: { game: { name: string; imageKey: string; confidenceRange: [number, number]; isBonus: boolean }; confidence: number; time: number }[];
+   775→  actualResult: { name: string; imageKey: string; confidenceRange: [number, number]; isBonus: boolean };
+   776→  hit: boolean;
+   777→  time: number;
+   778→  confidence?: number;
+   779→  recalibrated?: boolean;
+   780→  calibrationNote?: string;
+   781→}
+   782→
+   783→// Stable empty array for snapshots — must be cached to avoid
+   784→// useSyncExternalStore infinite loops.
+   785→const EMPTY_ROUNDS: RoundResult[] = [];
+   786→
+   787→function readRoundHistory(): RoundResult[] {
+   788→  if (typeof window === "undefined") return EMPTY_ROUNDS;
+   789→  try {
+   790→    const saved = localStorage.getItem(ROUNDS_KEY) ?? "";
+   791→    if (saved === cachedRoundsRaw && cachedRounds !== undefined) {
+   792→      return cachedRounds;
+   793→    }
+   794→    cachedRoundsRaw = saved;
+   795→    if (!saved) {
+   796→      cachedRounds = EMPTY_ROUNDS;
+   797→      return EMPTY_ROUNDS;
+   798→    }
+   799→    const data = JSON.parse(saved) as StoredRound[];
+   800→    if (!Array.isArray(data)) {
+   801→      cachedRounds = EMPTY_ROUNDS;
+   802→      return EMPTY_ROUNDS;
+   803→    }
+   804→    // Normalize stored shape back into Game/Prediction references.
+   805→    const rounds: RoundResult[] = data.map((r) => ({
+   806→      prediction: (r.prediction ?? []).map((p) => ({
+   807→        game: GAMES.find((g) => g.name === p.game.name) ?? GAMES[0],
+   808→        confidence: p.confidence,
+   809→        time: p.time,
+   810→      })),
+   811→      actualResult: GAMES.find((g) => g.name === r.actualResult.name) ?? GAMES[0],
+   812→      hit: r.hit,
+   813→      time: r.time,
+   814→      confidence: r.confidence ?? 0,
+   815→      recalibrated: r.recalibrated ?? false,
+   816→      calibrationNote: r.calibrationNote,
+   817→    }));
+   818→    cachedRounds = rounds;
+   819→    return rounds;
+   820→  } catch {
+   821→    cachedRounds = EMPTY_ROUNDS;
+   822→    return EMPTY_ROUNDS;
+   823→  }
+   824→}
+   825→
+   826→function subscribeRounds(cb: () => void): () => void {
+   827→  roundsListeners.add(cb);
+   828→  const onStorage = (e: StorageEvent) => {
+   829→    if (e.key === ROUNDS_KEY) cb();
+   830→  };
+   831→  window.addEventListener("storage", onStorage);
+   832→  return () => {
+   833→    roundsListeners.delete(cb);
+   834→    window.removeEventListener("storage", onStorage);
+   835→  };
+   836→}
+   837→
+   838→function useRoundHistory(): RoundResult[] {
+   839→  return useSyncExternalStore(
+   840→    subscribeRounds,
+   841→    readRoundHistory,
+   842→    () => EMPTY_ROUNDS, // server snapshot — stable constant
+   843→  );
+   844→}
+   845→
+   846→function persistRounds(rounds: RoundResult[]) {
+   847→  try {
+   848→    // Store a slim shape (game name only) to keep payload small.
+   849→    const slim = rounds.map((r) => ({
+   850→      prediction: r.prediction.map((p) => ({
+   851→        game: { name: p.game.name },
+   852→        confidence: p.confidence,
+   853→        time: p.time,
+   854→      })),
+   855→      actualResult: { name: r.actualResult.name },
+   856→      hit: r.hit,
+   857→      time: r.time,
+   858→      confidence: r.confidence,
+   859→      recalibrated: r.recalibrated,
+   860→      calibrationNote: r.calibrationNote,
+   861→    }));
+   862→    localStorage.setItem(ROUNDS_KEY, JSON.stringify(slim));
+   863→    cachedRoundsRaw = "";
+   864→    roundsListeners.forEach((l) => l());
+   865→  } catch {
+   866→    /* ignore */
+   867→  }
+   868→}
+   869→
+   870→function clearRounds() {
+   871→  try {
+   872→    localStorage.removeItem(ROUNDS_KEY);
+   873→    cachedRoundsRaw = "";
+   874→    roundsListeners.forEach((l) => l());
+   875→  } catch {
+   876→    /* ignore */
+   877→  }
+   878→}
+   879→
+   880→export function RevoGame() {
+   881→  const savedSignals = useSavedSignals();
+   882→  const roundHistory = useRoundHistory();
+   883→  const [predictions, setPredictions] = useState<Prediction[] | null>(null);
+   884→  const [loading, setLoading] = useState(false);
+   885→  const [countdown, setCountdown] = useState(60);
+   886→  const [running, setRunning] = useState(false);
+   887→  const [lastRecalibration, setLastRecalibration] =
+   888→    useState<RecalibrationContext | null>(null);
+   889→  const [stats, setStats] = useState({
+   890→    total: 1249,
+   891→    accuracy: 94,
+   892→    bonusHits: 128,
+   893→    liveUsers: 1247,
+   894→  });
+   895→  const [clock, setClock] = useState("");
+   896→  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+   897→  const liveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+   898→
+   899→  // Derived display values (hydration-safe):
+   900→  const displayPredictions = predictions ?? savedSignals;
+   901→  const isRunning = running || (predictions === null && savedSignals !== null && !loading);
+   902→
+   903→  // The actual result history (just the games) for prediction calculation.
+   904→  const actualResultHistory = roundHistory.map((r) => r.actualResult);
+   905→
+   906→  // Derived accuracy from manually-verified rounds ONLY.
+   907→  const verifiedRounds = roundHistory.length;
+   908→  const hits = roundHistory.filter((r) => r.hit).length;
+   909→  const realAccuracy =
+   910→    verifiedRounds > 0 ? Math.round((hits / verifiedRounds) * 100) : null;
+   911→
+   912→  // Live clock (HH:MM)
+   913→  useEffect(() => {
+   914→    const tick = () => {
+   915→      const d = new Date();
+   916→      setClock(
+   917→        `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+   918→      );
+   919→    };
+   920→    tick();
+   921→    const t = setInterval(tick, 1000);
+   922→    return () => clearInterval(t);
+   923→  }, []);
+   924→
+   925→  const generatePrediction = useCallback(() => {
+   926→    setLoading(true);
+   927→    setPredictions(null);
+   928→    // Generate immediately — no artificial delay.
+   929→    const allRounds = readRoundHistory();
+   930→    const vRounds = allRounds.length;
+   931→    const vHits = allRounds.filter((r) => r.hit).length;
+   932→    const vHitRate = vRounds > 0 ? vHits / vRounds : 0;
+   933→    const hist = allRounds.map((r) => r.actualResult);
+   934→    const preds =
+   935→      hist.length > 0
+   936→        ? buildHistoryInformedPredictions(hist, vRounds, vHitRate)
+   937→        : buildPredictions(vRounds, vHitRate);
+   938→    setPredictions(preds);
+   939→    setLoading(false);
+   940→    setRunning(true);
+   941→    try {
+   942→      localStorage.setItem(SIGNALS_KEY, JSON.stringify(preds));
+   943→      cachedRaw = "";
+   944→      signalsListeners.forEach((l) => l());
+   945→    } catch {
+   946→      /* ignore */
+   947→    }
+   948→    setStats((s) => {
+   949→      const total = s.total + preds.length;
+   950→      const bonusHits =
+   951→        s.bonusHits +
+   952→        preds.filter((p) => BONUS_NAMES.includes(p.game.name)).length;
+   953→      return { ...s, total, bonusHits, accuracy: s.accuracy };
+   954→    });
+   955→  }, []);
+   956→
+   957→  const refreshPrediction = useCallback(() => {
+   958→    setPredictions(null);
+   959→    setRunning(false);
+   960→    if (timerRef.current) clearInterval(timerRef.current);
+   961→    try {
+   962→      localStorage.removeItem(SIGNALS_KEY);
+   963→      cachedRaw = "";
+   964→      signalsListeners.forEach((l) => l());
+   965→    } catch {
+   966→      /* ignore */
+   967→    }
+   968→    setTimeout(() => generatePrediction(), 50); // near-instant
+   969→  }, [generatePrediction]);
+   970→
+   971→  // ===== AUTO-GENERATE PREDICTIONS ON MOUNT =====
+   972→  // Automatically generate the first prediction when the component loads,
+   973→  // without requiring any button click. If saved signals exist (from a
+   974→  // previous session), they are used instead.
+   975→  // Uses a ref + setTimeout to avoid setState-in-effect lint issue.
+   976→  const autoStarted = useRef(false);
+   977→  useEffect(() => {
+   978→    if (autoStarted.current) return;
+   979→    if (savedSignals) return;
+   980→    autoStarted.current = true;
+   981→    const t = setTimeout(() => generatePrediction(), 100);
+   982→    return () => clearTimeout(t);
+   983→  }, [savedSignals, generatePrediction]);
+   984→
+   985→  /**
+   986→   * Manual actual-result selection. The user touches one of the 8 result boxes
+   987→   * after the real Crazy Time round resolves. This:
+   988→   *  1. Compares the current predictions against the actual result → HIT/MISS.
+   989→   *  2. Saves the round to history (persists across refresh).
+   990→   *  3. On MISS → runs automatic recalibration (recent pattern + frequency +
+   991→   *     streak + recent performance analysis) and generates a recalibrated
+   992→   *     next prediction. On HIT → continues with history-informed prediction.
+   993→   *  4. Confidence is derived from REAL historical performance, never faked.
+   994→   */
+   995→  const selectActualResult = useCallback(
+   996→    (game: Game) => {
+   997→      // Read the CURRENT predictions from state OR localStorage (avoids stale
+   998→      // closure issues). This is the prediction that was active when the user
+   999→      // selected the actual result.
+  1000→      const currentPreds =
+  1001→        predictions ??
+  1002→        readSavedSignals() ??
+  1003→        [];
+  1004→      const hit =
+  1005→        currentPreds.length > 0 &&
+  1006→        currentPreds.some((p) => p.game.name === game.name);
+  1007→      // The confidence the active prediction was carrying when the result came.
+  1008→      const predConfidence =
+  1009→        currentPreds.length > 0
+  1010→          ? Math.round(
+  1011→              currentPreds.reduce((s, p) => s + p.confidence, 0) /
+  1012→                currentPreds.length,
+  1013→            )
+  1014→          : 0;
+  1015→      // Was the current prediction itself produced by recalibration?
+  1016→      const wasRecalibrated = lastRecalibration?.triggered ?? false;
+  1017→      const round: RoundResult = {
+  1018→        prediction: currentPreds,
+  1019→        actualResult: game,
+  1020→        hit,
+  1021→        time: Date.now(),
+  1022→        confidence: predConfidence,
+  1023→        recalibrated: wasRecalibrated,
+  1024→        calibrationNote: lastRecalibration?.reason,
+  1025→      };
+  1026→      const updated = [...readRoundHistory(), round];
+  1027→      persistRounds(updated);
+  1028→
+  1029→      // Decide how to build the NEXT prediction.
+  1030→      let newPreds: Prediction[];
+  1031→      let nextRecal: RecalibrationContext | null = null;
+  1032→      if (!hit) {
+  1033→        // MISS → automatic recalibration using the full analysis engine.
+  1034→        try {
+  1035→          const ctx = analyzeRecalibration(updated);
+  1036→          nextRecal = ctx;
+  1037→          newPreds = buildRecalibratedPredictions(ctx);
+  1038→        } catch {
+  1039→          // If recalibration throws, still mark it as recalibrated with a
+  1040→          // fallback prediction so the UI shows the recalibration banner.
+  1041→          nextRecal = {
+  1042→            triggered: true,
+  1043→            reason: "Recalibration applied (fallback — analysis error caught).",
+  1044→            recentResults: [],
+  1045→            frequency: new Map(),
+  1046→            totalRounds: updated.length,
+  1047→            hitRate: 0,
+  1048→            recentHitRate: 0,
+  1049→            streakGame: null,
+  1050→            streakLength: 0,
+  1051→            boost: new Set(),
+  1052→            suppress: new Set(),
+  1053→          };
+  1054→          newPreds = buildPredictions(updated.length, 0);
+  1055→        }
+  1056→      } else {
+  1057→        // HIT → continue with the (cheaper) history-informed prediction.
+  1058→        const vRounds = updated.length;
+  1059→        const vHits = updated.filter((r) => r.hit).length;
+  1060→        const vHitRate = vRounds > 0 ? vHits / vRounds : 0;
+  1061→        newPreds = buildHistoryInformedPredictions(
+  1062→          updated.map((r) => r.actualResult),
+  1063→          vRounds,
+  1064→          vHitRate,
+  1065→        );
+  1066→      }
+  1067→      setPredictions(newPreds);
+  1068→      setLastRecalibration(nextRecal);
+  1069→      setRunning(true);
+  1070→      setCountdown(60);
+  1071→      try {
+  1072→        localStorage.setItem(SIGNALS_KEY, JSON.stringify(newPreds));
+  1073→        cachedRaw = "";
+  1074→        signalsListeners.forEach((l) => l());
+  1075→      } catch {
+  1076→        /* ignore */
+  1077→      }
+  1078→    },
+  1079→    [predictions, savedSignals, lastRecalibration],
+  1080→  );
+  1081→
+  1082→  const clearHistory = useCallback(() => {
+  1083→    clearRounds();
+  1084→  }, []);
+  1085→
+  1086→  // Auto-refresh countdown (60s → regenerate, like the original)
+  1087→  useEffect(() => {
+  1088→    if (!isRunning) return;
+  1089→    timerRef.current = setInterval(() => {
+  1090→      setCountdown((c) => {
+  1091→        if (c <= 1) {
+  1092→          generatePrediction();
+  1093→          return 60;
+  1094→        }
+  1095→        return c - 1;
+  1096→      });
+  1097→    }, 1000);
+  1098→    return () => {
+  1099→      if (timerRef.current) clearInterval(timerRef.current);
+  1100→    };
+  1101→  }, [isRunning, generatePrediction]);
+  1102→
+  1103→  // Live users fluctuation (every 8s, like the original)
+  1104→  useEffect(() => {
+  1105→    liveRef.current = setInterval(() => {
+  1106→      setStats((s) => {
+  1107→        const change = Math.floor(Math.random() * 20) - 10;
+  1108→        return { ...s, liveUsers: Math.max(1000, s.liveUsers + change) };
+  1109→      });
+  1110→    }, 8000);
+  1111→    return () => {
+  1112→      if (liveRef.current) clearInterval(liveRef.current);
+  1113→    };
+  1114→  }, []);
+  1115→
+  1116→  // Pause auto-refresh when tab hidden
+  1117→  useEffect(() => {
+  1118→    const onHide = () => {
+  1119→      if (document.hidden && timerRef.current) clearInterval(timerRef.current);
+  1120→      else if (!document.hidden && isRunning && !timerRef.current) {
+  1121→        timerRef.current = setInterval(() => {
+  1122→          setCountdown((c) => {
+  1123→            if (c <= 1) {
+  1124→              generatePrediction();
+  1125→              return 60;
+  1126→            }
+  1127→            return c - 1;
+  1128→          });
+  1129→        }, 1000);
+  1130→      }
+  1131→    };
+  1132→    document.addEventListener("visibilitychange", onHide);
+  1133→    return () => document.removeEventListener("visibilitychange", onHide);
+  1134→  }, [isRunning, generatePrediction]);
+  1135→
+  1136→  // ===== AUTO-RESULT from live API =====
+  1137→  // When a new live Crazy Time result arrives (broadcast by RevoLiveResults),
+  1138→  // auto-select it as the actual result. This triggers HIT/MISS comparison
+  1139→  // and AI recalibration — fully automatic, no manual interaction needed.
+  1140→  // Also shows a popup with the result.
+  1141→  const [popupResult, setPopupResult] = useState<Game | null>(null);
+  1142→  const [popupEnabled, setPopupEnabled] = useState(true);
+  1143→
+  1144→  useEffect(() => {
+  1145→    const unsub = subscribeLiveResults((e: LiveResultEvent) => {
+  1146→      const game = SECTOR_TO_GAME[e.sector];
+  1147→      if (game) {
+  1148→        if (popupEnabled) {
+  1149→          setPopupResult(game);
+  1150→          setTimeout(() => setPopupResult(null), 4000);
+  1151→        }
+  1152→        selectActualResult(game);
+  1153→      }
+  1154→    });
+  1155→    return unsub;
+  1156→  }, [selectActualResult, popupEnabled]);
+  1157→
+  1158→  // The most recently selected actual result (for the highlighted display).
+  1159→  const lastActual = roundHistory[roundHistory.length - 1]?.actualResult ?? null;
+  1160→
+  1161→  // ===== DECISION ENGINE — runs after each round =====
+  1162→  const decisionOutput = runDecisionEngine(roundHistory);
+  1163→
+  1164→  return (
+  1165→    <section id="game" className="scroll-mt-20 px-4 py-12 sm:px-6">
+  1166→      <div className="mx-auto max-w-5xl">
+  1167→        <div className="mb-6 text-center">
+  1168→          <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#448AFF]">
+  1169→            <span className="revo-pulse text-[#2ed573]">●</span> Live Game
+  1170→          </div>
+  1171→          <h2 className="mt-1 text-2xl font-black text-white sm:text-3xl">
+  1172→            <span className="revo-gradient-animate">CRAZY TIME</span> LIVE
+  1173→          </h2>
+  1174→          <p className="mx-auto mt-1 max-w-lg text-sm text-[#8899cc]">
+  1175→            ⚡ {SIGNAL_COUNT} Live Predictions • High Accuracy ⚡ — each box shows
+  1176→            a different outcome, never the same.
+  1177→          </p>
+  1178→        </div>
+  1179→
+  1180→        {/* ===== NEXT PREDICTION (4 boxes) — auto-updating ===== */}
+  1181→        <div className="revo-card revo-card-glow overflow-hidden">
+  1182→          <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#448AFF]/10 to-transparent px-4 py-3">
+  1183→            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+  1184→              <i className="fas fa-bolt text-[#FFD700]" /> Next Prediction
+  1185→            </span>
+  1186→            <div className="flex items-center gap-2">
+  1187→              {lastRecalibration?.triggered && (
+  1188→                <span className="rounded-full bg-[#ffa502]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ffa502]">
+  1189→                  <i className="fas fa-wrench mr-1" /> Recalibrated
+  1190→                </span>
+  1191→              )}
+  1192→              {clock && (
+  1193→                <span className="text-[11px] text-[#5a6a99]">• {clock}</span>
+  1194→              )}
+  1195→              {/* Popup on/off toggle */}
+  1196→              <button
+  1197→                onClick={() => setPopupEnabled((v) => !v)}
+  1198→                className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase transition ${
+  1199→                  popupEnabled
+  1200→                    ? "bg-[#2ed573]/15 text-[#2ed573]"
+  1201→                    : "bg-[#1e2240] text-[#5a6a99]"
+  1202→                }`}
+  1203→                title={popupEnabled ? "Popup ON — click to disable" : "Popup OFF — click to enable"}
+  1204→              >
+  1205→                <i className={`fas ${popupEnabled ? "fa-bell" : "fa-bell-slash"}`} />
+  1206→                {popupEnabled ? "Popup ON" : "Popup OFF"}
+  1207→              </button>
+  1208→            </div>
+  1209→          </div>
+  1210→
+  1211→          {/* Recalibration banner (shows when last round was a MISS) */}
+  1212→          {lastRecalibration?.triggered && (
+  1213→            <div className="border-b border-[#ffa502]/20 bg-[#ffa502]/8 px-4 py-2.5">
+  1214→              <div className="flex items-start gap-2 text-[11px]">
+  1215→                <i className="fas fa-wrench mt-0.5 text-[#ffa502]" />
+  1216→                <div className="flex-1">
+  1217→                  <span className="font-bold text-[#ffa502]">
+  1218→                    Auto-recalibration applied:
+  1219→                  </span>{" "}
+  1220→                  <span className="text-[#bcc6e0]">{lastRecalibration.reason}</span>
+  1221→                </div>
+  1222→              </div>
+  1223→            </div>
+  1224→          )}
+  1225→
+  1226→          <div className="p-4 sm:p-6">
+  1227→            {loading && (
+  1228→              <div className="flex flex-col items-center justify-center py-10 text-center">
+  1229→                <div className="mb-3 h-11 w-11 animate-spin rounded-full border-4 border-[#448AFF]/15 border-t-[#448AFF]" />
+  1230→                <div className="text-sm font-bold text-white">Analyzing Patterns…</div>
+  1231→                <div className="text-xs text-[#5a6a99]">Generating predictions</div>
+  1232→              </div>
+  1233→            )}
+  1234→
+  1235→            {displayPredictions && !loading && (
+  1236→              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  1237→                {displayPredictions.map((pred, i) => (
+  1238→                  <SignalCard
+  1239→                    key={`${pred.game.name}-${pred.time}-${i}`}
+  1240→                    pred={pred}
+  1241→                    index={i}
+  1242→                    verifiedRounds={verifiedRounds}
+  1243→                  />
+  1244→                ))}
+  1245→              </div>
+  1246→            )}
+  1247→          </div>
+  1248→        </div>
+  1249→
+  1250→        {/* ===== LIVE RESULT POPUP ===== */}
+  1251→        {popupResult && (
+  1252→          <div className="fixed inset-0 z-[200] flex items-center justify-center px-4" onClick={() => setPopupResult(null)}>
+  1253→            <div className="absolute inset-0 bg-black/70 backdrop-blur-md" aria-hidden />
+  1254→            <div
+  1255→              className="relative w-full max-w-sm overflow-hidden rounded-3xl border-2 p-8 text-center"
+  1256→              style={{
+  1257→                borderColor: popupResult.isBonus ? "#FFD700" : "#2ed573",
+  1258→                background: "linear-gradient(180deg, #141827, #0a0b14)",
+  1259→                boxShadow: `0 0 60px -10px ${popupResult.isBonus ? "#FFD700" : "#2ed573"}80`,
+  1260→              }}
+  1261→            >
+  1262→              {/* LIVE badge */}
+  1263→              <div className="mb-4 flex items-center justify-center gap-2">
+  1264→                <span className="flex items-center gap-1.5 rounded-full bg-[#ff4757]/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#ff4757]">
+  1265→                  <span className="h-2 w-2 animate-pulse rounded-full bg-[#ff4757]" />
+  1266→                  LIVE RESULT
+  1267→                </span>
+  1268→              </div>
+  1269→
+  1270→              {/* Result image */}
+  1271→              <img
+  1272→                src={GAME_IMAGES[popupResult.imageKey]}
+  1273→                alt={popupResult.name}
+  1274→                className="mx-auto mb-3 h-28 w-28 object-contain"
+  1275→                style={{ animation: "revoPop 0.4s ease-out" }}
+  1276→              />
+  1277→
+  1278→              {/* Result name — large */}
+  1279→              <div
+  1280→                className="text-4xl font-black sm:text-5xl"
+  1281→                style={{
+  1282→                  color: popupResult.isBonus ? "#FFD700" : "#2ed573",
+  1283→                  textShadow: popupResult.isBonus
+  1284→                    ? "0 0 20px rgba(255,215,0,0.5)"
+  1285→                    : "0 0 20px rgba(46,213,115,0.5)",
+  1286→                }}
+  1287→              >
+  1288→                {popupResult.name}
+  1289→              </div>
+  1290→
+  1291→              {/* Bonus badge */}
+  1292→              {popupResult.isBonus && (
+  1293→                <span className="mt-2 inline-block rounded-full bg-[#FFD700]/20 px-3 py-1 text-[11px] font-bold uppercase text-[#FFD700]">
+  1294→                  ★ Bonus Round
+  1295→                </span>
+  1296→              )}
+  1297→
+  1298→              {/* Confirmed */}
+  1299→              <div className="mt-4 flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#2ed573]">
+  1300→                <i className="fas fa-check-circle" /> Result Confirmed
+  1301→              </div>
+  1302→
+  1303→              {/* Auto-dismiss hint */}
+  1304→              <div className="mt-3 text-[10px] text-[#5a6a99]">
+  1305→                Auto-dismiss in 4s · Tap to close
+  1306→              </div>
+  1307→            </div>
+  1308→          </div>
+  1309→        )}
+  1310→
+  1311→        {/* ===== NOT IN PREDICTION (Missing 4 Outcomes) ===== */}
+  1312→        <div className="revo-card mt-4 overflow-hidden">
+  1313→          <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#ff4757]/10 to-transparent px-4 py-3">
+  1314→            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+  1315→              <i className="fas fa-ban text-[#ff4757]" /> Not In Prediction
+  1316→            </span>
+  1317→            <span className="text-[10px] text-[#5a6a99]">
+  1318→              4 outcomes not covered
+  1319→            </span>
+  1320→          </div>
+  1321→
+  1322→          <div className="p-4">
+  1323→            <p className="mb-3 text-center text-[11px] text-[#8899cc]">
+  1324→              <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
+  1325→              These 4 outcomes are NOT in the current prediction. If any of these
+  1326→              hit, the prediction will MISS.
+  1327→            </p>
+  1328→
+  1329→            {/* Missing 4 outcomes — display only */}
+  1330→            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+  1331→              {(() => {
+  1332→                const predNames = (displayPredictions ?? []).map((p) => p.game.name);
+  1333→                const missing = GAMES.filter((g) => !predNames.includes(g.name));
+  1334→                return missing.map((g) => (
+  1335→                  <div
+  1336→                    key={g.name}
+  1337→                    className={`flex flex-col items-center rounded-xl border p-2.5 ${
+  1338→                      g.isBonus
+  1339→                        ? "border-[#FFD700]/30 bg-[#FFD700]/5"
+  1340→                        : "border-[#ff4757]/30 bg-[#ff4757]/5"
+  1341→                    }`}
+  1342→                  >
+  1343→                    <img
+  1344→                      src={GAME_IMAGES[g.imageKey]}
+  1345→                      alt={g.name}
+  1346→                      className="h-12 w-full object-contain opacity-70"
+  1347→                    />
+  1348→                    <div className="mt-1 text-xs font-bold text-[#8899cc]">
+  1349→                      {g.name}
+  1350→                    </div>
+  1351→                    {g.isBonus && (
+  1352→                      <span className="text-[8px] font-bold uppercase text-[#FFD700]">★</span>
+  1353→                    )}
+  1354→                  </div>
+  1355→                ));
+  1356→              })()}
+  1357→            </div>
+  1358→
+  1359→            {/* Last actual result (from live, display only) */}
+  1360→            {lastActual && (
+  1361→              <div className="mt-4 rounded-xl border border-[#2ed573]/40 bg-[#2ed573]/8 p-3 text-center">
+  1362→                <div className="text-[10px] font-bold uppercase tracking-wider text-[#2ed573]">
+  1363→                  <i className="fas fa-check-circle mr-1" />
+  1364→                  Last Live Result
+  1365→                </div>
+  1366→                <div className="mt-1 text-2xl font-black text-white">
+  1367→                  {lastActual.name}
+  1368→                </div>
+  1369→                {lastActual.isBonus && (
+  1370→                  <span className="mt-0.5 inline-block rounded-full bg-[#FFD700]/20 px-2 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+  1371→                    ★ Bonus Round
+  1372→                  </span>
+  1373→                )}
+  1374→              </div>
+  1375→            )}
+  1376→          </div>
+  1377→        </div>
+  1378→
+  1379→        {/* ===== ADVANCED DECISION ENGINE (Opposite-Signal Logic) ===== */}
+  1380→        {decisionOutput && (
+  1381→          <div className="revo-card mt-4 overflow-hidden">
+  1382→            <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#a78bfa]/10 to-transparent px-4 py-3">
+  1383→              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+  1384→                <i className="fas fa-microchip text-[#a78bfa]" /> Decision Engine
+  1385→              </span>
+  1386→              <div className="flex items-center gap-1.5">
+  1387→                {decisionOutput.consecutiveMisses > 0 && (
+  1388→                  <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#ff4757]">
+  1389→                    {decisionOutput.consecutiveMisses}× MISS
+  1390→                  </span>
+  1391→                )}
+  1392→                <span
+  1393→                  className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+  1394→                    decisionOutput.status === "READY"
+  1395→                      ? "bg-[#2ed573]/15 text-[#2ed573]"
+  1396→                      : decisionOutput.status === "WAIT"
+  1397→                        ? "bg-[#ffa502]/15 text-[#ffa502]"
+  1398→                        : decisionOutput.status === "RECALIBRATE"
+  1399→                          ? "bg-[#a78bfa]/15 text-[#a78bfa]"
+  1400→                          : "bg-[#ff4757]/15 text-[#ff4757]"
+  1401→                  }`}
+  1402→                >
+  1403→                  {decisionOutput.status}
+  1404→                </span>
+  1405→              </div>
+  1406→            </div>
+  1407→
+  1408→            <div className="space-y-3 p-4">
+  1409→              {/* LAST RESULT + STATUS + DECISION */}
+  1410→              <div className="grid grid-cols-4 gap-2">
+  1411→                <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
+  1412→                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Last Result</div>
+  1413→                  <div className="text-sm font-black text-white">{decisionOutput.lastResult}</div>
+  1414→                </div>
+  1415→                <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
+  1416→                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Status</div>
+  1417→                  <div className="text-sm font-black" style={{
+  1418→                    color: decisionOutput.result === "HIT" ? "#2ed573" : "#ff4757",
+  1419→                  }}>{decisionOutput.result}</div>
+  1420→                </div>
+  1421→                <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
+  1422→                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Confidence</div>
+  1423→                  <div className="text-sm font-black" style={{
+  1424→                    color: decisionOutput.confidence >= 65 ? "#2ed573" : decisionOutput.confidence >= 40 ? "#448AFF" : "#ffa502",
+  1425→                  }}>{decisionOutput.confidence}%</div>
+  1426→                  <div className="text-[7px] text-[#5a6a99]">{decisionOutput.confidenceLabel}</div>
+  1427→                </div>
+  1428→                <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
+  1429→                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Decision</div>
+  1430→                  <div className="text-sm font-black" style={{
+  1431→                    color: decisionOutput.decision === "BET" ? "#2ed573" : decisionOutput.decision === "WAIT" ? "#ffa502" : "#a78bfa",
+  1432→                  }}>{decisionOutput.decision}</div>
+  1433→                </div>
+  1434→              </div>
+  1435→
+  1436→              {/* RISK LEVEL */}
+  1437→              <div className="flex items-center gap-2">
+  1438→                <span className="text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">Risk:</span>
+  1439→                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{
+  1440→                  background: decisionOutput.riskLevel === "LOW" ? "#2ed57315" : decisionOutput.riskLevel === "MEDIUM" ? "#ffa50215" : "#ff475715",
+  1441→                  color: decisionOutput.riskLevel === "LOW" ? "#2ed573" : decisionOutput.riskLevel === "MEDIUM" ? "#ffa502" : "#ff4757",
+  1442→                }}>
+  1443→                  {decisionOutput.riskLevel}
+  1444→                </span>
+  1445→              </div>
+  1446→
+  1447→              {/* PREVIOUS PREDICTION vs ACTUAL */}
+  1448→              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
+  1449→                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1450→                  Previous Prediction → Actual Result
+  1451→                </div>
+  1452→                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+  1453→                  {decisionOutput.previousPrediction.map((name) => (
+  1454→                    <span key={name} className={`rounded px-1.5 py-0.5 font-bold ${
+  1455→                      name === decisionOutput.lastResult ? "bg-[#2ed573]/20 text-[#2ed573]" : "bg-[#1e2240] text-[#8899cc]"
+  1456→                    }`}>{name}</span>
+  1457→                  ))}
+  1458→                  <span className="text-[#5a6a99]">→</span>
+  1459→                  <span className="rounded bg-[#448AFF]/20 px-1.5 py-0.5 font-bold text-[#448AFF]">
+  1460→                    {decisionOutput.lastResult}
+  1461→                  </span>
+  1462→                </div>
+  1463→              </div>
+  1464→
+  1465→              {/* RCA — only on MISS */}
+  1466→              {decisionOutput.rcaNote && (
+  1467→                <div className="rounded-lg border border-[#ff4757]/30 bg-[#ff4757]/8 p-3">
+  1468→                  <div className="mb-1 flex items-center justify-between">
+  1469→                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#ff4757]">
+  1470→                      <i className="fas fa-magnifying-glass" /> RCA
+  1471→                    </span>
+  1472→                    <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]">
+  1473→                      {decisionOutput.rcaCause}
+  1474→                    </span>
+  1475→                  </div>
+  1476→                  <div className="text-xs text-[#bcc6e0]">{decisionOutput.rcaNote}</div>
+  1477→                </div>
+  1478→              )}
+  1479→
+  1480→              {/* OPPOSITE / EXCLUDED ANALYSIS — only on MISS */}
+  1481→              {decisionOutput.oppositeAnalysis && (
+  1482→                <div className="rounded-lg border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-3">
+  1483→                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#00d4ff]">
+  1484→                    <i className="fas fa-arrows-left-right" /> Opposite / Excluded Analysis
+  1485→                  </div>
+  1486→                  <div className="mb-2 flex flex-wrap gap-1">
+  1487→                    {decisionOutput.excludedAnalysis?.map((name) => {
+  1488→                      const game = GAMES.find((g) => g.name === name);
+  1489→                      return (
+  1490→                        <span key={name} className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+  1491→                          game?.isBonus ? "bg-[#FFD700]/10 text-[#FFD700]" : "bg-[#00d4ff]/10 text-[#00d4ff]"
+  1492→                        }`}>{name}</span>
+  1493→                      );
+  1494→                    })}
+  1495→                  </div>
+  1496→                  <div className="text-xs text-[#8899cc]">{decisionOutput.oppositeAnalysis}</div>
+  1497→                </div>
+  1498→              )}
+  1499→
+  1500→              {/* NEXT SIGNAL — ranked 4 candidates */}
+  1501→              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
+  1502→                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1503→                  Next Signal
+  1504→                </div>
+  1505→                {decisionOutput.nextSignal.length > 0 ? (
+  1506→                  <div className="space-y-1.5">
+  1507→                    {decisionOutput.nextSignal.map((name, i) => {
+  1508→                      const game = GAMES.find((g) => g.name === name);
+  1509→                      const label = decisionOutput.nextSignalLabels[i] ?? "";
+  1510→                      return (
+  1511→                        <div key={name} className="flex items-center gap-2">
+  1512→                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#a78bfa] text-[9px] font-black text-white">
+  1513→                            {i + 1}
+  1514→                          </span>
+  1515→                          <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${
+  1516→                            game?.isBonus ? "bg-[#FFD700]/10 text-[#FFD700]" : "bg-[#448AFF]/10 text-[#448AFF]"
+  1517→                          }`}>{name}</span>
+  1518→                          <span className="text-[9px] text-[#5a6a99]">{label}</span>
+  1519→                        </div>
+  1520→                      );
+  1521→                    })}
+  1522→                  </div>
+  1523→                ) : (
+  1524→                  <div className="text-sm text-[#ffa502]">
+  1525→                    <i className="fas fa-hourglass-half mr-1" />
+  1526→                    {decisionOutput.status === "HOLD"
+  1527→                      ? "HOLD — Insufficient data. Select more actual results."
+  1528→                      : decisionOutput.status === "RECALIBRATE"
+  1529→                        ? "RECALIBRATE — Consecutive misses. Model recalibrating with recent data."
+  1530→                        : "WAIT — Confidence below threshold. No forced prediction."}
+  1531→                  </div>
+  1532→                )}
+  1533→              </div>
+  1534→
+  1535→              {/* WHY THIS MOVE */}
+  1536→              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
+  1537→                <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1538→                  Why This Move
+  1539→                </div>
+  1540→                <div className="text-xs text-[#bcc6e0]">{decisionOutput.whyThisMove}</div>
+  1541→              </div>
+  1542→
+  1543→              {/* VALIDATION CRITERIA */}
+  1544→              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
+  1545→                <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1546→                  Validation Criteria
+  1547→                </div>
+  1548→                <div className="text-xs text-[#8899cc]">{decisionOutput.validationCriteria}</div>
+  1549→              </div>
+  1550→            </div>
+  1551→          </div>
+  1552→        )}
+  1553→
+  1554→        {/* ===== VERIFIED ACCURACY (from manual results only) ===== */}
+  1555→        {verifiedRounds > 0 && (
+  1556→          <div className="revo-card mt-4 p-4">
+  1557→            <div className="mb-3 flex items-center justify-between">
+  1558→              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+  1559→                <i className="fas fa-circle-check text-[#2ed573]" /> Verified Accuracy
+  1560→              </span>
+  1561→              <span className="text-[10px] text-[#5a6a99]">
+  1562→                from {verifiedRounds} manual result{verifiedRounds !== 1 ? "s" : ""}
+  1563→              </span>
+  1564→            </div>
+  1565→            <div className="grid grid-cols-3 gap-2">
+  1566→              <div className="rounded-lg border border-[#2ed573]/30 bg-[#2ed573]/8 p-2.5 text-center">
+  1567→                <div className="text-xl font-black text-[#2ed573]">{realAccuracy}%</div>
+  1568→                <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Accuracy</div>
+  1569→              </div>
+  1570→              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020] p-2.5 text-center">
+  1571→                <div className="text-xl font-black text-[#2ed573]">{hits}</div>
+  1572→                <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Hits</div>
+  1573→              </div>
+  1574→              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020] p-2.5 text-center">
+  1575→                <div className="text-xl font-black text-[#ff4757]">{verifiedRounds - hits}</div>
+  1576→                <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Misses</div>
+  1577→              </div>
+  1578→            </div>
+  1579→          </div>
+  1580→        )}
+  1581→
+  1582→        {/* ===== ROUND HISTORY (prediction vs actual → HIT/MISS) ===== */}
+  1583→        {roundHistory.length > 0 && (
+  1584→          <div className="revo-card mt-4 overflow-hidden">
+  1585→            <div className="flex items-center justify-between border-b border-[#1e2240] px-4 py-3">
+  1586→              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+  1587→                <i className="fas fa-clock-rotate-left text-[#448AFF]" /> Round History
+  1588→              </span>
+  1589→              <button
+  1590→                onClick={clearHistory}
+  1591→                className="text-[11px] font-semibold text-[#ff4757] transition hover:text-[#ff6b6b]"
+  1592→              >
+  1593→                <i className="fas fa-trash mr-1" /> Clear
+  1594→              </button>
+  1595→            </div>
+  1596→            <div className="max-h-72 overflow-y-auto revo-scroll p-2">
+  1597→              {[...roundHistory].reverse().map((r, i) => (
+  1598→                <RoundRow key={r.time + "-" + i} round={r} />
+  1599→              ))}
+  1600→            </div>
+  1601→          </div>
+  1602→        )}
+  1603→
+  1604→        {/* ===== ORIGINAL STATS (kept as-is) ===== */}
+  1605→        <div className="revo-card mt-4 p-4">
+  1606→          <div className="grid grid-cols-4 gap-2">
+  1607→            <Stat value={stats.total.toLocaleString()} label="Total" color="#448AFF" />
+  1608→            <Stat value={`${stats.accuracy}%`} label="Accuracy" color="#2ed573" />
+  1609→            <Stat value={String(stats.bonusHits)} label="Bonus" color="#FFD700" />
+  1610→            <Stat value={`${(stats.liveUsers / 1000).toFixed(1)}k`} label="Live" color="#00d4ff" />
+  1611→          </div>
+  1612→        </div>
+  1613→
+  1614→        {/* Game outcomes reference */}
+  1615→        <div className="mt-4">
+  1616→          <div className="mb-2 text-center text-[11px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1617→            Possible outcomes
+  1618→          </div>
+  1619→          <div className="flex flex-wrap justify-center gap-1.5">
+  1620→            {GAMES.map((g) => (
+  1621→              <span
+  1622→                key={g.name}
+  1623→                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+  1624→                  g.isBonus
+  1625→                    ? "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]"
+  1626→                    : "border-[#1e2240] bg-[#0d1020] text-[#8899cc]"
+  1627→                }`}
+  1628→              >
+  1629→                {g.name}
+  1630→              </span>
+  1631→            ))}
+  1632→          </div>
+  1633→        </div>
+  1634→
+  1635→        <p className="mt-4 text-center text-[11px] text-[#5a6a99]">
+  1636→          <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
+  1637→          Each signal box shows a different game. Select the actual result after
+  1638→          each round to verify accuracy &amp; improve the next prediction.
+  1639→          Predictions are for entertainment. Play responsibly.
+  1640→        </p>
+  1641→      </div>
+  1642→    </section>
+  1643→  );
+  1644→}
+  1645→
+  1646→/** One history row: prediction (4 chips) vs actual result → HIT/MISS badge.
+  1647→ *  Shows confidence + recalibration status from the verified round. */
+  1648→function RoundRow({ round }: { round: RoundResult }) {
+  1649→  return (
+  1650→    <div className="mb-1.5 rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5">
+  1651→      <div className="flex items-center gap-3">
+  1652→        <span
+  1653→          className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[11px] font-black ${
+  1654→            round.hit
+  1655→              ? "bg-[#2ed573]/15 text-[#2ed573]"
+  1656→              : "bg-[#ff4757]/15 text-[#ff4757]"
+  1657→          }`}
+  1658→        >
+  1659→          {round.hit ? "HIT" : "MISS"}
+  1660→        </span>
+  1661→        <div className="min-w-0 flex-1">
+  1662→          <div className="flex flex-wrap items-center gap-1">
+  1663→            <span className="text-[10px] uppercase tracking-wider text-[#5a6a99]">
+  1664→              Predicted:
+  1665→            </span>
+  1666→            {round.prediction.map((p, i) => (
+  1667→              <span
+  1668→                key={i}
+  1669→                className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+  1670→                  p.game.name === round.actualResult.name
+  1671→                    ? "bg-[#2ed573]/20 text-[#2ed573]"
+  1672→                    : "bg-[#1e2240] text-[#8899cc]"
+  1673→                }`}
+  1674→              >
+  1675→                {p.game.name}
+  1676→              </span>
+  1677→            ))}
+  1678→          </div>
+  1679→          <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+  1680→            <span className="text-[10px] uppercase tracking-wider text-[#5a6a99]">
+  1681→              Actual:
+  1682→            </span>
+  1683→            <span className="font-bold text-white">{round.actualResult.name}</span>
+  1684→            {round.actualResult.isBonus && (
+  1685→              <span className="rounded-full bg-[#FFD700]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+  1686→                ★
+  1687→              </span>
+  1688→            )}
+  1689→          </div>
+  1690→        </div>
+  1691→        <span className="shrink-0 text-[10px] text-[#5a6a99]">
+  1692→          {new Date(round.time).toLocaleTimeString("en-IN", {
+  1693→            hour: "2-digit",
+  1694→            minute: "2-digit",
+  1695→          })}
+  1696→        </span>
+  1697→      </div>
+  1698→      {/* Recalibration + confidence metadata */}
+  1699→      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-[#1e2240]/60 pt-1.5 pl-12 text-[9px]">
+  1700→        {round.recalibrated && (
+  1701→          <span className="rounded bg-[#ffa502]/15 px-1.5 py-0.5 font-bold uppercase text-[#ffa502]">
+  1702→            <i className="fas fa-wrench mr-0.5" /> Recalibrated
+  1703→          </span>
+  1704→        )}
+  1705→        <span className="text-[#5a6a99]">
+  1706→          Confidence: <b className="text-[#bcc6e0]">{round.confidence}%</b>
+  1707→        </span>
+  1708→        {round.calibrationNote && (
+  1709→          <span className="truncate text-[#5a6a99]" title={round.calibrationNote}>
+  1710→            • {round.calibrationNote}
+  1711→          </span>
+  1712→        )}
+  1713→      </div>
+  1714→    </div>
+  1715→  );
+  1716→}
+  1717→
+  1718→function SignalCard({
+  1719→  pred,
+  1720→  index,
+  1721→  verifiedRounds,
+  1722→}: {
+  1723→  pred: Prediction;
+  1724→  index: number;
+  1725→  verifiedRounds: number;
+  1726→}) {
+  1727→  const colors = ["#448AFF", "#FFD700", "#2ed573", "#00d4ff"];
+  1728→  const accent = colors[index % colors.length];
+  1729→  const { label: confLabel, color: confColor } = confidenceLabel(
+  1730→    pred.confidence,
+  1731→    verifiedRounds,
+  1732→  );
+  1733→
+  1734→  return (
+  1735→    <div
+  1736→      className="group relative flex flex-col overflow-hidden rounded-2xl border-2 bg-[#141827] transition hover:-translate-y-1"
+  1737→      style={{
+  1738→        borderColor: `${accent}60`,
+  1739→        boxShadow: `0 4px 24px -8px ${accent}40, inset 0 1px 0 rgba(255,255,255,0.04)`,
+  1740→      }}
+  1741→    >
+  1742→      {/* index badge */}
+  1743→      <span
+  1744→        className="absolute right-2 top-2 z-20 grid h-7 w-7 place-items-center rounded-lg text-[11px] font-black text-white shadow-lg"
+  1745→        style={{ background: accent }}
+  1746→      >
+  1747→        {index + 1}
+  1748→      </span>
+  1749→
+  1750→      {/* confidence label badge */}
+  1751→      <span
+  1752→        className="absolute left-2 top-2 z-20 rounded-md px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide"
+  1753→        style={{ background: `${confColor}30`, color: confColor, backdropFilter: "blur(4px)" }}
+  1754→      >
+  1755→        {confLabel}
+  1756→      </span>
+  1757→
+  1758→      {/* HD image — no blur, sharp rendering */}
+  1759→      <div className="relative overflow-hidden bg-gradient-to-b from-[#0d1020] to-[#141827]">
+  1760→        <img
+  1761→          src={GAME_IMAGES[pred.game.imageKey]}
+  1762→          alt={pred.game.name}
+  1763→          className="h-36 w-full object-contain p-2 transition duration-300 group-hover:scale-110 sm:h-40"
+  1764→          style={{ imageRendering: "crisp-edges" }}
+  1765→          loading="eager"
+  1766→        />
+  1767→        {/* Gradient overlay for text readability — no blur on the image itself */}
+  1768→        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#141827] via-[#141827]/80 to-transparent p-3 text-center">
+  1769→          <div className="text-lg font-black tracking-tight text-white sm:text-xl">
+  1770→            {pred.game.name}
+  1771→          </div>
+  1772→          {pred.game.isBonus && (
+  1773→            <span className="mt-1 inline-block rounded-full bg-[#FFD700]/20 px-2 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+  1774→              ★ Bonus Round
+  1775→            </span>
+  1776→          )}
+  1777→        </div>
+  1778→      </div>
+  1779→
+  1780→      {/* confidence bar — HD style */}
+  1781→      <div className="border-t border-[#1e2240] p-3">
+  1782→        <div className="mb-1.5 flex items-center justify-between text-[11px]">
+  1783→          <span className="flex items-center gap-1 font-bold text-[#8899cc]">
+  1784→            <i className="fas fa-chart-line" style={{ color: accent }} />
+  1785→            Confidence
+  1786→          </span>
+  1787→          <span className="font-black text-base" style={{ color: accent }}>
+  1788→            {pred.confidence}%
+  1789→          </span>
+  1790→        </div>
+  1791→        <div className="h-2 overflow-hidden rounded-full bg-[#1e2240]">
+  1792→          <div
+  1793→            className="h-full rounded-full transition-all duration-500"
+  1794→            style={{
+  1795→              width: `${pred.confidence}%`,
+  1796→              background: `linear-gradient(90deg, ${accent}, ${accent}cc)`,
+  1797→              boxShadow: `0 0 8px ${accent}80`,
+  1798→            }}
+  1799→          />
+  1800→        </div>
+  1801→      </div>
+  1802→    </div>
+  1803→  );
+  1804→}
+  1805→
+  1806→function Stat({ value, label, color }: { value: string; label: string; color: string }) {
+  1807→  return (
+  1808→    <div className="text-center">
+  1809→      <div className="text-lg font-black sm:text-xl" style={{ color }}>
+  1810→        {value}
+  1811→      </div>
+  1812→      <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">{label}</div>
+  1813→    </div>
+  1814→  );
+  1815→}
+  1816→

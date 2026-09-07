@@ -582,3 +582,55 @@ Stage Summary:
 - Structured output panel with all fields.
 - Nothing removed — 8 result boxes, 4 prediction boxes, GET SIGNAL, HIT/MISS history all kept.
 - Lint clean, verified in browser.
+
+---
+
+Task ID: 18 (user request — AI HIT/MISS + SIGNAL PERFORMANCE OPTIMIZATION)
+Agent: Z.ai Code
+Task: Strongly optimize the Prediction Engine logic without changing existing UI/design. Build a unified AI decision engine implementing every-round AI validation, signal vs not-in-prediction comparison, true HIT/MISS definition, evidence-based signal selection, overfitting protection (Wilson LB), recent + long-term performance windows, prediction stability, performance dashboard, and the full CORE ENGINE pipeline.
+
+Work Log:
+- Read previous worklog (Tasks 1–17). Confirmed project stable: server HTTP 200, 8 sections, lint clean, 7 rounds already verified from prior live-result auto-feeding.
+- Reviewed existing `RevoGame.tsx` (1816 lines) + `aiStats.ts` + `liveResultsBus.ts`. Identified that the prediction logic, NOT IN PREDICTION section, Decision Engine panel, confidence, risk, and history were all computed by SEPARATE functions (`runDecisionEngine`, `buildPredictions`, `buildHistoryInformedPredictions`, `buildRecalibratedPredictions`, `analyzeRecalibration`, `honestConfidence`) — NOT a single source of truth.
+- Created new unified module **`src/components/revo/decisionEngine.ts`** (~580 lines) implementing the user's full spec:
+  1. **Wilson score lower bound** (`wilsonLowerBound`) — sample-size-aware confidence. 2/2 ≠ 100%. Solves overfitting.
+  2. **Adaptive weighting** between recent (last 5/10) and long-term — divergent recent → trust recent more (capped 0.3–0.8).
+  3. **Chi-square anomaly detection** (8 segments, 7 dof, p=0.01 threshold 18.5) → detects model drift.
+  4. **Pattern-shift detection** via Total Variation Distance (last-10 vs long-term, threshold 0.6) → triggers recent-data weighting.
+  5. **Performance Dashboard** (`buildDashboard`): totalRounds, hits, misses, predictionHitRate, predictionMissRate, recentHitRate (5/10), longTermHitRate, adaptiveWeight, excludedResultRate (= MISS rate by definition), modelStability (variance-based), sampleSize, currentStreak, signalWiseHitRate (per-game: predicted/hit/rate/wilsonLower), patternShiftDetected, anomalyDetected.
+  6. **RCA engine** (`runRca`) — classifies MISS into: INSUFFICIENT DATA / MODEL DRIFT / PATTERN SHIFT / PREDICTION BIAS / VOLATILITY / OUTLIER / TREND CHANGE / NORMAL VARIANCE. Returns structured flags (patternFailure, predictionBias, trendReversal, modelDrift, anomaly, insufficientData).
+  7. **Multi-signal candidate scoring** (`scoreCandidates`) — 10 signals per game: theoretical prior, recent-active, overdue (mild), trend (adaptive), pattern-stable, Wilson-LB-verified, volatility penalty, prev-miss-dampen (no blind switching), prev-hit-confirm (no blind repeat), anomaly/shift weighting. Top 4 → NEXT SIGNAL.
+  8. **Honest confidence** — Wilson LB × (1 − adaptiveW*0.4) + recentHitRate × (adaptiveW*0.4). Dampened after MISS (-10), boosted after HIT streak (+5), penalized on instability/anomaly (-5). Capped at 85% with 10+ rounds, 70% otherwise.
+  9. **Single `runEngine()` entry point** → produces `EngineOutput` containing EVERYTHING: predictions, excludedOutcomes, dashboard, candidateScores, decision fields, RCA, excludedAnalysis, whyThisMove, validationCriteria.
+  10. **`recalibrate()` + `buildInitial()`** — wrappers for MISS-triggered recalibration vs initial/HIT continuation.
+- Rewrote **`src/components/revo/RevoGame.tsx`** (now ~1050 lines, slimmer) to use the unified engine:
+  - Removed all old engine functions (`runDecisionEngine`, `buildPredictions`, `buildHistoryInformedPredictions`, `buildRecalibratedPredictions`, `analyzeRecalibration`, `honestConfidence`, `pickUniqueGames`, `confidenceFor`).
+  - `useMemo(() => buildInitial(roundHistory), [roundHistory])` → THE single source of truth. Re-derives on every round change.
+  - `generatePrediction` / `selectActualResult` now call `buildInitial` / `recalibrate` and convert via `engineToPredictions`.
+  - **Prediction section** reads from `engine.predictions` (rank #1–#4 with labels: strongest evidence / second strongest / alternative signal / defensive).
+  - **NOT IN PREDICTION section** reads from `engine.excludedOutcomes` + warning text "Not treated as a bet signal".
+  - **NEW Performance Dashboard panel** — KPI grid (8 metrics: Hit Rate, Miss Rate, Recent 5/10, Long-Term, Excluded Rate, Stability, Adaptive Wt) + hits/misses/sample size + pattern-shift alert + anomaly alert + signal-wise hit rate table (8 games × Wilson LB).
+  - **Decision Engine panel** — same 4-column status grid + risk + previous prediction→actual + RCA (with structured flags) + excluded analysis + next-signal ranked candidates (each showing Wilson LB + signal badges) + why-this-move + validation criteria + next-signal chip summary.
+  - Verified-Accuracy + Round-History + Original-Stats + Possible-Outcomes sections unchanged.
+- `bun run lint` → **0 errors**.
+- agent-browser QA end-to-end:
+  - Page loads with no console/runtime errors (8 Cloudinary images loaded successfully).
+  - 4 prediction cards show rank labels: STRONGEST EVIDENCE / SECOND STRONGEST / ALTERNATIVE SIGNAL / DEFENSIVE / LOW-PROBABILITY.
+  - NOT IN PREDICTION section shows the 4 excluded outcomes with proper warning text.
+  - Performance Dashboard renders: Hit Rate 83%, Miss Rate 17%, Recent (5) 80%, Recent (10) 83%, Long-Term 83%, Excluded Rate 17%, Stability 72%, Adaptive Wt 52%, Hits 5, Misses 1, Sample Size 6, signal-wise table with Wilson LB per game.
+  - Decision Engine: Risk LOW, previous prediction→actual chips, 4 ranked candidates with signal badges (RECENT-ACTIVE, OVERDUE, VERIFIED MODERATE/WEAK, PREV-HIT-CONFIRM) and Wilson LB %s (41/32/27/15%), Why This Move (Streak 5× HIT, Hit-rate 86% 6/7, Recent 100%, Stability 76%, Adaptive 59%), Validation Criteria (STABLE prediction note).
+  - 7 rounds persisted in localStorage (live results auto-feeding the engine via `liveResultsBus`).
+
+Stage Summary:
+- Unified AI Decision Engine built — ALL UI state (predictions, NOT IN PREDICTION, Decision Engine, confidence, risk, history) now flows from ONE `runEngine()` call.
+- CORE ENGINE pipeline implemented exactly per spec: LIVE RESULT → VERIFY HIT/MISS → UPDATE HISTORY → ANALYZE ACTIVE+EXCLUDED → COMPARE RECENT vs LONG-TERM → DETECT PATTERN SHIFT → RCA IF MISS → RECALIBRATE → SELECT STRONGEST EVIDENCE-BASED SIGNAL → UPDATE PREDICTION.
+- True HIT/MISS definition enforced: HIT = actual ∈ prediction; MISS = actual ∉ prediction. NOT IN PREDICTION is NEVER a separate bet signal — only flagged for RCA/anomaly monitoring.
+- Overfitting protection via Wilson score lower bound (2/2 ≠ 100%).
+- Adaptive weighting (recent vs long-term) — no single-result panic switching.
+- Prediction stability: prediction stays until next live result arrives.
+- New Performance Dashboard with 8 KPIs + signal-wise Wilson LB table + pattern-shift/anomaly alerts.
+- RCA structured with 6 flag types (Pattern Failure, Prediction Bias, Trend Reversal, Model Drift, Anomaly, Insufficient Data).
+- Candidate scoring with 10 signals — top 4 ranked by combined evidence.
+- No random switching, no opposite-result chasing, no previous-result chasing, no forced prediction, no retrospective correction. No profit guarantee — only statistical reliability estimate.
+- Lint clean, agent-browser QA green, server HTTP 200, no console/runtime errors.
+
