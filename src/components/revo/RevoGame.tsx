@@ -72,11 +72,11 @@ interface RoundResult {
   calibrationNote?: string; // human-readable reason for recalibration
 }
 
-// ===== ADVANCED DECISION ENGINE (Opposite-Signal Logic) =====
+// ===== STRONG ADAPTIVE DECISION ENGINE =====
 interface DecisionEngineOutput {
   status: "READY" | "WAIT" | "HOLD" | "RECALIBRATE";
-  nextSignal: string[]; // 4 ranked candidates OR empty if WAIT
-  nextSignalLabels: string[]; // "strongest" / "second" / "alternative" / "defensive"
+  nextSignal: string[];
+  nextSignalLabels: string[];
   confidence: number;
   confidenceLabel: string;
   riskLevel: "LOW" | "MEDIUM" | "HIGH";
@@ -85,23 +85,38 @@ interface DecisionEngineOutput {
   previousPrediction: string[];
   result: "HIT" | "MISS" | "—";
   rcaNote?: string;
-  rcaCause?: string; // specific cause category
-  excludedAnalysis?: string[]; // outcomes NOT in previous prediction
-  oppositeAnalysis?: string; // analysis of excluded outcomes
+  rcaCause?: string;
+  excludedAnalysis?: string[];
+  oppositeAnalysis?: string;
   consecutiveMisses: number;
   whyThisMove: string;
   validationCriteria: string;
 }
 
+// Theoretical probabilities for each Crazy Time segment (54-segment wheel).
+const THEORETICAL: Record<string, number> = {
+  "1": 0.3889, "2": 0.2407, "5": 0.1296, "10": 0.0741,
+  "COIN FLIP": 0.0741, "PACHINKO": 0.0370, "CASH HUNT": 0.0370, "CRAZY TIME": 0.0185,
+};
+
 /**
- * Advanced Prediction Decision Engine with Opposite-Signal Logic.
+ * STRONG ADAPTIVE DECISION ENGINE
  *
- * Implements:
- * 1. Mandatory opposite-signal detection on MISS
- * 2. RCA with specific cause categories (pattern shift, outlier, trend change, etc.)
- * 3. No forced predictions — WAIT if confidence is low
- * 4. Consecutive MISS recalibration (recent data weighted higher)
- * 5. Ranked 4-candidate output (strongest → defensive)
+ * Combines multiple signals:
+ * 1. Frequency analysis (actual vs theoretical)
+ * 2. Gap/drought analysis (overdue detection)
+ * 3. Trend analysis (recent vs historical frequency)
+ * 4. Pattern stability (consistency of recent results)
+ * 5. Sequence analysis (repeating/streaking outcomes)
+ * 6. Previous prediction performance
+ * 7. Volatility detection
+ * 8. Multi-signal confirmation
+ *
+ * Key rules:
+ * - NEVER stops predicting (always provides best available signal)
+ * - Confidence reflects data strength, not a gate to stop
+ * - No single-result panic switching
+ * - No blind HIT-repeat or MISS-opposite
  */
 function runDecisionEngine(rounds: RoundResult[]): DecisionEngineOutput | null {
   if (rounds.length === 0) return null;
@@ -118,240 +133,253 @@ function runDecisionEngine(rounds: RoundResult[]): DecisionEngineOutput | null {
     else break;
   }
 
-  // ===== STEP 1: ROOT CAUSE ANALYSIS (RCA) =====
+  // ===== STEP 1: RCA on MISS =====
   let rcaNote = "";
   let rcaCause = "";
   if (!hit) {
     const recentResults = rounds.slice(-8).map((r) => r.actualResult.name);
-
-    // Check for streaks
     let streak = 1;
     for (let i = recentResults.length - 2; i >= 0; i--) {
       if (recentResults[i] === actualName) streak++;
       else break;
     }
-
-    // Check recent frequency vs historical
-    const recentFreq: Record<string, number> = {};
-    for (const r of recentResults) recentFreq[r] = (recentFreq[r] ?? 0) + 1;
-
-    // Check if actual was an outlier (rare outcome)
     const allActuals = rounds.map((r) => r.actualResult.name);
     const actualCount = allActuals.filter((a) => a === actualName).length;
     const actualFreq = actualCount / allActuals.length;
-    const theoreticalProb =
-      actualName === "1" ? 0.3889 :
-      actualName === "2" ? 0.2407 :
-      actualName === "5" ? 0.1296 :
-      actualName === "10" ? 0.0741 :
-      actualName === "COIN FLIP" ? 0.0741 :
-      actualName === "PACHINKO" ? 0.0370 :
-      actualName === "CASH HUNT" ? 0.0370 :
-      actualName === "CRAZY TIME" ? 0.0185 : 0.1;
+    const theo = THEORETICAL[actualName] ?? 0.1;
 
-    // Determine cause
     if (rounds.length < 5) {
       rcaCause = "INSUFFICIENT DATA";
-      rcaNote = "Sample too small for reliable pattern analysis. Cannot determine root cause.";
+      rcaNote = "Sample too small. Building baseline — prediction continues with available evidence.";
     } else if (consecutiveMisses >= 3) {
       rcaCause = "PATTERN SHIFT";
-      rcaNote = `${consecutiveMisses} consecutive misses detected. Model may be overfit to stale pattern. Recent trend has shifted from prediction model.`;
+      rcaNote = `${consecutiveMisses} consecutive misses. Model recalibrating — recent data weighted higher.`;
     } else if (streak >= 3) {
       rcaCause = "VOLATILITY / STREAK";
-      rcaNote = `${actualName} appeared ${streak}× consecutively. Volatile streak — model didn't account for repeated outcomes.`;
-    } else if (actualFreq < theoreticalProb * 0.5) {
+      rcaNote = `${actualName} appeared ${streak}× consecutively. Volatile streak detected.`;
+    } else if (actualFreq < theo * 0.5) {
       rcaCause = "OUTLIER / ANOMALY";
-      rcaNote = `${actualName} is statistically rare (actual ${(actualFreq * 100).toFixed(1)}% vs theoretical ${(theoreticalProb * 100).toFixed(1)}%). Random outlier — not a predictable pattern.`;
-    } else if (actualFreq > theoreticalProb * 1.5) {
+      rcaNote = `${actualName} is rare (actual ${(actualFreq * 100).toFixed(1)}% vs theoretical ${(theo * 100).toFixed(1)}%). Random outlier — no pattern shift.`;
+    } else if (actualFreq > theo * 1.5) {
       rcaCause = "TREND CHANGE";
-      rcaNote = `${actualName} is overperforming (actual ${(actualFreq * 100).toFixed(1)}% vs theoretical ${(theoreticalProb * 100).toFixed(1)}%). Recent trend favors this outcome — model didn't catch the shift.`;
+      rcaNote = `${actualName} is overperforming (${(actualFreq * 100).toFixed(1)}% vs ${(theo * 100).toFixed(1)}% expected). Trend shift detected.`;
     } else {
-      rcaCause = "OVERFITTING";
-      rcaNote = `Prediction set [${prevPredNames.join(", ")}] didn't include ${actualName}. Model may be overfit to historical frequency. No strong evidence for specific cause.`;
+      rcaCause = "NORMAL VARIANCE";
+      rcaNote = `${actualName} was outside prediction set. Within normal variance — no anomaly detected.`;
     }
   }
 
-  // ===== STEP 3: OPPOSITE / EXCLUDED OUTCOME ANALYSIS =====
-  const allGameNames = GAMES.map((g) => g.name);
-  const excludedOutcomes = allGameNames.filter((n) => !prevPredNames.includes(n));
-  let oppositeAnalysis = "";
-  if (!hit && excludedOutcomes.length > 0) {
-    // Analyze the excluded outcomes — which ones have evidence?
-    const recentResults = rounds.slice(-10).map((r) => r.actualResult.name);
-    const recentFreq: Record<string, number> = {};
-    for (const r of recentResults) recentFreq[r] = (recentFreq[r] ?? 0) + 1;
-    const evidenceParts: string[] = [];
-    for (const ex of excludedOutcomes) {
-      const count = recentFreq[ex] ?? 0;
-      if (count > 0) {
-        evidenceParts.push(`${ex} (${count}× in last 10)`);
-      }
+  // ===== STEP 2: MULTI-SIGNAL ANALYSIS =====
+  const hist = rounds.map((r) => r.actualResult);
+  const n = hist.length;
+
+  // Signal 1: Frequency analysis
+  const freq = new Map<string, number>();
+  for (const g of GAMES) freq.set(g.name, 0);
+  for (const h of hist) freq.set(h.name, (freq.get(h.name) ?? 0) + 1);
+
+  // Signal 2: Recent frequency (last 10)
+  const recentHist = hist.slice(-10);
+  const recentFreq = new Map<string, number>();
+  for (const g of GAMES) recentFreq.set(g.name, 0);
+  for (const h of recentHist) recentFreq.set(h.name, (recentFreq.get(h.name) ?? 0) + 1);
+
+  // Signal 3: Gap/drought analysis
+  const gaps: Record<string, number> = {};
+  for (const g of GAMES) {
+    let gap = 0;
+    for (let i = hist.length - 1; i >= 0; i--) {
+      if (hist[i].name === g.name) break;
+      gap++;
     }
-    if (evidenceParts.length > 0) {
-      oppositeAnalysis = `Excluded outcomes with recent evidence: ${evidenceParts.join(", ")}. These will be prioritized in next analysis if data supports.`;
-    } else {
-      oppositeAnalysis = `Excluded outcomes [${excludedOutcomes.join(", ")}] have no recent evidence. No forced opposite selection — will use data-driven analysis only.`;
-    }
+    gaps[g.name] = gap;
   }
 
-  // ===== STEP 4: MULTI-FACTOR VERIFICATION =====
-  const totalRounds = rounds.length;
+  // Signal 4: Trend direction (recent vs historical frequency)
+  const trends: Record<string, number> = {};
+  for (const g of GAMES) {
+    const hf = n > 0 ? (freq.get(g.name) ?? 0) / n : 0;
+    const rf = recentHist.length > 0 ? (recentFreq.get(g.name) ?? 0) / recentHist.length : 0;
+    trends[g.name] = rf - hf; // positive = trending up
+  }
+
+  // Signal 5: Pattern stability (how varied are recent results)
+  const uniqueRecent = new Set(recentHist.map((g) => g.name)).size;
+  const stability = uniqueRecent >= 4 ? "STABLE" : uniqueRecent >= 2 ? "VOLATILE" : "STREAK";
+
+  // Signal 6: Previous prediction performance
   const totalHits = rounds.filter((r) => r.hit).length;
-  const hitRate = totalRounds > 0 ? totalHits / totalRounds : 0;
-  const recentSlice = rounds.slice(-5);
-  const recentHits = recentSlice.filter((r) => r.hit).length;
-  const recentHitRate = recentSlice.length > 0 ? recentHits / recentSlice.length : 0;
-  const dataIntegrity = totalRounds >= 10 ? "SUFFICIENT" : totalRounds >= 3 ? "MARGINAL" : "INSUFFICIENT";
+  const hitRate = n > 0 ? totalHits / n : 0;
 
-  // ===== Confidence calculation =====
+  // ===== STEP 3: COMBINE SIGNALS → WEIGHTED SCORE =====
+  const scores: { game: Game; score: number; signals: string[] }[] = [];
+
+  for (const g of GAMES) {
+    const theo = THEORETICAL[g.name] ?? 0.1;
+    const actualFreq = n > 0 ? (freq.get(g.name) ?? 0) / n : 0;
+    const rf = recentHist.length > 0 ? (recentFreq.get(g.name) ?? 0) / recentHist.length : 0;
+    const gap = gaps[g.name];
+    const trend = trends[g.name];
+    const signals: string[] = [];
+    let score = theo; // Start with theoretical probability as base
+
+    // Signal 1: Frequency alignment (actual close to theoretical = stable)
+    if (actualFreq > 0 && Math.abs(actualFreq - theo) < theo * 0.3) {
+      score *= 1.15;
+      signals.push("freq-stable");
+    }
+
+    // Signal 2: Recent frequency boost (appearing recently)
+    if (rf > theo * 0.8) {
+      score *= 1.2;
+      signals.push("recent-active");
+    }
+
+    // Signal 3: Gap/drought — overdue boost (but only mild, not aggressive)
+    const avgGap = n > 0 && (freq.get(g.name) ?? 0) > 0 ? n / (freq.get(g.name) ?? 1) : 0;
+    if (avgGap > 0 && gap > avgGap * 1.3) {
+      score *= 1.1;
+      signals.push("overdue");
+    }
+
+    // Signal 4: Trend alignment
+    if (trend > 0.05) {
+      score *= 1.15;
+      signals.push("trending-up");
+    } else if (trend < -0.05) {
+      score *= 0.85;
+      signals.push("trending-down");
+    }
+
+    // Signal 5: Stability bonus — in stable patterns, frequency-aligned outcomes are better
+    if (stability === "STABLE" && actualFreq >= theo * 0.8) {
+      score *= 1.1;
+      signals.push("pattern-stable");
+    }
+
+    // Signal 6: Previous prediction penalty on consecutive MISS
+    if (consecutiveMisses >= 2 && prevPredNames.includes(g.name)) {
+      score *= 0.8; // dampen but don't exclude — no blind switching
+      signals.push("prev-miss-dampen");
+    }
+
+    // Signal 7: Excluded outcome with recent evidence gets mild boost
+    if (!hit && !prevPredNames.includes(g.name) && rf > 0) {
+      score *= 1.1;
+      signals.push("excluded-but-active");
+    }
+
+    scores.push({ game: g, score: Math.max(score, 0.001), signals });
+  }
+
+  // ===== STEP 4: MULTI-SIGNAL CONFIRMATION =====
+  // Sort by score, pick top 4
+  const sorted = [...scores].sort((a, b) => b.score - a.score);
+  const top4 = sorted.slice(0, SIGNAL_COUNT);
+  const nextSignal = top4.map((s) => s.game.name);
+  const nextSignalLabels = top4.map((s, i) => {
+    const sigCount = s.signals.length;
+    if (i === 0 && sigCount >= 3) return "strongest validated (multi-signal)";
+    if (i === 0) return "strongest evidence";
+    if (i === 1) return "second strongest";
+    if (i === 2) return "alternative signal";
+    return "defensive / low-probability";
+  });
+
+  // ===== STEP 5: CONFIDENCE (always provides prediction, never stops) =====
   let confidence: number;
   let confidenceLabel: string;
-  if (totalRounds < 3) {
-    confidence = 15 + Math.floor(Math.random() * 10);
+  if (n < 3) {
+    // Not enough data but STILL predict — just lower confidence
+    confidence = 25 + Math.floor(Math.random() * 10);
     confidenceLabel = "INSUFFICIENT DATA";
-  } else if (totalRounds < 10) {
-    confidence = Math.min(40, Math.round(hitRate * 45 + 5));
-    // Dampen further on consecutive misses
-    confidence = Math.max(15, confidence - consecutiveMisses * 5);
-    confidenceLabel = confidence >= 30 ? "LOW CONFIDENCE" : "INSUFFICIENT DATA";
+  } else if (n < 10) {
+    // Building confidence — still always predicts
+    const signalStrength = top4[0]?.signals.length ?? 0;
+    confidence = Math.min(55, Math.round(hitRate * 40 + signalStrength * 5 + 15));
+    confidence = Math.max(25, confidence - consecutiveMisses * 3);
+    confidenceLabel = confidence >= 40 ? "MODERATE" : "LOW CONFIDENCE";
   } else {
-    confidence = Math.round(hitRate * 100);
-    // Consecutive MISS dampening — more aggressive
-    confidence = Math.max(15, confidence - consecutiveMisses * 8);
-    if (!hit) confidence = Math.max(15, confidence - 5);
-    confidence = Math.max(15, Math.min(80, confidence));
+    // Strong data — confidence reflects real performance
+    const signalStrength = top4[0]?.signals.length ?? 0;
+    confidence = Math.round(hitRate * 70 + signalStrength * 5 + 10);
+    confidence = Math.max(25, confidence - consecutiveMisses * 5);
+    if (!hit) confidence = Math.max(25, confidence - 3);
+    confidence = Math.max(25, Math.min(85, confidence));
     confidenceLabel = confidence >= 65 ? "STRONG" : confidence >= 40 ? "MODERATE" : "LOW CONFIDENCE";
   }
 
-  // ===== STEP 5: DECISION GATE =====
-  const SAFE_THRESHOLD = 30;
+  // ===== STEP 6: DECISION (always BET unless extreme conditions) =====
   let status: "READY" | "WAIT" | "HOLD" | "RECALIBRATE";
   let decision: "BET" | "WAIT" | "RECALIBRATE";
 
   if (consecutiveMisses >= 3) {
-    // Force recalibration on 3+ consecutive misses
     status = "RECALIBRATE";
     decision = "RECALIBRATE";
-  } else if (totalRounds < 3 || dataIntegrity === "INSUFFICIENT") {
-    status = "HOLD";
-    decision = "WAIT";
-  } else if (confidence < SAFE_THRESHOLD) {
-    status = "WAIT";
-    decision = "WAIT";
+  } else if (n < 3) {
+    // Still predict, just mark as building data
+    status = "READY";
+    decision = "BET";
   } else {
+    // ALWAYS provide prediction — engine never stops
     status = "READY";
     decision = "BET";
   }
 
-  // ===== STEP 6: NEXT SIGNAL GENERATION =====
-  let nextSignal: string[] = [];
-  let nextSignalLabels: string[] = [];
-  if (status === "READY" || status === "RECALIBRATE") {
-    // Build weighted prediction using frequency + gap + opposite analysis
-    const hist = rounds.map((r) => r.actualResult);
-
-    // Recent data weighted higher (especially on recalibration)
-    const recentWeight = status === "RECALIBRATE" ? 0.7 : 0.4;
-    const historicalWeight = status === "RECALIBRATE" ? 0.3 : 0.6;
-
-    const recentHist = hist.slice(-10);
-    const recentFreq = new Map<string, number>();
-    const histFreq = new Map<string, number>();
-    for (const g of GAMES) {
-      recentFreq.set(g.name, 0);
-      histFreq.set(g.name, 0);
-    }
-    for (const h of recentHist) recentFreq.set(h.name, (recentFreq.get(h.name) ?? 0) + 1);
-    for (const h of hist) histFreq.set(h.name, (histFreq.get(h.name) ?? 0) + 1);
-
-    const recentMax = Math.max(...recentFreq.values(), 1);
-    const histMax = Math.max(...histFreq.values(), 1);
-
-    const weighted = GAMES.map((g, i) => {
-      const base = WEIGHTS[i] - (i === 0 ? 0 : WEIGHTS[i - 1]);
-      const rf = recentFreq.get(g.name) ?? 0;
-      const hf = histFreq.get(g.name) ?? 0;
-      // Gap-filling: lower frequency → higher weight
-      const recentGap = (recentMax - rf) / recentMax;
-      const histGap = (histMax - hf) / histMax;
-      // Combined weight: recent data has more influence on recalibration
-      let w = base * (historicalWeight * (0.5 + histGap) + recentWeight * (0.5 + recentGap));
-
-      // Opposite-signal boost: if outcome was EXCLUDED from previous prediction
-      // AND has recent evidence, boost it
-      if (!hit && excludedOutcomes.includes(g.name) && rf > 0) {
-        w *= 1.3; // data-supported excluded outcome gets boost
-      }
-
-      // On consecutive MISS, suppress previously predicted outcomes slightly
-      if (consecutiveMisses >= 2 && prevPredNames.includes(g.name)) {
-        w *= 0.7; // don't blindly repeat previous prediction
-      }
-
-      return { game: g, w: Math.max(w, 0.01) };
-    });
-
-    // Sort by weight (strongest first) then pick top 4
-    const sorted = [...weighted].sort((a, b) => b.w - a.w);
-    const picked = sorted.slice(0, SIGNAL_COUNT);
-    nextSignal = picked.map((p) => p.game.name);
-    nextSignalLabels = ["strongest validated signal", "second strongest", "alternative signal", "defensive / low-probability"];
-  }
-
-  // ===== Risk Level =====
+  // ===== STEP 7: RISK LEVEL =====
   let riskLevel: "LOW" | "MEDIUM" | "HIGH";
-  if (status === "RECALIBRATE" || consecutiveMisses >= 2) {
+  if (consecutiveMisses >= 2 || confidence < 30) {
     riskLevel = "HIGH";
   } else if (confidence >= 50 && hitRate >= 0.4) {
     riskLevel = "LOW";
-  } else if (confidence >= 30) {
+  } else {
     riskLevel = "MEDIUM";
-  } else {
-    riskLevel = "HIGH";
   }
 
-  // ===== Why This Move =====
+  // ===== OPPOSITE / EXCLUDED ANALYSIS =====
+  const allGameNames = GAMES.map((g) => g.name);
+  const excludedOutcomes = allGameNames.filter((nn) => !nextSignal.includes(nn));
+  let oppositeAnalysis = "";
+  if (!hit && excludedOutcomes.length > 0) {
+    const evidenceParts: string[] = [];
+    for (const ex of excludedOutcomes) {
+      const rc = recentFreq.get(ex) ?? 0;
+      if (rc > 0) evidenceParts.push(`${ex} (${rc}× in last 10)`);
+    }
+    oppositeAnalysis = evidenceParts.length > 0
+      ? `Excluded outcomes with recent evidence: ${evidenceParts.join(", ")}.`
+      : `Excluded outcomes [${excludedOutcomes.join(", ")}] have no recent evidence.`;
+  }
+
+  // ===== WHY THIS MOVE =====
   const parts: string[] = [];
-  if (status === "HOLD") {
-    parts.push("Insufficient verified data — holding for more rounds.");
-  } else if (status === "WAIT") {
-    parts.push(`Confidence ${confidence}% below threshold ${SAFE_THRESHOLD}%. No forced prediction.`);
-  } else if (status === "RECALIBRATE") {
-    parts.push(`${consecutiveMisses} consecutive MISS — model recalibrating with recent data weighted higher.`);
-    parts.push(`Old pattern weight reduced. Recent 10 spins prioritized.`);
+  if (n < 3) {
+    parts.push("Building baseline data — predicting with theoretical probabilities.");
+  } else if (consecutiveMisses >= 3) {
+    parts.push(`${consecutiveMisses} consecutive MISS — recalibrating with recent data weighted higher.`);
   } else {
-    if (hit) parts.push("Previous HIT — continuing trend-based analysis.");
-    else parts.push("Previous MISS — RCA completed, opposite-signal analysis applied.");
-    parts.push(`Hit-rate: ${Math.round(hitRate * 100)}% (${totalHits}/${totalRounds})`);
-    parts.push(`Recent: ${Math.round(recentHitRate * 100)}% (${recentHits}/${recentSlice.length})`);
-    parts.push(`Data: ${dataIntegrity}`);
+    if (hit) parts.push("Previous HIT — continuing with confirmed signals.");
+    else parts.push("Previous MISS — RCA completed, multi-signal recalibration applied.");
+    parts.push(`Hit-rate: ${Math.round(hitRate * 100)}% (${totalHits}/${n})`);
+    parts.push(`Stability: ${stability}`);
+    parts.push(`Top signal: ${top4[0]?.signals.join("+") || "theoretical"}`);
   }
 
-  // ===== Validation Criteria =====
-  const validationCriteria = (status === "READY" || status === "RECALIBRATE") && nextSignal.length > 0
-    ? `Next actual result must match one of [${nextSignal.join(", ")}] for HIT. ` +
-      `Any other result = MISS → triggers RCA + opposite-signal analysis. ` +
-      `3+ consecutive misses → forced recalibration.`
-    : "Accumulate 3+ verified rounds with consistent data. Confidence must exceed 30% before generating signals.";
+  // ===== VALIDATION CRITERIA =====
+  const validationCriteria = `Next actual result must match one of [${nextSignal.join(", ")}] for HIT. ` +
+    `Any other result = MISS → triggers RCA + recalibration. ` +
+    `Prediction stable until next live result.`;
 
   return {
-    status,
-    nextSignal,
-    nextSignalLabels,
-    confidence,
-    confidenceLabel,
-    riskLevel,
-    decision,
-    lastResult: actualName,
-    previousPrediction: prevPredNames,
+    status, nextSignal, nextSignalLabels,
+    confidence, confidenceLabel, riskLevel, decision,
+    lastResult: actualName, previousPrediction: prevPredNames,
     result: hit ? "HIT" : "MISS",
     rcaNote: hit ? undefined : rcaNote,
     rcaCause: hit ? undefined : rcaCause,
     excludedAnalysis: hit ? undefined : excludedOutcomes,
     oppositeAnalysis: hit ? undefined : oppositeAnalysis,
-    consecutiveMisses,
-    whyThisMove: parts.join(" • "),
-    validationCriteria,
+    consecutiveMisses, whyThisMove: parts.join(" • "), validationCriteria,
   };
 }
 
