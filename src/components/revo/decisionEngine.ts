@@ -1278,20 +1278,28 @@ function scoreCandidates(
     }
 
     // ===================================================================
-    // EXPLICITLY REMOVED (last-hit carryover bias):
-    //   - NO prev-miss-dampen (previous MISS → automatic penalty)
-    //   - NO prev-HIT continuation (previous HIT → automatic bonus)
+    // EXPLICITLY REMOVED (single-round last-hit carryover bias):
+    //   - NO single prev-miss-dampen (one MISS → automatic penalty)
+    //   - NO prev-HIT continuation (one HIT → automatic bonus)
     //   - NO overdue gap-filling boost (isOverdue → boost)
     //   - NO hot/cold z-score boost
-    // Every round is a FRESH evidence-based ranking. Previous result is just
-    // ONE historical data point — it only affects the score via the
-    // Repeat-Pattern Analysis above (and only if statistically supported).
+    //
+    // BUT: PERSISTENCE PENALTY after REPEATED consecutive failures.
+    // If the same outcome keeps appearing in FAILED predictions (2+ consecutive
+    // MISSes), apply a graduated dampening so alternatives get a fair evaluation.
+    // This prevents tunnel vision — the engine must challenge its own targets
+    // when they repeatedly fail, not keep selecting the same set.
     // ===================================================================
+    if (dashboard.consecutiveMisses >= 2 && prevPredNames.includes(g.name)) {
+      // Graduated penalty: -3% per consecutive miss (capped at -15%)
+      const penalty = Math.min(0.15, dashboard.consecutiveMisses * 0.03);
+      score *= (1 - penalty);
+      signals.push(`persistence-penalty (-${Math.round(penalty * 100)}%)`);
+    }
     void isOverdue;
     void isHot;
     void isCold;
     void lastHit;
-    void prevPredNames;
 
     // ===== SIGNAL 9: Anomaly handling (pure relative — no prior multiplication) =====
     if (dashboard.anomalyDetected) {
