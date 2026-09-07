@@ -171,9 +171,9 @@ export function RevoLiveResults() {
                       <td className="px-2 py-2 text-[#5a6a99]">{s.maxDrought}</td>
                       <td className="px-2 py-2 text-[#2ed573]">{(s.bayesianProb * 100).toFixed(1)}%</td>
                       <td className="px-2 py-2">
-                        {s.isHot && <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]">🔥 Hot</span>}
-                        {s.isCold && <span className="rounded-full bg-[#00d4ff]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#00d4ff]">❄️ Cold</span>}
-                        {s.isOverdue && <span className="rounded-full bg-[#ffa502]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ffa502]">⏰ Overdue</span>}
+                        {s.isHot && <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]" title="Descriptive only — NOT a bet signal">🔥 INFO: Hot</span>}
+                        {s.isCold && <span className="rounded-full bg-[#00d4ff]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#00d4ff]" title="Descriptive only — NOT 'due'">❄️ INFO: Cold</span>}
+                        {s.isOverdue && <span className="rounded-full bg-[#ffa502]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ffa502]" title="Descriptive only — NOT 'due to happen'">⏰ INFO: Overdue</span>}
                         {!s.isHot && !s.isCold && !s.isOverdue && <span className="text-[#5a6a99]">—</span>}
                       </td>
                     </tr>
@@ -239,6 +239,24 @@ export function RevoLiveResults() {
                           <div className="mt-0.5 text-[10px] font-bold" style={{ color: stat.confidence >= 70 ? "#2ed573" : stat.confidence >= 45 ? "#448AFF" : "#ffa502" }}>
                             {stat.confidenceLabel}
                           </div>
+                          {/* INFO indicators (NOT bet signals) — descriptive only */}
+                          <div className="mt-1.5 flex flex-wrap justify-center gap-1">
+                            {stat.isHot && (
+                              <span className="rounded bg-[#ff4757]/10 px-1 py-0.5 text-[7px] font-bold uppercase text-[#ff4757]" title="Descriptive statistic only — NOT a bet signal">
+                                <i className="fas fa-circle-info" /> INFO: Hot
+                              </span>
+                            )}
+                            {stat.isOverdue && (
+                              <span className="rounded bg-[#ffa502]/10 px-1 py-0.5 text-[7px] font-bold uppercase text-[#ffa502]" title="Descriptive statistic only — NOT 'due to happen'">
+                                <i className="fas fa-circle-info" /> INFO: Overdue
+                              </span>
+                            )}
+                            {stat.currentGap > stat.avgGap * 1.3 && stat.avgGap > 0 && (
+                              <span className="rounded bg-[#5a6a99]/10 px-1 py-0.5 text-[7px] font-bold uppercase text-[#5a6a99]" title="Gap is informational only — gambler's fallacy avoided">
+                                <i className="fas fa-circle-info" /> INFO: Gap {stat.currentGap}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -247,6 +265,16 @@ export function RevoLiveResults() {
                     <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
                     <b className="text-white">Method:</b> {analysis.predictionMethod}. Sample: {analysis.predictionSample} spins.
                     Predictions vary each refresh — weighted by real evidence, not fixed.
+                  </div>
+                  {/* No-bias disclaimer */}
+                  <div className="mt-2 rounded-lg border border-[#2ed573]/20 bg-[#2ed573]/5 px-3 py-2 text-[10px] text-[#8899cc]">
+                    <i className="fas fa-shield-halved mr-1.5 text-[#2ed573]" />
+                    <b className="text-[#2ed573]">No HOT/OVERDUE/GAP bias:</b>{" "}
+                    "HOT" ≠ "NEXT", "OVERDUE" ≠ "NEXT", "LONG GAP" ≠ "NEXT".
+                    HOT/OVERDUE/GAP are shown as <b>INFO only</b> — they NEVER
+                    affect the prediction score. Final score combines recent
+                    pattern + long-term freq + Bayesian + trend + stability +
+                    Wilson LB + signal correlation. No gambler's fallacy.
                   </div>
                 </>
               )}

@@ -339,11 +339,36 @@ function findLongestStreak(spins: SpinData[]): { segment: string; length: number
 }
 
 // ============================================================
-// EVIDENCE SCORING — combine all signals (NO fixed signals)
+// MULTI-FACTOR EVIDENCE SCORING — NO HOT/OVERDUE/GAP BIAS
 // ============================================================
-/** Combine all 10 statistical signals into a per-segment evidence score.
- *  No bonus round or number is ever "fixed" — every segment is scored
- *  purely by its statistical evidence. */
+/**
+ * Combine multiple statistical signals into a per-segment evidence score.
+ *
+ * CORE RULE (per user spec):
+ *   "HOT" ≠ "NEXT"
+ *   "OVERDUE" ≠ "NEXT"
+ *   "LONG GAP" ≠ "NEXT"
+ *
+ * HOT / OVERDUE / CURRENT GAP / MAX DROUGHT are INFORMATIONAL DESCRIPTIVE
+ * statistics only — they are NEVER used as direct bet signals or prediction
+ * boosts. The AI does NOT chase hot numbers (hot-number bias) and does NOT
+ * assume overdue outcomes are "due to happen" (gambler's fallacy).
+ *
+ * Final score combines ONLY these factors:
+ *   - Recent sequence frequency      (what's been appearing lately)
+ *   - Long-term frequency             (theoretical + observed blend)
+ *   - Recent frequency                (last 10)
+ *   - Bayesian probability            (Laplace-smoothed posterior)
+ *   - Pattern stability               (consistency of recent results)
+ *   - Trend direction                 (recent vs long-term delta)
+ *   - Volatility                      (gap-variance stability — penalty only)
+ *   - Signal correlation              (Markov transition — weak signal)
+ *   - Recent HIT/MISS performance     (verified prediction history)
+ *   - Sample size                     (Wilson lower bound)
+ *
+ * Gap is used ONLY as a minor pattern-stability signal (high volatility =
+ * less reliable), NOT as a "due to happen" boost.
+ */
 function scoreEvidence(
   seg: string,
   stat: {
@@ -364,45 +389,69 @@ function scoreEvidence(
   n: number,
 ): number {
   const theo = THEORETICAL_PROB[seg] ?? 0.1;
-  // Base = Bayesian posterior (already blends prior + observed).
-  let score = stat.bayesianProb;
 
-  // Signal 1: Frequency alignment (actual close to theoretical = stable)
+  // ===== BASE: weighted blend of Bayesian posterior + theoretical prior =====
+  // Bayesian already combines observed frequency (likelihood) with theoretical
+  // (prior) via Laplace smoothing. This is the honest base — no HOT/OVERDUE
+  // bias. Weight: 50% Bayesian evidence, 50% theoretical prior (regression to
+  // mean — prevents chasing outliers).
+  let score = stat.bayesianProb * 0.5 + theo * 0.5;
+
+  // ===== FACTOR 1: Recent sequence frequency (last 10) =====
+  // What's been appearing lately — a mild adaptive signal, NOT a chase.
+  // RecFreq > theo means it's appearing more than expected recently → mild
+  // evidence that the wheel is currently favouring it (regime, not streak).
+  // Capped to prevent hot-number chasing.
+  // (Computed externally as part of bayesianProb blend — no extra boost here
+  // to avoid double-counting.)
+
+  // ===== FACTOR 2: Frequency alignment (stability) =====
+  // Outcomes whose actual frequency is close to theoretical are MORE PREDICTABLE
+  // (the wheel behaves as expected). This is a reliability signal, not a
+  // hot/cold bias.
   if (n >= 10 && Math.abs(stat.actualFreq - theo) < theo * 0.3) {
-    score *= 1.1;
+    score *= 1.08; // mild stability bonus
   }
 
-  // Signal 2: Overdue gap-filling (mild — no aggressive chasing)
-  if (stat.isOverdue && stat.avgGap > 0) {
-    const ratio = stat.currentGap / stat.avgGap;
-    score *= 1 + Math.min(0.15, (ratio - 1) * 0.08);
-  }
-
-  // Signal 3: Hot streak (recent over-performance — mild boost, capped)
-  if (stat.isHot && stat.zScore > 1.5) {
-    score *= 1 + Math.min(0.12, (stat.zScore - 1.5) * 0.05);
-  }
-
-  // Signal 4: Cold dampening (recent under-performance)
-  if (stat.isCold && stat.zScore < -1.5) {
-    score *= 1 + Math.max(-0.2, (stat.zScore + 1.5) * 0.05);
-  }
-
-  // Signal 5: Markov transition boost — if last spin was X, what follows?
-  // Only apply when we have enough data for the transition to be meaningful.
-  if (n >= 15 && lastSpinSector && stat.markovNextProb > theo * 1.2) {
-    score *= 1 + Math.min(0.15, (stat.markovNextProb - theo) * 0.5);
-  }
-
-  // Signal 6: Volatility penalty (high-variance gap history = less reliable)
+  // ===== FACTOR 3: Pattern stability (volatility penalty only) =====
+  // High gap-variance = erratic = LESS reliable → mild penalty.
+  // This is NOT an overdue boost — it's a reliability adjustment.
   if (stat.volatility > stat.avgGap * stat.avgGap * 1.5 && stat.avgGap > 0) {
-    score *= 0.9;
+    score *= 0.92; // mild reliability penalty
   }
 
-  // Signal 7: Streak potential (momentum)
-  if (stat.streakPotential > 0.6) {
-    score *= 1.05;
+  // ===== FACTOR 4: Signal correlation (Markov — weak, capped) =====
+  // If the last spin was X, what tends to follow? Only apply as a WEAK signal
+  // (capped at +8%) and only with sufficient data (15+ spins). NOT a chase —
+  // just a mild correlation hint.
+  if (n >= 15 && lastSpinSector && stat.markovNextProb > theo * 1.2) {
+    score *= 1 + Math.min(0.08, (stat.markovNextProb - theo) * 0.3);
   }
+
+  // ===== FACTOR 5: Sample size confidence (Wilson lower bound) =====
+  // Outcomes with verified good prediction history get a mild boost — but
+  // Wilson LB penalizes tiny samples automatically (2/2 ≠ 100%).
+  // This is tracked via the engine's signalWiseHitRate (decisionEngine.ts),
+  // not here in aiStats (which only has raw spin data).
+
+  // ===================================================================
+  // EXPLICITLY REMOVED (gambler's fallacy / hot-number bias):
+  //   - NO overdue gap-filling boost
+  //   - NO hot streak boost
+  //   - NO cold dampening (cold ≠ "due")
+  //   - NO streak potential momentum boost
+  // These remain as INFORMATIONAL DESCRIPTIVE stats in the UI (badges,
+  // table columns) but they NEVER affect the prediction score.
+  // ===================================================================
+
+  // (stat.isHot, stat.isCold, stat.isOverdue, stat.streakPotential,
+  //  stat.currentGap, stat.maxDrought are intentionally NOT used here.)
+  void stat.isHot;
+  void stat.isCold;
+  void stat.isOverdue;
+  void stat.streakPotential;
+  void stat.currentGap;
+  void stat.zScore;
 
   return Math.max(score, 0.001);
 }

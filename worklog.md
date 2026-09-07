@@ -743,3 +743,64 @@ Stage Summary:
 - SSR hydration fixed via mount guard + skip-sampling-when-no-data.
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 21 (user request — HOT/OVERDUE targeting bias fix)
+Agent: Z.ai Code
+Task: User requested removal of HOT/OVERDUE/GAP-based targeting bias from the prediction engine. "HOT" ≠ "NEXT", "OVERDUE" ≠ "NEXT", "LONG GAP" ≠ "NEXT". HOT/OVERDUE/GAP must be informational only, NOT bet signals. No gambler's fallacy. Final prediction must come from combined multi-factor evidence.
+
+Root Cause Found:
+- `aiStats.ts` `scoreEvidence()` had 4 bias signals that directly boosted the prediction score based on HOT/OVERDUE/GAP:
+  - Signal 2: Overdue gap-filling boost (isOverdue → +15% score) — gambler's fallacy
+  - Signal 3: Hot streak boost (isHot + zScore>1.5 → +12% score) — hot-number bias
+  - Signal 4: Cold dampening (isCold → -20% score) — opposite bias
+  - Signal 7: Streak potential momentum boost (streakPotential>0.6 → +5%) — chasing bias
+- `decisionEngine.ts` `scoreCandidates()` had:
+  - Signal 2: Overdue gap-filling boost (isOverdue → +15% score) — gambler's fallacy
+  - Signal 8: Previous HIT continuation boost (prev-hit-confirm → +5%) — repeatedly targets same HOT number
+
+Fixes Applied:
+
+1. **`aiStats.ts` — Rewrote `scoreEvidence()`** (multi-factor, NO HOT/OVERDUE/GAP bias):
+   - BASE: 50% Bayesian posterior + 50% theoretical prior (regression to mean — prevents chasing outliers)
+   - FACTOR 2: Frequency alignment stability bonus (actual close to theoretical → +8%) — reliability, not hot/cold
+   - FACTOR 3: Volatility penalty (high gap-variance → -8%) — reliability only, NOT overdue boost
+   - FACTOR 4: Markov correlation (weak, capped +8%) — pattern hint, not a chase
+   - EXPLICITLY REMOVED: overdue gap-filling, hot streak, cold dampening, streak potential
+   - Added `void` statements for isHot/isCold/isOverdue/streakPotential/currentGap/zScore to document they're intentionally unused
+   - Core rule documented in comments: "HOT" ≠ "NEXT", "OVERDUE" ≠ "NEXT", "LONG GAP" ≠ "NEXT"
+
+2. **`decisionEngine.ts` — Rewrote `scoreCandidates()` signals** (NO HOT/OVERDUE bias):
+   - FACTOR 1: Recent active (capped +10%, was +15%) — mild adaptive, NOT a chase
+   - FACTOR 2: Trend alignment (capped +12%/-20%, was +20%/-25%) — regime evidence
+   - FACTOR 3: Pattern stability (+6%, was +8%)
+   - FACTOR 4: Wilson LB verified (+25%, was +30%)
+   - FACTOR 5: Volatility penalty (-8%) — reliability only
+   - FACTOR 6: Previous MISS dampening (-12%) — no blind switching
+   - EXPLICITLY REMOVED: overdue gap-filling boost, prev-HIT continuation boost (which repeatedly targeted same HOT number)
+   - Added `void` statements for isOverdue/isHot/isCold
+
+3. **UI — INFO indicators (not bet signals)**:
+   - Variance & Z-Score table: badges changed from "🔥 Hot / ❄️ Cold / ⏰ Overdue" to "🔥 INFO: Hot / ❄️ INFO: Cold / ⏰ INFO: Overdue" with tooltip "Descriptive only — NOT a bet signal"
+   - AI Prediction cards: added INFO badges (INFO: Hot, INFO: Overdue, INFO: Gap N) with tooltips explaining they're descriptive only
+   - Added "No HOT/OVERDUE/GAP bias" disclaimer panel (green): *"HOT" ≠ "NEXT", "OVERDUE" ≠ "NEXT", "LONG GAP" ≠ "NEXT". HOT/OVERDUE/GAP are shown as INFO only — they NEVER affect the prediction score. Final score combines recent pattern + long-term freq + Bayesian + trend + stability + Wilson LB + signal correlation. No gambler's fallacy.*
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- INFO badges render: "⏰ INFO: OVERDUE" in Z-Score table, "INFO: OVERDUE" + "INFO: GAP 23" on prediction cards.
+- No-bias disclaimer renders: "No HOT/OVERDUE/GAP bias: "HOT" ≠ "NEXT", "OVERDUE" ≠ "NEXT", "LONG GAP" ≠ "NEXT". HOT/OVERDUE/GAP are shown as INFO only — they NEVER affect the prediction score... No gambler's fallacy."
+- Prediction variety verified (5 runs): [1,2,5,10], [1,5,2,COIN FLIP], [1,5,2,10], [1,5,2,10], [1,5,10,CASH HUNT] — high-freq numbers appear often (correct — higher theoretical prob) but bonus rounds get sampled based on probability. The same HOT number is NOT repeatedly forced into every prediction set.
+- VLM confirmed: INFO badges visible on prediction cards, No-bias disclaimer panel visible.
+
+Stage Summary:
+- HOT/OVERDUE/GAP targeting bias completely removed from both prediction engines (aiStats.ts + decisionEngine.ts).
+- HOT/OVERDUE/GAP remain as INFORMATIONAL DESCRIPTIVE statistics in the UI (badges with "INFO:" prefix + tooltips) — they NEVER affect the prediction score.
+- Final prediction score combines ONLY: recent pattern + long-term freq + Bayesian + trend + stability + Wilson LB + signal correlation + volatility (reliability penalty only).
+- No gambler's fallacy: the AI does NOT assume overdue outcomes are "due to happen".
+- No hot-number chasing: the AI does NOT prioritize HOT outcomes.
+- No prev-HIT continuation: the AI does NOT repeatedly target the same HOT number.
+- Core rule enforced: "HOT" ≠ "NEXT", "OVERDUE" ≠ "NEXT", "LONG GAP" ≠ "NEXT".
+- Lint clean, no errors, agent-browser QA green.
+

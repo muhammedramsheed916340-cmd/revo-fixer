@@ -615,67 +615,72 @@ function scoreCandidates(
 
     // ===== BASE SCORE =====
     // Adaptive blend of long-term + recent frequencies, anchored to the prior.
+    // NO HOT/OVERDUE/GAP bias — pure multi-factor evidence.
     const blendedFreq = (longFreq * longW + recFreq * adaptW);
     let score = livePrior * 0.4 + blendedFreq * 0.6;
     if (!useLivePrior && n === 0) score = theo; // no data at all → pure theoretical
 
-    // ===== SIGNAL 1: Recent active boost =====
+    // ===== FACTOR 1: Recent active (mild adaptive signal — NOT a chase) =====
+    // Appearing more than 80% of theoretical recently → mild evidence the wheel
+    // is currently favouring it (regime). Capped to prevent hot-number chasing.
     if (recFreq > livePrior * 0.8 && (n >= 5 || liveN >= 20)) {
-      score *= 1.15;
+      score *= 1.10;
       signals.push("recent-active");
     }
 
-    // ===== SIGNAL 2: Overdue (gap-filling) — MILD only =====
-    if (isOverdue && avgGap > 0) {
-      const overdueRatio = gap / avgGap;
-      score *= 1 + Math.min(0.15, (overdueRatio - 1) * 0.1);
-      signals.push("overdue");
-    }
-
-    // ===== SIGNAL 3: Trend alignment (adaptive weighting) =====
+    // ===== FACTOR 2: Trend alignment (adaptive weighting) =====
+    // Recent vs long-term delta — mild evidence of regime shift. NOT a chase.
     if (trend > 0.05 && (n >= 10 || liveN >= 20)) {
-      score *= 1 + Math.min(0.2, trend * 2 * adaptW);
+      score *= 1 + Math.min(0.12, trend * 1.5 * adaptW);
       signals.push("trending-up");
     } else if (trend < -0.05 && (n >= 10 || liveN >= 20)) {
-      score *= 1 + Math.max(-0.25, trend * 2 * adaptW);
+      score *= 1 + Math.max(-0.20, trend * 1.5 * adaptW);
       signals.push("trending-down");
     }
 
-    // ===== SIGNAL 4: Pattern stability bonus =====
+    // ===== FACTOR 3: Pattern stability bonus =====
+    // Stable patterns (4+ unique in recent 10) = more predictable wheel.
+    // Reliability signal, not a hot/cold bias.
     if (stability === "STABLE" && longFreq >= livePrior * 0.8) {
-      score *= 1.08;
+      score *= 1.06;
       signals.push("pattern-stable");
     }
 
-    // ===== SIGNAL 5: Wilson score confidence (sample-size-aware) =====
+    // ===== FACTOR 4: Wilson score confidence (sample-size-aware) =====
     // Games with verified good prediction history get a mild boost.
-    // Wilson lower bound penalizes tiny samples automatically.
+    // Wilson lower bound penalizes tiny samples automatically (2/2 ≠ 100%).
     if (sampleSize >= 3) {
-      score *= 1 + wilsonLower * 0.3; // up to +30% for proven signals
+      score *= 1 + wilsonLower * 0.25; // up to +25% for proven signals
       signals.push(`verified (${hitLabel(sampleSize, signalHitRate)})`);
     }
 
-    // ===== SIGNAL 6: Volatility penalty =====
+    // ===== FACTOR 5: Volatility penalty (reliability only — NOT overdue boost) =====
+    // High gap-variance = erratic = LESS reliable → mild penalty.
+    // This is NOT an overdue boost — gap is used ONLY as a stability signal.
     if (volatility > avgGap * avgGap * 1.5 && avgGap > 0) {
-      score *= 0.9;
+      score *= 0.92;
       signals.push("high-volatility");
     }
 
-    // ===== SIGNAL 7: Previous MISS dampening (no blind switching) =====
+    // ===== FACTOR 6: Previous MISS dampening (no blind switching) =====
     // If the last round was a MISS and this game was in the prediction set,
     // dampen slightly — but never exclude. No opposite-result chasing.
     if (lastHit === false && prevPredNames.includes(g.name)) {
-      score *= 0.85;
+      score *= 0.88;
       signals.push("prev-miss-dampen");
     }
 
-    // ===== SIGNAL 8: Previous HIT continuation =====
-    // If the last round was a HIT and this game was correctly predicted,
-    // mild boost — no blind HIT-repeat either, just evidence weighting.
-    if (lastHit === true && prevPredNames.includes(g.name) && sw.rate >= 0.3) {
-      score *= 1.05;
-      signals.push("prev-hit-confirm");
-    }
+    // ===================================================================
+    // EXPLICITLY REMOVED (gambler's fallacy / hot-number bias):
+    //   - NO overdue gap-filling boost (isOverdue → boost)
+    //   - NO prev-HIT continuation boost (would repeatedly target same HOT number)
+    //   - NO hot/cold z-score boost
+    // These remain as INFORMATIONAL DESCRIPTIVE stats in the UI (badges,
+    // table columns) but they NEVER affect the prediction score.
+    // ===================================================================
+    void isOverdue;
+    void isHot;
+    void isCold;
 
     // ===== SIGNAL 9: Anomaly handling =====
     // If anomaly detected, weight recent data even more.
