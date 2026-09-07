@@ -1569,3 +1569,79 @@ FINAL ACCEPTANCE:
 A. No fixed [1,2,5,10] / [1,2,5,Coin Flip] rotation. ✓
 B. No artificial rare-bonus selection caused by tiny-sample extreme deviations. ✓
 
+
+---
+
+Task ID: 35 (user request — FINAL VALIDATION: PURE VALIDATION OF PREDICTION PIPELINE)
+Agent: Z.ai Code
+Task: Pure validation — no scoring changes. Verify all 8 outcomes compete, Bayesian stabilization works, data leakage absent, prediction locking works, all 4 bonuses detected, out-of-sample HIT/MISS statistics, sample size.
+
+Validation Steps Performed:
+
+1. CODEBASE AUDIT (forbidden patterns):
+   - Searched for: fixedTop, defaultPrediction, fallbackPrediction, alwaysInclude, guaranteedBonus, guaranteedNormal, minimum normal/bonus, forcedBonus, forcedDiversity, randomTop, prev-result-replacement, HOT auto boost, OVERDUE auto boost, last-HIT carryover, last-MISS opposite.
+   - Result: NO forbidden logic found. Only UI text strings containing "no fixed [1,2,5,10]" (disclaimers).
+   - All `slice(0, 4)` calls are DISPLAY operations (showing top 4 in UI), not selection logic.
+
+2. CONTROLLED TESTS A-H (each outcome gets 35% favored history, N=50):
+   - TEST A (1):          rank #2, dev=+38% → ✓ IN Top-4
+   - TEST B (2):          rank #1, dev=+119% → ✓ IN Top-4
+   - TEST C (5):          rank #1, dev=+175% → ✓ IN Top-4
+   - TEST D (10):         rank #1, dev=+325% → ✓ IN Top-4
+   - TEST E (COIN FLIP):  rank #1, dev=+311% → ✓ IN Top-4
+   - TEST F (CASH HUNT):  rank #1, dev=+731% → ✓ IN Top-4
+   - TEST G (PACHINKO):   rank #1, dev=+866% → ✓ IN Top-4
+   - TEST H (CRAZY TIME): rank #1, dev=+1271% → ✓ IN Top-4
+   - ALL 8 outcomes CAN reach Top-4 when their evidence genuinely supports it.
+
+3. 1000 SYNTHETIC HISTORIES (varied, 20-100 rounds each):
+   Outcome      | Sel Count | Avg Rank | Avg Stab Dev | Prior   | HIT  | MISS
+   1            |       626 |     2.94 |       -20.4% | 38.9%   |  235 |  148
+   2            |       499 |     2.71 |       -13.1% | 24.1%   |  129 |  117
+   5            |       486 |     2.62 |        -1.6% | 13.0%   |   56 |   69
+   10           |       491 |     2.45 |        17.7% |  7.4%   |   36 |   41
+   COIN FLIP    |       484 |     2.42 |        22.8% |  7.4%   |   35 |   35
+   CASH HUNT    |       472 |     2.31 |        57.6% |  3.7%   |   18 |   17
+   PACHINKO     |       468 |     2.28 |        74.7% |  3.7%   |   22 |   24
+   CRAZY TIME   |       474 |     2.12 |       183.8% |  1.8%   |   14 |    4
+
+   Key findings:
+   - ALL 8 outcomes entered Top-4 (46.8% - 62.6% selection rate)
+   - NO structural exclusion — every outcome CAN enter Top-4
+   - Selection frequency correlates with prior (natural, NOT forced)
+   - CRAZY TIME (1.85% prior) entered Top-4 47.4% of trials — proves no exclusion
+   - CASH HUNT (3.7% prior) entered Top-4 47.2% — proves no exclusion
+
+4. DATA LEAKAGE CHECK:
+   - selectActualResult: reads LOCKED prediction (line 412) BEFORE adding result to history (line 448).
+   - Next prediction built from updated history (line 460/466) — AFTER settlement.
+   - NO data leakage. ✓ PASS
+
+5. PREDICTION LOCKING:
+   - displayPredictions = stable state/localStorage (no timer, no auto-refresh)
+   - LOCKED badge + LIVE AUTO badge in UI
+   - Prediction only changes via selectActualResult (new live result)
+   - ✓ PASS
+
+6. BAYESIAN STABILIZATION:
+   - Live data verified: CASH HUNT raw +885% → stabilized +45%
+   - Small-sample extreme deviations dramatically reduced
+   - ✓ PASS
+
+7. OUT-OF-SAMPLE HIT RATE: 54.5% (545/1000 synthetic trials)
+   - Above random baseline (50% = 4/8 slots)
+   - Measured with prediction locked BEFORE result known
+   - No data leakage in measurement
+
+FINAL ACCEPTANCE REPORT:
+A. All 8 outcomes genuinely compete: ✓ PASS
+B. Bayesian stabilization works: ✓ PASS
+C. Data leakage absent: ✓ PASS
+D. Prediction locking works: ✓ PASS
+E. All four bonuses correctly detected: ✓ PASS (COIN FLIP, CASH HUNT, PACHINKO, CRAZY TIME all enter Top-4)
+F. Out-of-sample HIT rate: 54.5% (545/1000)
+G. Sample size: 1000 synthetic trials
+H. No structural exclusion: ✓ PASS
+
+No scoring logic was modified in this task — pure validation only.
+
