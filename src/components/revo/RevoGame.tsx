@@ -395,6 +395,20 @@ export function RevoGame() {
     return () => clearTimeout(t);
   }, [savedSignals, generatePrediction]);
 
+  // Event debug log — proves the exact pipeline order for each live result
+  const [eventLog, setEventLog] = useState<Array<{
+    eventId: number;
+    actual: string;
+    oldPrediction: string[];
+    hitMiss: string;
+    historyNBefore: number;
+    historyNAfter: number;
+    newPrediction: string[];
+    predictionId: number;
+    locked: boolean;
+    timestamp: number;
+  }>>([]);
+
   // ============================================================
   // CORE ENGINE PIPELINE — runs on EVERY live result / manual selection
   // ============================================================
@@ -427,8 +441,14 @@ export function RevoGame() {
         saveSignals(preds);
         return;
       }
-      const hit =
-        currentPreds.some((p) => p.game.name === game.name);
+
+      // ===== PIPELINE AUDIT: log exact event order =====
+      const historyBefore = readRoundHistory();
+      const historyNBefore = historyBefore.length;
+      const oldPredNames = currentPreds.map((p) => p.game.name);
+
+      // STEP 1: SETTLE OLD LOCKED PREDICTION (before history update)
+      const hit = currentPreds.some((p) => p.game.name === game.name);
       const predConfidence =
         Math.round(
           currentPreds.reduce((s, p) => s + p.confidence, 0) /
@@ -444,33 +464,52 @@ export function RevoGame() {
         recalibrated: wasRecalibrated,
         calibrationNote: lastRecalibration?.reason,
       };
-      const updated = [...readRoundHistory(), round];
-      persistRounds(updated);
 
-      // === BUILD NEXT PREDICTION USING THE UNIFIED ENGINE ===
-      // Pass REAL casino spins so recalibration uses observed frequency.
+      // STEP 2: APPEND NEW RESULT TO HISTORY
+      const updated = [...historyBefore, round];
+      persistRounds(updated);
+      const historyNAfter = updated.length;
+
+      // STEP 3: RECALCULATE ALL 8 OUTCOMES USING UPDATED HISTORY
       const spins = getLiveSpins();
       let nextPreds: Prediction[];
       let nextRecal: { triggered: boolean; reason: string } | null = null;
 
       if (!hit) {
-        // MISS → RCA → RECALIBRATE → fresh evidence-based prediction
-        // NOTE: No automatic carryover from previous prediction. Fresh ranking.
         const reason = `Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover — every outcome re-scored from scratch.`;
         const eng = recalibrate(updated, reason, spins);
         nextPreds = engineToPredictions(eng);
         nextRecal = { triggered: true, reason };
       } else {
-        // HIT → continue with fresh ranking (NO automatic carryover)
-        // Previous HIT does NOT auto-include the same outcome. Fresh evidence.
         const eng = buildInitial(updated, spins);
         nextPreds = engineToPredictions(eng);
         nextRecal = null;
       }
+
+      const newPredNames = nextPreds.map((p) => p.game.name);
+
+      // STEP 4: LOG EVENT DEBUG TABLE
+      const eventId = historyNAfter;
+      setEventLog((prev) => {
+        const next = [{
+          eventId,
+          actual: game.name,
+          oldPrediction: oldPredNames,
+          hitMiss: hit ? "HIT" : "MISS",
+          historyNBefore,
+          historyNAfter,
+          newPrediction: newPredNames,
+          predictionId: eventId + 1,
+          locked: true,
+          timestamp: Date.now(),
+        }, ...prev];
+        return next.slice(0, 20); // keep last 20 events
+      });
+
+      // STEP 5: DISPLAY + LOCK NEW PREDICTION
       setPredictions(nextPreds);
       setLastRecalibration(nextRecal);
       setRunning(true);
-      // NO countdown reset — prediction is LOCKED until next live result.
       saveSignals(nextPreds);
     },
     [predictions, savedSignals, lastRecalibration],
@@ -804,6 +843,69 @@ export function RevoGame() {
               No stale live-result cache. Polling=2s, API always fresh. Source→App = casino settledAt → app detection.
               App→UI = internal pipeline (target &lt;300ms). App→Pred = prediction generation (target &lt;500ms).
               Initial stale result excluded from stats. Dedup by timestamp, NOT by result name.
+            </div>
+          </div>
+        )}
+
+        {/* ===== EVENT DEBUG TABLE (pipeline audit) ===== */}
+        {eventLog.length > 0 && (
+          <div className="revo-card mt-2 overflow-hidden border border-[#a78bfa]/20">
+            <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#a78bfa]/5 to-transparent px-4 py-2">
+              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#a78bfa]">
+                <i className="fas fa-list-check" /> Event Debug Log (pipeline audit)
+              </span>
+              <span className="text-[9px] text-[#5a6a99]">{eventLog.length} events logged</span>
+            </div>
+            <div className="overflow-x-auto revo-scroll">
+              <table className="w-full min-w-[900px] text-center text-[8px]">
+                <thead>
+                  <tr className="border-b border-[#1e2240] bg-[#0d1020]/60">
+                    <th className="px-1 py-1.5">Event#</th>
+                    <th className="px-1 py-1.5">Actual</th>
+                    <th className="px-1 py-1.5">Old Pred (LOCKED)</th>
+                    <th className="px-1 py-1.5">H/M</th>
+                    <th className="px-1 py-1.5">N Before</th>
+                    <th className="px-1 py-1.5">N After</th>
+                    <th className="px-1 py-1.5">New Pred</th>
+                    <th className="px-1 py-1.5">Pred#</th>
+                    <th className="px-1 py-1.5">Lock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {eventLog.map((e, i) => (
+                    <tr key={i} className="border-b border-[#1e2240]/40 hover:bg-white/[0.02]">
+                      <td className="px-1 py-1 font-bold text-[#a78bfa]">{e.eventId}</td>
+                      <td className="px-1 py-1">
+                        <span className={`font-bold ${["COIN FLIP","CASH HUNT","PACHINKO","CRAZY TIME"].includes(e.actual) ? "text-[#FFD700]" : "text-white"}`}>
+                          {e.actual}
+                        </span>
+                      </td>
+                      <td className="px-1 py-1 text-[#5a6a99]">
+                        [{e.oldPrediction.join(",")}]
+                      </td>
+                      <td className="px-1 py-1">
+                        <span className={`font-bold ${e.hitMiss === "HIT" ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
+                          {e.hitMiss}
+                        </span>
+                      </td>
+                      <td className="px-1 py-1 text-[#5a6a99]">{e.historyNBefore}</td>
+                      <td className="px-1 py-1 text-[#2ed573]">{e.historyNAfter}</td>
+                      <td className="px-1 py-1 font-bold text-[#00d4ff]">
+                        [{e.newPrediction.join(",")}]
+                      </td>
+                      <td className="px-1 py-1 text-[#a78bfa]">{e.predictionId}</td>
+                      <td className="px-1 py-1">
+                        {e.locked ? <i className="fas fa-lock text-[#2ed573]" /> : <i className="fas fa-lock-open text-[#ff4757]" />}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t border-[#1e2240] px-4 py-1 text-[8px] text-[#5a6a99]">
+              <i className="fas fa-shield-halved mr-1 text-[#2ed573]" />
+              <b>Pipeline proof:</b> Old prediction settled BEFORE history update. New prediction uses updated history (N+1).
+              Prediction Y tested against result X+1, NEVER against result X.
             </div>
           </div>
         )}
