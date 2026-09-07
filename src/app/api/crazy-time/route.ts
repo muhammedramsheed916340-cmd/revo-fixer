@@ -14,7 +14,7 @@ const HEADERS: Record<string, string> = {
 // Server-side in-memory cache — very short TTL for near real-time updates.
 let recentCache: { data: unknown; at: number } | null = null;
 let statsCache: { data: unknown; at: number } | null = null;
-const RECENT_CACHE_TTL = 3000; // 3 seconds (near real-time)
+const RECENT_CACHE_TTL = 5000; // 5 seconds
 const STATS_CACHE_TTL = 15000; // 15 seconds (stats don't change as fast)
 
 export async function GET(req: Request) {
