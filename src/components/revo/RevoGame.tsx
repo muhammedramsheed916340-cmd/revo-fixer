@@ -1209,10 +1209,13 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
             </div>
           )}
 
-          {/* ===== Selection Bias Detection (per-bonus) ===== */}
+          {/* ===== Calibration Check (per-outcome, sample-size aware) ===== */}
           <div className="mt-2 rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-2">
-            <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
-              Selection Bias Detection (inclusion vs base prob vs observed)
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                Calibration Check (per-outcome)
+              </span>
+              <span className="text-[8px] text-[#5a6a99]">NO reactive correction — diagnostic only</span>
             </div>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
               {["COIN FLIP", "CASH HUNT", "PACHINKO", "CRAZY TIME"].map((bonusName) => {
@@ -1237,6 +1240,10 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
                       Base: <span className="text-[#448AFF]">{Math.round(sb.baseProbability * 100)}%</span>
                       {" "}Obs: <span className="text-[#00d4ff]">{Math.round(sb.observedRate * 100)}%</span>
                     </div>
+                    <div className="text-[7px] text-[#5a6a99]">
+                      HIT:{sb.hitContribution} MISS:{sb.missContribution}
+                    </div>
+                    <div className="mt-0.5 text-[7px] font-bold text-[#5a6a99]">{sb.calibrationTier}</div>
                     {sb.overSelected && (
                       <div className="mt-0.5 text-[7px] font-bold uppercase text-[#ff4757]">⚠ Over-selected</div>
                     )}
@@ -1247,8 +1254,13 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
                 );
               })}
             </div>
+            {/* Calibration tier note (sample-size aware) */}
+            <div className="mt-1.5 text-[8px] text-[#5a6a99]">
+              <i className="fas fa-circle-info mr-0.5" />
+              {selectionBiasNote}
+            </div>
             {selectionBiasWarning && (
-              <div className="mt-1.5 rounded border border-[#ff4757]/30 bg-[#ff4757]/8 px-2 py-1 text-[9px] text-[#ff4757]">
+              <div className="mt-1 rounded border border-[#ff4757]/30 bg-[#ff4757]/8 px-2 py-1 text-[9px] text-[#ff4757]">
                 <i className="fas fa-triangle-exclamation mr-1" />
                 {selectionBiasNote}
               </div>

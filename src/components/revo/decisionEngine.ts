@@ -244,10 +244,13 @@ export interface PerformanceDashboard {
     inclusionRate: number;          // how often this bonus is in the prediction (0..1)
     baseProbability: number;        // 54-segment base prior (0..1)
     observedRate: number;           // actual observed frequency (0..1)
-    overSelected: boolean;          // inclusionRate > baseProbability * 2 (with 10+ sample)
-    underSelected: boolean;         // inclusionRate < observedRate * 0.3 (with 10+ sample)
+    overSelected: boolean;          // inclusionRate > baseProbability * 2 (n>=50 only)
+    underSelected: boolean;         // inclusionRate < observedRate * 0.3 (n>=50 only)
+    calibrationTier: string;       // sample-size tier label
+    hitContribution: number;      // HITs this bonus contributed
+    missContribution: number;     // MISSes this bonus caused
   }>;
-  selectionBiasWarning: boolean;    // true if any bonus is over-selected
+  selectionBiasWarning: boolean;    // true if any bonus is over-selected (n>=50)
   selectionBiasNote: string;
 }
 
@@ -713,8 +716,8 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
     const predictedRate = totalRounds > 0 ? predictedCount / totalRounds : 0;
     const actualRate = totalRounds > 0 ? actualCount / totalRounds : 0;
     const hitRate = predictedCount > 0 ? hitCount / predictedCount : 0;
-    // Underrepresented = actual appears 1.5× more than predicted (with 10+ sample)
-    const underrepresented = totalRounds >= 10 && actualRate > predictedRate * 1.5 && actualCount >= 2;
+    // Underrepresented = actual appears 1.5× more than predicted (n>=50 only — meaningful)
+    const underrepresented = totalRounds >= 50 && actualRate > predictedRate * 1.5 && actualCount >= 2;
     perBonusPerformance[bonusName] = {
       predictedCount,
       actualCount,
@@ -735,26 +738,36 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
     ? `Underrepresented: ${underrepresentedBonuses.map((b) => `${b} (pred ${Math.round(perBonusPerformance[b].predictedRate * 100)}% / actual ${Math.round(perBonusPerformance[b].actualRate * 100)}%)`).join(", ")}. Model may be under-selecting bonuses.`
     : "No bonus underrepresentation detected.";
 
-  // ===== NEW: Model-bias warning =====
+  // ===== NEW: Model-bias warning (n>=50 only — meaningful) =====
   // True if 2+ bonuses repeatedly appear in actuals while being excluded from predictions.
   const biasBonuses = BONUS_NAMES.filter((b) => {
     const p = perBonusPerformance[b];
-    return totalRounds >= 10 && p.missCount >= 2 && p.predictedRate < p.actualRate * 0.5;
+    return totalRounds >= 50 && p.missCount >= 2 && p.predictedRate < p.actualRate * 0.5;
   });
   const modelBiasWarning = biasBonuses.length >= 2;
   const modelBiasNote = modelBiasWarning
     ? `MODEL BIAS WARNING: ${biasBonuses.length} bonuses (${biasBonuses.join(", ")}) are repeatedly appearing in actual results while being excluded from predictions. Recalibration needed — do NOT keep selecting [1,2,5,10].`
     : "No model bias detected.";
 
-  // ===== NEW: Per-bonus selection bias detection =====
-  // For each bonus: inclusion rate vs base probability vs observed rate.
-  // If a bonus is selected far more than its evidence supports → over-selected.
+  // ===== NEW: Per-bonus selection bias detection (calibration, NOT reactive) =====
+  // Per user spec — MINIMUM SAMPLE REQUIREMENT:
+  //   n < 10:  Do NOT declare over/under-selected.
+  //   n < 20:  Show "EARLY DATA" — no bias declaration.
+  //   n >= 20: Begin preliminary calibration analysis (info only, no flag).
+  //   n >= 50: Allow meaningful selection-bias detection (flag).
+  //   n >= 100: Allow mature calibration assessment.
+  //
+  // NO REACTIVE CORRECTION: bias detection does NOT immediately boost/penalty
+  // any outcome. It only flags for diagnostic purposes.
   const perBonusSelectionBias: Record<string, {
     inclusionRate: number;
     baseProbability: number;
     observedRate: number;
     overSelected: boolean;
     underSelected: boolean;
+    calibrationTier: string;      // sample-size tier label
+    hitContribution: number;     // how many HITs this bonus contributed
+    missContribution: number;    // how many MISSes this bonus caused
   }> = {};
   const overSelectedBonuses: string[] = [];
   for (const bonusName of BONUS_NAMES) {
@@ -762,23 +775,38 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
     const baseProb = THEORETICAL[bonusName] ?? 0.05;
     const inclusionRate = totalRounds > 0 ? p.predictedCount / totalRounds : 0;
     const observedRate = totalRounds > 0 ? p.actualCount / totalRounds : 0;
-    // Over-selected: inclusion > 2× base probability (with 10+ sample)
-    const overSelected = totalRounds >= 10 && inclusionRate > baseProb * 2;
-    // Under-selected: inclusion < 30% of observed (with 10+ sample)
-    const underSelected = totalRounds >= 10 && observedRate > 0 && inclusionRate < observedRate * 0.3;
+    // Calibration tier (sample-size based)
+    const calibrationTier = totalRounds < 10
+      ? "INSUFFICIENT (<10)"
+      : totalRounds < 20
+        ? "EARLY DATA (<20)"
+        : totalRounds < 50
+          ? "PRELIMINARY (<50)"
+          : totalRounds < 100
+            ? "MEANINGFUL (<100)"
+            : "MATURE (100+)";
+    // Over-selected: only flag at n >= 50 (meaningful), inclusion > 2× base
+    const overSelected = totalRounds >= 50 && inclusionRate > baseProb * 2;
+    // Under-selected: only flag at n >= 50, inclusion < 30% of observed
+    const underSelected = totalRounds >= 50 && observedRate > 0 && inclusionRate < observedRate * 0.3;
     perBonusSelectionBias[bonusName] = {
       inclusionRate,
       baseProbability: baseProb,
       observedRate,
       overSelected,
       underSelected,
+      calibrationTier,
+      hitContribution: p.hitCount,
+      missContribution: p.missCount,
     };
     if (overSelected) overSelectedBonuses.push(bonusName);
   }
   const selectionBiasWarning = overSelectedBonuses.length > 0;
   const selectionBiasNote = selectionBiasWarning
-    ? `SELECTION BIAS: ${overSelectedBonuses.map((b) => `${b} (inclusion ${Math.round(perBonusSelectionBias[b].inclusionRate * 100)}% vs base ${Math.round(perBonusSelectionBias[b].baseProbability * 100)}%)`).join(", ")} — being selected far more than evidence supports. Recalibrating.`
-    : "No selection bias detected.";
+    ? `SELECTION BIAS (n>=50): ${overSelectedBonuses.map((b) => `${b} (incl ${Math.round(perBonusSelectionBias[b].inclusionRate * 100)}% vs base ${Math.round(perBonusSelectionBias[b].baseProbability * 100)}%)`).join(", ")} — over-selected. Diagnostic only — NO reactive correction.`
+    : totalRounds < 50
+      ? `Calibration: ${totalRounds < 10 ? "INSUFFICIENT" : totalRounds < 20 ? "EARLY DATA" : "PRELIMINARY"} — need 50+ rounds for meaningful bias detection.`
+      : "No selection bias detected.";
 
   return {
     totalRounds,

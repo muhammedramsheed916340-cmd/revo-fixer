@@ -1321,3 +1321,51 @@ Stage Summary:
 - All 8 outcomes compete on the SAME scoring framework.
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 31 (user request — FINAL CALIBRATION, NO OVER/UNDER TARGETING)
+Agent: Z.ai Code
+Task: User requested calibration, not forcing variety. No fixed bonus/normal/Coin Flip/HOT/OVERDUE boost. Minimum sample requirements for bias detection (n<10: no flag, n<20: EARLY DATA, n>=20: preliminary, n>=50: meaningful, n>=100: mature). No reactive correction.
+
+Fixes Applied:
+
+1. **`decisionEngine.ts` — Updated bias detection thresholds to sample-size tiers**:
+   - `overSelected`: now requires n>=50 (was n>=10) — meaningful detection only
+   - `underSelected`: now requires n>=50 (was n>=10)
+   - `bonusUnderrepresented`: now requires n>=50 (was n>=10)
+   - `modelBiasWarning`: now requires n>=50 (was n>=10)
+   - Added `calibrationTier` field: "INSUFFICIENT (<10)" / "EARLY DATA (<20)" / "PRELIMINARY (<50)" / "MEANINGFUL (<100)" / "MATURE (100+)"
+   - Added `hitContribution` / `missContribution` per bonus
+   - `selectionBiasNote` now shows calibration tier when n<50: "Calibration: INSUFFICIENT — need 50+ rounds for meaningful bias detection."
+
+2. **`decisionEngine.ts` — NO reactive correction**:
+   - Bias detection is DIAGNOSTIC ONLY — does NOT boost/penalty any outcome.
+   - The scoring engine (FACTOR 1-7) is unchanged — no reactive adjustment based on bias flags.
+   - Bias flags only appear in the UI for transparency.
+
+3. **`RevoGame.tsx` — Renamed panel to "Calibration Check (per-outcome)"**:
+   - Header: "NO reactive correction — diagnostic only"
+   - Each bonus shows: Incl / Base / Obs / HIT / MISS / calibration tier
+   - Calibration tier label per bonus (INSUFFICIENT / EARLY DATA / PRELIMINARY / MEANINGFUL / MATURE)
+   - Calibration note shows sample-size requirement
+   - Over-selected/Under-selected badges only appear at n>=50
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Calibration Check panel renders with "NO reactive correction — diagnostic only" header.
+- All 4 bonuses show "INSUFFICIENT (<10)" tier (with 0 rounds).
+- Calibration note: "Calibration: INSUFFICIENT — need 50+ rounds for meaningful bias detection."
+- Each bonus shows HIT:0 MISS:0 (no data yet).
+- Prediction: [1, 2, 5, COIN FLIP] — evidence-based, no forced variety.
+
+Stage Summary:
+- Calibration over appearance: bias detection requires n>=50 (meaningful sample).
+- NO reactive correction: bias flags are diagnostic only — never boost/penalty outcomes.
+- Sample-size tiers: INSUFFICIENT (<10) / EARLY DATA (<20) / PRELIMINARY (<50) / MEANINGFUL (<100) / MATURE (100+).
+- Per-outcome calibration tracking: Base Prob / Actual Observed / Inclusion Rate / Hit Contribution / Miss Contribution / Sample Size.
+- No fixed target, no fixed bonus, no forced diversity.
+- Evidence over frequency. Out-of-sample performance over short hit streaks.
+- Lint clean, no errors, agent-browser QA green.
+
