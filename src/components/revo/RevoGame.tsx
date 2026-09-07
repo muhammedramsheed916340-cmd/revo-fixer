@@ -450,13 +450,15 @@ export function RevoGame() {
       let nextRecal: { triggered: boolean; reason: string } | null = null;
 
       if (!hit) {
-        // MISS → RCA → RECALIBRATE → new evidence-based prediction
-        const reason = `Recalibration triggered by MISS. RCA: analyzing pattern shift, anomaly, signal-wise performance, recent vs long-term. Adaptive weighting applied.`;
+        // MISS → RCA → RECALIBRATE → fresh evidence-based prediction
+        // NOTE: No automatic carryover from previous prediction. Fresh ranking.
+        const reason = `Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover — every outcome re-scored from scratch.`;
         const eng = recalibrate(updated, reason, spins);
         nextPreds = engineToPredictions(eng);
         nextRecal = { triggered: true, reason };
       } else {
-        // HIT → continue with the unified engine (no recalibration flag)
+        // HIT → continue with fresh ranking (NO automatic carryover)
+        // Previous HIT does NOT auto-include the same outcome. Fresh evidence.
         const eng = buildInitial(updated, spins);
         nextPreds = engineToPredictions(eng);
         nextRecal = null;

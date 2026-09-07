@@ -567,6 +567,53 @@ function scoreCandidates(
   const recentUnique = new Set(recentHist.map((g) => g.name)).size;
   const stability = recentUnique >= 4 ? "STABLE" : recentUnique >= 2 ? "VOLATILE" : "STREAK";
 
+  // ===== REPEAT-PATTERN ANALYSIS (data-based, NOT blind carryover) =====
+  // Analyze the historical tendency of each outcome to REPEAT in the next
+  // round. This is NOT "last hit → predict same again". Instead, we measure:
+  //   P(next = X | current = X)  from ALL historical consecutive pairs.
+  // If the last actual result was X, and X has a historically HIGH repeat
+  // rate, then X gets a MILD evidence boost (capped). If X has a LOW repeat
+  // rate, no penalty — we just don't boost. This is pure statistical
+  // evidence, not a "last hit shortcut".
+  //
+  // We use BOTH the user-verified round history AND the live casino spins
+  // (mapped to game names) for a larger, more reliable sample.
+  const lastActualName = n > 0 ? hist[n - 1].name : null;
+  const lastLiveSpinName = liveN > 0
+    ? (SPIN_TO_GAME_NAME[liveSpins[0].sector] ?? null)
+    : null;
+  // Prefer the most recent data point (live spins are newer than user rounds).
+  const lastResultName = lastLiveSpinName ?? lastActualName;
+
+  // Build a combined consecutive-pair sequence from both sources.
+  // Live spins are newest-first; reverse to oldest-first for pair analysis.
+  const liveGameSeq = liveSpins
+    .map((s) => SPIN_TO_GAME_NAME[s.sector] ?? null)
+    .filter((x): x is string => x !== null)
+    .reverse(); // oldest-first
+  const userGameSeq = hist.map((h) => h.name);
+  const combinedSeq = [...userGameSeq, ...liveGameSeq];
+
+  // Count repeat pairs: P(next = X | current = X)
+  const repeatStats: Record<string, { currentCount: number; repeatCount: number; rate: number }> = {};
+  for (const g of GAMES) repeatStats[g.name] = { currentCount: 0, repeatCount: 0, rate: 0 };
+  for (let i = 0; i < combinedSeq.length - 1; i++) {
+    const cur = combinedSeq[i];
+    const next = combinedSeq[i + 1];
+    if (repeatStats[cur]) {
+      repeatStats[cur].currentCount++;
+      if (next === cur) repeatStats[cur].repeatCount++;
+    }
+  }
+  for (const g of GAMES) {
+    const rs = repeatStats[g.name];
+    rs.rate = rs.currentCount >= 3 ? rs.repeatCount / rs.currentCount : 0;
+  }
+  // Overall average repeat rate (for comparison baseline).
+  const totalRepeatCur = Object.values(repeatStats).reduce((s, r) => s + r.currentCount, 0);
+  const totalRepeatCount = Object.values(repeatStats).reduce((s, r) => s + r.repeatCount, 0);
+  const baselineRepeatRate = totalRepeatCur >= 5 ? totalRepeatCount / totalRepeatCur : 0;
+
   const scores: CandidateScore[] = [];
 
   for (let i = 0; i < GAMES.length; i++) {
@@ -662,25 +709,52 @@ function scoreCandidates(
       signals.push("high-volatility");
     }
 
-    // ===== FACTOR 6: Previous MISS dampening (no blind switching) =====
-    // If the last round was a MISS and this game was in the prediction set,
-    // dampen slightly — but never exclude. No opposite-result chasing.
-    if (lastHit === false && prevPredNames.includes(g.name)) {
-      score *= 0.88;
-      signals.push("prev-miss-dampen");
+    // ===== FACTOR 6: Repeat-Pattern Analysis (DATA-BASED, NOT blind carryover) =====
+    // If the last actual result was this game's name, AND this game has a
+    // historically HIGH repeat rate (P(next=X|cur=X) > baseline), then give
+    // a MILD evidence boost. This is NOT "last hit → predict same again" —
+    // it's "this outcome has a statistical tendency to repeat, and it just
+    // happened, so the evidence for continuation is slightly stronger".
+    //
+    // KEY RULES (per user spec):
+    //   - Previous result gets NO automatic bonus (bonus = 0 by default).
+    //   - Previous HIT gets NO automatic carryover.
+    //   - Previous MISS gets NO automatic penalty.
+    //   - Repeat is ALLOWED but ONLY when statistical evidence supports it.
+    //   - Same number CAN repeat, but only if its repeat rate is above baseline.
+    //
+    // We compare this game's repeat rate against the baseline repeat rate.
+    // Only if ABOVE baseline (and 3+ observed pairs) do we apply a mild boost.
+    if (lastResultName === g.name) {
+      const rs = repeatStats[g.name];
+      if (rs.currentCount >= 3 && rs.rate > baselineRepeatRate * 1.15) {
+        // Above baseline by 15%+ → mild evidence boost (capped at +10%).
+        const excess = (rs.rate - baselineRepeatRate) / Math.max(baselineRepeatRate, 0.01);
+        score *= 1 + Math.min(0.10, excess * 0.15);
+        signals.push(`repeat-supported (${Math.round(rs.rate * 100)}%)`);
+      } else if (rs.currentCount >= 3 && rs.rate < baselineRepeatRate * 0.5) {
+        // Below baseline by 50%+ → mild evidence dampening (repeat is unlikely).
+        score *= 0.95;
+        signals.push(`repeat-unlikely (${Math.round(rs.rate * 100)}%)`);
+      }
+      // If repeat rate is near baseline → NO boost, NO penalty. Fresh ranking.
     }
 
     // ===================================================================
-    // EXPLICITLY REMOVED (gambler's fallacy / hot-number bias):
+    // EXPLICITLY REMOVED (last-hit carryover bias):
+    //   - NO prev-miss-dampen (previous MISS → automatic penalty)
+    //   - NO prev-HIT continuation (previous HIT → automatic bonus)
     //   - NO overdue gap-filling boost (isOverdue → boost)
-    //   - NO prev-HIT continuation boost (would repeatedly target same HOT number)
     //   - NO hot/cold z-score boost
-    // These remain as INFORMATIONAL DESCRIPTIVE stats in the UI (badges,
-    // table columns) but they NEVER affect the prediction score.
+    // Every round is a FRESH evidence-based ranking. Previous result is just
+    // ONE historical data point — it only affects the score via the
+    // Repeat-Pattern Analysis above (and only if statistically supported).
     // ===================================================================
     void isOverdue;
     void isHot;
     void isCold;
+    void lastHit;
+    void prevPredNames;
 
     // ===== SIGNAL 9: Anomaly handling =====
     // If anomaly detected, weight recent data even more.
@@ -959,23 +1033,27 @@ export function runEngine(
   if (rounds.length === 0 && !useLivePrior) {
     whyParts.push("No data yet — predicting with theoretical priors + weighted probabilistic sampling.");
   } else if (useLivePrior && rounds.length === 0) {
-    whyParts.push(`Real casino data: ${liveSpins.length} spins analyzed. Predicting with observed frequency + weighted sampling (varied each cycle).`);
+    whyParts.push(`Real casino data: ${liveSpins.length} spins analyzed. Fresh ranking — no last-hit carryover.`);
   } else if (rounds.length < 3) {
-    whyParts.push(`Building baseline data (${rounds.length} round${rounds.length !== 1 ? "s" : ""})${useLivePrior ? ` + ${liveSpins.length} real casino spins` : ""} — evidence-weighted probabilistic selection.`);
+    whyParts.push(`Building baseline (${rounds.length} round${rounds.length !== 1 ? "s" : ""})${useLivePrior ? ` + ${liveSpins.length} real spins` : ""} — fresh evidence-weighted ranking.`);
   } else {
+    // CORE: Every round is a FRESH ranking. Previous HIT/MISS does NOT
+    // auto-carry the same outcome forward. No "last hit → same number" shortcut.
     if (lastHit === true) {
-      whyParts.push(`Previous HIT — continuing with confirmed signals. Streak: ${consecutiveHits}× HIT.`);
+      whyParts.push(`Previous HIT — but NO automatic carryover. Fresh ranking from all evidence.`);
     } else if (lastHit === false) {
-      whyParts.push(`Previous MISS — RCA completed (${rca?.cause ?? "unknown"}), multi-signal recalibration applied.`);
+      whyParts.push(`Previous MISS — fresh ranking. RCA: ${rca?.cause ?? "unknown"}. No auto-exclude.`);
     }
     whyParts.push(`Hit-rate: ${Math.round(dashboard.predictionHitRate * 100)}% (${dashboard.hits}/${dashboard.totalRounds})`);
     whyParts.push(`Recent (5): ${Math.round(dashboard.recentHitRate * 100)}% • Recent (10): ${Math.round(dashboard.recentHitRateLong * 100)}%`);
-    whyParts.push(`Stability: ${dashboard.modelStability}% • Adaptive weight (recent): ${Math.round(dashboard.adaptiveWeight * 100)}%`);
+    whyParts.push(`Stability: ${dashboard.modelStability}% • Adaptive weight: ${Math.round(dashboard.adaptiveWeight * 100)}%`);
     if (useLivePrior) whyParts.push(`Real casino prior: ${liveSpins.length} spins — observed frequency drives selection`);
     whyParts.push(`Top sampled evidence: ${top4[0]?.signals.join("+") || "theoretical"}`);
     if (dashboard.anomalyDetected) whyParts.push(`⚠ Anomaly detected — χ²=${anomaly.statistic.toFixed(1)}`);
     if (dashboard.patternShiftDetected) whyParts.push(`⚠ Pattern shift — recent data weighted higher`);
   }
+  // Always emphasize: fresh ranking, no last-hit shortcut.
+  whyParts.push("FRESH ranking — previous result is one data point only, NOT a prediction command.");
 
   // VALIDATION CRITERIA
   const validationCriteria =

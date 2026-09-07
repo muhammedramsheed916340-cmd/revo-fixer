@@ -269,12 +269,20 @@ export function RevoLiveResults() {
                   {/* No-bias disclaimer */}
                   <div className="mt-2 rounded-lg border border-[#2ed573]/20 bg-[#2ed573]/5 px-3 py-2 text-[10px] text-[#8899cc]">
                     <i className="fas fa-shield-halved mr-1.5 text-[#2ed573]" />
-                    <b className="text-[#2ed573]">No HOT/OVERDUE/GAP bias:</b>{" "}
+                    <b className="text-[#2ed573]">Fresh Ranking — No Last-Hit Carryover:</b>{" "}
+                    "LAST HIT" ≠ "NEXT PREDICTION". Previous result is ONE data
+                    point only — it does NOT auto-carry into the next prediction.
+                    Every round is a <b>fresh evidence-based ranking</b>: repeat
+                    is allowed only when statistically supported (repeat-pattern
+                    analysis), forced repeat is NOT allowed, forced opposite is
+                    NOT allowed.
+                  </div>
+                  <div className="mt-1.5 rounded-lg border border-[#448AFF]/20 bg-[#448AFF]/5 px-3 py-2 text-[10px] text-[#8899cc]">
+                    <i className="fas fa-circle-info mr-1.5 text-[#448AFF]" />
+                    <b className="text-[#448AFF]">No HOT/OVERDUE/GAP bias:</b>{" "}
                     "HOT" ≠ "NEXT", "OVERDUE" ≠ "NEXT", "LONG GAP" ≠ "NEXT".
-                    HOT/OVERDUE/GAP are shown as <b>INFO only</b> — they NEVER
-                    affect the prediction score. Final score combines recent
-                    pattern + long-term freq + Bayesian + trend + stability +
-                    Wilson LB + signal correlation. No gambler's fallacy.
+                    HOT/OVERDUE/GAP are <b>INFO only</b> — they NEVER affect the
+                    prediction score. No gambler's fallacy.
                   </div>
                 </>
               )}

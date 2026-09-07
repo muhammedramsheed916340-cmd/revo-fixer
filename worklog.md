@@ -804,3 +804,60 @@ Stage Summary:
 - Core rule enforced: "HOT" ≠ "NEXT", "OVERDUE" ≠ "NEXT", "LONG GAP" ≠ "NEXT".
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 22 (user request — LAST HIT REPEAT BIAS fix)
+Agent: Z.ai Code
+Task: User reported "Prediction wrong LAST HIT REPEAT BIAS — FIX IMMEDIATELY". Previous round's HIT outcome must NOT automatically carry into the next prediction. "LAST HIT" ≠ "NEXT PREDICTION". Every round must be a fresh evidence-based ranking. Repeat is allowed but ONLY when statistically supported.
+
+Root Cause Found:
+- `decisionEngine.ts` `scoreCandidates()` had FACTOR 6 "Previous MISS dampening" (prev-miss-dampen) — when the last round was a MISS, outcomes that were in the previous prediction set got a -12% score penalty. This is a form of last-hit bias (automatically penalizing based on previous prediction).
+- The previous HIT continuation boost was already removed in Task 21, but the prev-miss-dampen remained.
+- No proper repeat-pattern analysis existed — the engine never checked whether the last actual result has a historical tendency to repeat.
+
+Fixes Applied:
+
+1. **`decisionEngine.ts` — Added Repeat-Pattern Analysis** (data-based, NOT blind carryover):
+   - Computes `P(next = X | current = X)` from ALL historical consecutive pairs in BOTH the user-verified round history AND the live casino spins (mapped to game names).
+   - Builds a `repeatStats` record per game: `{ currentCount, repeatCount, rate }`.
+   - Computes a `baselineRepeatRate` (overall average repeat rate) for comparison.
+   - Only applies a mild boost (+10% cap) when: (a) the last result was this game AND (b) this game's repeat rate is 15%+ above baseline AND (c) 3+ observed pairs.
+   - Applies a mild dampening (-5%) when the repeat rate is 50%+ below baseline.
+   - Near-baseline → NO boost, NO penalty (fresh ranking).
+   - This is pure statistical evidence — NOT "last hit → predict same again".
+
+2. **`decisionEngine.ts` — Removed prev-miss-dampen**:
+   - Deleted FACTOR 6 "Previous MISS dampening" entirely.
+   - Added `void lastHit; void prevPredNames;` to document they're intentionally unused in scoring.
+   - Every round is now a FRESH ranking — previous HIT/MISS does NOT auto-carry or auto-exclude.
+
+3. **Updated "Why This Move" panel**:
+   - HIT case: "Previous HIT — but NO automatic carryover. Fresh ranking from all evidence."
+   - MISS case: "Previous MISS — fresh ranking. RCA: [cause]. No auto-exclude."
+   - Always appends: "FRESH ranking — previous result is one data point only, NOT a prediction command."
+
+4. **Updated recalibration reason message** in `RevoGame.tsx`:
+   - "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover — every outcome re-scored from scratch."
+
+5. **UI — Added "Fresh Ranking — No Last-Hit Carryover" disclaimer panel** (green) in RevoLiveResults:
+   - "LAST HIT" ≠ "NEXT PREDICTION". Previous result is ONE data point only — it does NOT auto-carry into the next prediction. Every round is a fresh evidence-based ranking: repeat is allowed only when statistically supported (repeat-pattern analysis), forced repeat is NOT allowed, forced opposite is NOT allowed.
+   - Kept the existing "No HOT/OVERDUE/GAP bias" panel (blue) below it.
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Fresh-ranking disclaimers render: "Fresh Ranking — No Last-Hit Carryover" + "No HOT/OVERDUE/GAP bias".
+- Why This Move panel shows: "Building baseline (1 round) + 30 real spins — fresh evidence-weighted ranking. • FRESH ranking — previous result is one data point only, NOT a prediction command."
+- Recalibration banner shows: "Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover — every outcome re-scored from scratch."
+- Prediction variety verified (6 runs): [2,1,COIN FLIP,CASH HUNT], [2,1,5,10], [2,1,5,10], [2,1,COIN FLIP,PACHINKO], [2,1,COIN FLIP,CASH HUNT], [2,1,10,PACHINKO] — 4th slot varies (COIN FLIP, 5, 10, PACHINKO, CASH HUNT). High-freq numbers (2, 1) appear often (correct — higher theoretical prob) but the same HOT number is NOT forced into every prediction set.
+- VLM confirmed: green "Fresh Ranking — No Last-Hit Carryover" panel + blue "No HOT/OVERDUE/GAP bias" panel both visible.
+
+Stage Summary:
+- LAST HIT REPEAT BIAS completely removed from the prediction engine.
+- Previous HIT/MISS does NOT auto-carry or auto-exclude any outcome.
+- New Repeat-Pattern Analysis signal: P(next=X|cur=X) computed from historical pairs — mild boost ONLY when statistically supported (repeat rate 15%+ above baseline, 3+ pairs).
+- Every round is a FRESH evidence-based ranking — no "last hit → same number" shortcut.
+- Core rule enforced: "LAST HIT" ≠ "NEXT PREDICTION". Repeat is allowed, forced repeat is NOT, forced opposite is NOT.
+- Lint clean, no errors, agent-browser QA green.
+
