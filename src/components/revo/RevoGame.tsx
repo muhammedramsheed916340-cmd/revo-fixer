@@ -906,6 +906,16 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
     hitStreak,
     missStreak,
     predictionCoverage,
+    // NEW bonus risk analysis:
+    normalOutcomeCoverage,
+    bonusOutcomeCoverage,
+    bonusOutcomeRisk,
+    totalPredictionCoverage,
+    bonusRecentRate,
+    bonusLongTermRate,
+    bonusTrend,
+    bonusBursts,
+    bonusActive,
   } = dashboard;
 
   return (
@@ -991,6 +1001,78 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
           <div className="rounded-lg border border-[#1e2240] bg-[#0d1020] p-2.5 text-center">
             <div className="text-lg font-black text-white">{totalRounds}</div>
             <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Sample Size</div>
+          </div>
+        </div>
+
+        {/* ===== BONUS RISK ANALYSIS (no bonus blind spot) ===== */}
+        <div className="rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700]">
+              <i className="fas fa-triangle-exclamation" /> Bonus Risk Analysis
+            </span>
+            {bonusActive && (
+              <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]">
+                <i className="fas fa-circle-dot mr-0.5" /> Bonus Active
+              </span>
+            )}
+          </div>
+          {/* Coverage breakdown */}
+          <div className="grid grid-cols-3 gap-1.5">
+            <div className="rounded border border-[#448AFF]/30 bg-[#448AFF]/5 p-1.5 text-center">
+              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Normal Coverage</div>
+              <div className="text-sm font-black text-[#448AFF]">{(normalOutcomeCoverage * 100).toFixed(1)}%</div>
+            </div>
+            <div className="rounded border border-[#FFD700]/30 bg-[#FFD700]/5 p-1.5 text-center">
+              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Bonus Coverage</div>
+              <div className="text-sm font-black text-[#FFD700]">{(bonusOutcomeCoverage * 100).toFixed(1)}%</div>
+            </div>
+            <div className={`rounded border p-1.5 text-center ${bonusOutcomeRisk > 0.1 ? "border-[#ff4757]/40 bg-[#ff4757]/8" : "border-[#2ed573]/30 bg-[#2ed573]/5"}`}>
+              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Bonus Risk</div>
+              <div className={`text-sm font-black ${bonusOutcomeRisk > 0.1 ? "text-[#ff4757]" : "text-[#2ed573]"}`}>{(bonusOutcomeRisk * 100).toFixed(1)}%</div>
+            </div>
+          </div>
+          {/* Bonus activity stats */}
+          <div className="mt-2 grid grid-cols-2 gap-1.5 text-[9px] sm:grid-cols-4">
+            <div className="rounded bg-[#0d1020]/60 px-1.5 py-1 text-center">
+              <div className="text-[#5a6a99]">Bonus Recent</div>
+              <div className="font-bold text-white">{(bonusRecentRate * 100).toFixed(1)}%</div>
+            </div>
+            <div className="rounded bg-[#0d1020]/60 px-1.5 py-1 text-center">
+              <div className="text-[#5a6a99]">Bonus Long-Term</div>
+              <div className="font-bold text-white">{(bonusLongTermRate * 100).toFixed(1)}%</div>
+            </div>
+            <div className="rounded bg-[#0d1020]/60 px-1.5 py-1 text-center">
+              <div className="text-[#5a6a99]">Trend</div>
+              <div className={`font-bold ${bonusTrend > 0 ? "text-[#ff4757]" : bonusTrend < 0 ? "text-[#2ed573]" : "text-[#5a6a99]"}`}>
+                {bonusTrend > 0 ? "↑" : bonusTrend < 0 ? "↓" : "→"} {Math.abs(bonusTrend * 100).toFixed(1)}%
+              </div>
+            </div>
+            <div className="rounded bg-[#0d1020]/60 px-1.5 py-1 text-center">
+              <div className="text-[#5a6a99]">Clusters</div>
+              <div className="font-bold text-white">{bonusBursts}</div>
+            </div>
+          </div>
+          {/* Total coverage bar */}
+          <div className="mt-2">
+            <div className="mb-0.5 flex items-center justify-between text-[9px]">
+              <span className="text-[#5a6a99]">Total Prediction Coverage</span>
+              <span className="font-bold text-[#2ed573]">{(totalPredictionCoverage * 100).toFixed(1)}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-[#1e2240]">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${totalPredictionCoverage * 100}%`,
+                  background: "linear-gradient(90deg,#448AFF,#FFD700,#2ed573)",
+                }}
+              />
+            </div>
+          </div>
+          <div className="mt-1.5 text-[9px] text-[#8899cc]">
+            <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
+            <b className="text-white">No bonus blind spot:</b> ALL 8 outcomes (numbers + bonuses) are scored
+            equally. If bonus evidence is strong, a bonus CAN enter the Top-4 — no
+            fixed [1,2,5,10]. Bonus risk = probability of MISS from excluded bonus outcomes.
           </div>
         </div>
 

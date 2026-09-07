@@ -157,6 +157,16 @@ export interface PerformanceDashboard {
   hitStreak: number;                   // current consecutive HITs
   missStreak: number;                  // current consecutive MISSes
   predictionCoverage: number;         // theoretical coverage of active prediction (0..1)
+  // ===== NEW: Bonus risk analysis =====
+  normalOutcomeCoverage: number;       // theoretical coverage of number outcomes in active prediction
+  bonusOutcomeCoverage: number;        // theoretical coverage of bonus outcomes in active prediction
+  bonusOutcomeRisk: number;            // 0..1 — probability of a bonus MISS (excluded bonus prob)
+  totalPredictionCoverage: number;     // total coverage (normal + bonus)
+  bonusRecentRate: number;             // recent bonus frequency (last 10)
+  bonusLongTermRate: number;           // long-term bonus frequency
+  bonusTrend: number;                  // recent - long-term (positive = increasing)
+  bonusBursts: number;                 // count of bonus clusters (2+ in 3 spins)
+  bonusActive: boolean;                // bonus appeared in last 3 spins
 }
 
 // ============================================================
@@ -400,7 +410,7 @@ function runRca(
 // ============================================================
 // PERFORMANCE DASHBOARD
 // ============================================================
-function buildDashboard(rounds: RoundResult[]): PerformanceDashboard {
+function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): PerformanceDashboard {
   const totalRounds = rounds.length;
   const hits = rounds.filter((r) => r.hit).length;
   const misses = totalRounds - hits;
@@ -509,6 +519,53 @@ function buildDashboard(rounds: RoundResult[]): PerformanceDashboard {
   const anomaly = detectAnomaly(rounds);
   const patternShift = detectPatternShift(rounds);
 
+  // ===== BONUS RISK ANALYSIS =====
+  // Compute bonus coverage/risk from the active prediction (last round's pred).
+  const lastRoundForBonus = rounds[totalRounds - 1];
+  const activePredNames = lastRoundForBonus
+    ? lastRoundForBonus.prediction.map((p) => p.game.name)
+    : [];
+  const activeBonusNames = activePredNames.filter((n) => BONUS_NAMES.includes(n));
+  const activeNumberNames = activePredNames.filter((n) => !BONUS_NAMES.includes(n));
+  const normalOutcomeCoverage = activeNumberNames.reduce(
+    (s, n) => s + (THEORETICAL[n] ?? 0),
+    0,
+  );
+  const bonusOutcomeCoverage = activeBonusNames.reduce(
+    (s, n) => s + (THEORETICAL[n] ?? 0),
+    0,
+  );
+  // Bonus risk = probability that a bonus outcome occurs but is NOT in the prediction.
+  // = sum of theoretical probs of EXCLUDED bonus outcomes.
+  const excludedBonusNames = BONUS_NAMES.filter((n) => !activePredNames.includes(n));
+  const bonusOutcomeRisk = excludedBonusNames.reduce(
+    (s, n) => s + (THEORETICAL[n] ?? 0),
+    0,
+  );
+  const totalPredictionCoverage = normalOutcomeCoverage + bonusOutcomeCoverage;
+
+  // Bonus frequency from combined sequence (user rounds + live spins)
+  const combinedBonusSeq = [
+    ...rounds.map((r) => r.actualResult.name),
+    ...liveSpins.map((s) => SPIN_TO_GAME_NAME[s.sector] ?? "").filter((x) => x),
+  ];
+  const bonusLongTermRate = combinedBonusSeq.length > 0
+    ? combinedBonusSeq.filter((n) => BONUS_NAMES.includes(n)).length / combinedBonusSeq.length
+    : 0;
+  const recent10Combined = combinedBonusSeq.slice(-10);
+  const bonusRecentRate = recent10Combined.length > 0
+    ? recent10Combined.filter((n) => BONUS_NAMES.includes(n)).length / recent10Combined.length
+    : 0;
+  const bonusTrend = bonusRecentRate - bonusLongTermRate;
+  // Bonus bursts (2+ bonuses within 3 spins)
+  let bonusBursts = 0;
+  for (let i = 0; i < combinedBonusSeq.length - 2; i++) {
+    const window = combinedBonusSeq.slice(i, i + 3);
+    if (window.filter((n) => BONUS_NAMES.includes(n)).length >= 2) bonusBursts++;
+  }
+  const last3Combined = combinedBonusSeq.slice(-3);
+  const bonusActive = last3Combined.some((n) => BONUS_NAMES.includes(n));
+
   return {
     totalRounds,
     hits,
@@ -542,6 +599,16 @@ function buildDashboard(rounds: RoundResult[]): PerformanceDashboard {
     hitStreak,
     missStreak,
     predictionCoverage,
+    // NEW bonus risk analysis:
+    normalOutcomeCoverage,
+    bonusOutcomeCoverage,
+    bonusOutcomeRisk,
+    totalPredictionCoverage,
+    bonusRecentRate,
+    bonusLongTermRate,
+    bonusTrend,
+    bonusBursts,
+    bonusActive,
   };
 }
 
@@ -680,6 +747,42 @@ function scoreCandidates(
   const totalRepeatCount = Object.values(repeatStats).reduce((s, r) => s + r.repeatCount, 0);
   const baselineRepeatRate = totalRepeatCur >= 5 ? totalRepeatCount / totalRepeatCur : 0;
 
+  // ===== BONUS CLUSTER DETECTION (bonus-aware scoring) =====
+  // Analyze whether bonus outcomes are: increasing, decreasing, clustering,
+  // appearing after specific sequences, repeating, or showing unusual recent
+  // frequency. This is NOT "bonus appeared → predict bonus next". Instead,
+  // we measure the CURRENT bonus activity level vs the long-term baseline.
+  // If bonus activity is elevated, bonus outcomes get a mild evidence boost
+  // (capped). This ensures the engine does NOT have a bonus blind spot.
+  const isBonusGame = (name: string): boolean => BONUS_NAMES.includes(name);
+
+  // Bonus frequency in combined sequence (long-term)
+  const combinedBonusCount = combinedSeq.filter(isBonusGame).length;
+  const combinedBonusRate = combinedSeq.length > 0 ? combinedBonusCount / combinedSeq.length : 0;
+  // Bonus frequency in recent 10 of combined sequence (short-term)
+  const recentCombined = combinedSeq.slice(-10);
+  const recentBonusCount = recentCombined.filter(isBonusGame).length;
+  const recentBonusRate = recentCombined.length > 0 ? recentBonusCount / recentCombined.length : 0;
+  // Bonus activity trend: recent vs long-term
+  const bonusTrend = recentBonusRate - combinedBonusRate; // positive = increasing
+  // Bonus clustering: count bonus "bursts" (2+ bonuses within 3 spins)
+  let bonusBursts = 0;
+  for (let i = 0; i < combinedSeq.length - 2; i++) {
+    const window = combinedSeq.slice(i, i + 3);
+    const bonusInWindow = window.filter(isBonusGame).length;
+    if (bonusInWindow >= 2) bonusBursts++;
+  }
+  // Is a bonus currently "active" (appeared in last 3 spins)?
+  const last3 = combinedSeq.slice(-3);
+  const bonusInLast3 = last3.filter(isBonusGame).length;
+  const bonusActive = bonusInLast3 > 0;
+  // Per-bonus-game recent frequency (last 10 combined)
+  const bonusRecentFreq: Record<string, number> = {};
+  for (const b of BONUS_NAMES) bonusRecentFreq[b] = 0;
+  for (const name of recentCombined) {
+    if (isBonusGame(name)) bonusRecentFreq[name] = (bonusRecentFreq[name] ?? 0) + 1;
+  }
+
   const scores: CandidateScore[] = [];
 
   for (let i = 0; i < GAMES.length; i++) {
@@ -804,6 +907,46 @@ function scoreCandidates(
         signals.push(`repeat-unlikely (${Math.round(rs.rate * 100)}%)`);
       }
       // If repeat rate is near baseline → NO boost, NO penalty. Fresh ranking.
+    }
+
+    // ===== FACTOR 7: BONUS-AWARE SCORING (no bonus blind spot) =====
+    // Bonus outcomes are scored EQUALLY with number outcomes. If bonus
+    // activity is elevated (recent bonus rate > long-term baseline), bonus
+    // outcomes get a mild evidence boost. This is NOT "bonus appeared →
+    // predict bonus next" — it's "bonus activity is currently elevated, so
+    // bonus outcomes have slightly stronger evidence right now".
+    //
+    // This eliminates the [1,2,5,10] blind spot: when bonus evidence is
+    // strong enough, a bonus outcome CAN enter the Top-4.
+    if (isBonusGame(g.name)) {
+      // Boost if recent bonus rate is elevated vs long-term
+      if (combinedSeq.length >= 15 && recentBonusRate > combinedBonusRate * 1.3) {
+        const elevation = (recentBonusRate - combinedBonusRate) / Math.max(combinedBonusRate, 0.01);
+        score *= 1 + Math.min(0.20, elevation * 0.3);
+        signals.push(`bonus-elevated (${Math.round(recentBonusRate * 100)}%)`);
+      }
+      // Boost if this specific bonus appeared recently (last 10)
+      const thisBonusRecent = bonusRecentFreq[g.name] ?? 0;
+      if (thisBonusRecent > 0 && recentCombined.length > 0) {
+        const thisBonusRate = thisBonusRecent / recentCombined.length;
+        const thisBonusTheo = theo;
+        if (thisBonusRate > thisBonusTheo * 1.5) {
+          score *= 1.10;
+          signals.push("bonus-recent-active");
+        }
+      }
+      // Mild boost if bonus clustering detected (bursts)
+      if (bonusBursts >= 2 && bonusActive) {
+        score *= 1.05;
+        signals.push("bonus-clustering");
+      }
+    } else {
+      // For NUMBER outcomes: if bonus risk is high, numbers are slightly
+      // less reliable (the wheel is in a "bonus phase"). Mild dampening.
+      if (combinedSeq.length >= 15 && recentBonusRate > combinedBonusRate * 1.5) {
+        score *= 0.97;
+        signals.push("bonus-phase-risk");
+      }
     }
 
     // ===================================================================
@@ -1004,7 +1147,7 @@ export function runEngine(
   recalibrationReason = "",
   liveSpins: SpinData[] = [],
 ): EngineOutput {
-  const dashboard = buildDashboard(rounds);
+  const dashboard = buildDashboard(rounds, liveSpins);
   const anomaly = detectAnomaly(rounds);
   const patternShift = detectPatternShift(rounds);
 
