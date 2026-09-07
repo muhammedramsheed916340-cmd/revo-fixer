@@ -163,8 +163,13 @@ export interface CandidateScore {
   // ===== NEW: Full debug fields for QA verification =====
   observedFrequency: number;  // observed frequency in live data (0..1)
   blendedFrequency: number;   // blended long-term + recent frequency (0..1)
-  relativeDeviation: number;  // (blended - prior) / prior
-  evidenceScorePreMultiplier: number; // 1 + cappedDeviation (pure relative evidence)
+  relativeDeviation: number;  // RAW (unstabilized) deviation
+  evidenceScorePreMultiplier: number; // 1 + cappedDeviation (stabilized relative evidence)
+  sampleN: number;            // total sample size (user rounds + live spins)
+  observedCount: number;      // combined observed count for this outcome
+  smoothedFrequency: number;  // Laplace-smoothed frequency (0..1)
+  rawDeviation: number;       // raw (unstabilized) relative deviation
+  stabilizedDeviation: number; // sample-size-stabilized relative deviation
 }
 
 // ============================================================
@@ -1098,36 +1103,59 @@ function scoreCandidates(
 
     const signals: string[] = [];
 
-    // ===== BASE SCORE — PURE RELATIVE EVIDENCE (no prior multiplication) =====
-    // CRITICAL FIX: The previous formula `prior * (1 + deviation)` STILL
-    // multiplied by the absolute prior, so high-prior outcomes (1, 2) always
-    // scored higher even with identical relative evidence.
+    // ===== SAMPLE-SIZE STABILIZATION (Bayesian / Laplace shrinkage) =====
+    // CRITICAL: Small-sample observations must NOT create extreme deviations.
+    // A single CRAZY TIME in 30 spins → raw observed 3.3% vs prior 1.85% →
+    // raw deviation +78%. This is NOT statistically reliable.
     //
-    // NEW FORMULA: `score = (1 + cappedDeviation) * 0.85 + livePrior * 0.15`
+    // We use Laplace (Bayesian) smoothing:
+    //   smoothedFreq = (count + k * prior) / (N + k)
+    // where k = pseudo-count (prior strength). With k=20:
+    //   N=30, CRAZY TIME count=1, prior=1.85%:
+    //     raw = 3.3%, smoothed = (1 + 20*0.0185) / 50 = 2.74% → dev=+48% (was +78%)
+    //   N=30, "1" count=12, prior=38.89%:
+    //     raw = 40%, smoothed = (12 + 20*0.389) / 50 = 39.56% → dev=+1.7% (was +1.9%)
     //
-    // The PRIMARY signal (85%) is the RELATIVE DEVIATION — how strong is the
-    // evidence for this outcome relative to ITS OWN expected baseline?
-    // The SECONDARY signal (15%) is a mild prior weight (regression to mean).
+    // This naturally shrinks rare-outcome deviations more aggressively (because
+    // their prior pseudo-count is small relative to the observed count), while
+    // barely affecting common outcomes.
     //
-    // TEST 1 (control): identical deviation → identical primary score:
-    //   Outcome A: prior=40%, observed=44% → dev=+10% → primary=1.10
-    //   Outcome B: prior=4%,  observed=4.4%→ dev=+10% → primary=1.10
-    //   A total = 1.10*0.85 + 0.40*0.15 = 0.935 + 0.060 = 0.995
-    //   B total = 1.10*0.85 + 0.04*0.15 = 0.935 + 0.006 = 0.941
-    //   A is only 5.7% higher than B (due to mild prior weight) — NOT 10×.
-    //
-    // When deviations differ strongly:
-    //   A: prior=40%, observed=36% → dev=-10% → primary=0.90 → total=0.825
-    //   B: prior=4%,  observed=8%  → dev=+100%→ primary=2.00 → total=1.706
-    //   B out-ranks A (1.706 > 0.825) — strong evidence beats high prior. ✓
-    const blendedFreq = (longFreq * longW + recFreq * adaptW);
-    const deviation = livePrior > 0 ? (blendedFreq - livePrior) / livePrior : 0;
-    // Cap deviation to prevent extreme swings: [-0.6, +2.0]
-    const cappedDeviation = Math.max(-0.6, Math.min(2.0, deviation));
-    // Primary: relative evidence (85%), Secondary: mild prior weight (15%)
-    const evidenceScore = 1 + cappedDeviation; // pure relative evidence (pre-multiplier)
-    let score = evidenceScore * 0.85 + livePrior * 0.15;
-    if (!useLivePrior && n === 0) score = theo; // no data at all → pure theoretical
+    // The smoothing constant k=20 means: "treat the prior as equivalent to 20
+    // pseudo-observations." At N=20, observed data has equal weight to prior.
+    // At N=100, observed data has 5× the weight of prior. At N=1, prior
+    // dominates (19:1 ratio).
+    const SHRINKAGE_K = 20;
+
+    // Compute observed count and total N for this outcome.
+    // Use the larger of (user rounds, live spins) as the sample.
+    const userCount = freqAll.get(g.name) ?? 0;
+    const liveCount = liveFreqAll.get(g.name) ?? 0;
+    // Total sample N = combined user rounds + live spins
+    const sampleN = n + liveN;
+    // Combined observed count (user + live, weighted by their respective N)
+    const combinedCount = userCount + liveCount;
+
+    // Laplace-smoothed frequency
+    const smoothedFreq = sampleN > 0
+      ? (combinedCount + SHRINKAGE_K * theo) / (sampleN + SHRINKAGE_K)
+      : theo;
+
+    // Raw (unstabilized) deviation — for debug display only
+    const rawBlendedFreq = (longFreq * longW + recFreq * adaptW);
+    const rawDeviation = theo > 0 ? (rawBlendedFreq - theo) / theo : 0;
+
+    // Stabilized deviation — uses the Laplace-smoothed frequency
+    const stabilizedDeviation = theo > 0 ? (smoothedFreq - theo) / theo : 0;
+
+    // Cap stabilized deviation to prevent extreme swings: [-0.6, +2.0]
+    const cappedDeviation = Math.max(-0.6, Math.min(2.0, stabilizedDeviation));
+
+    // ===== BASE SCORE — PURE STABILIZED RELATIVE EVIDENCE =====
+    // Primary (85%): stabilized relative deviation (sample-size aware)
+    // Secondary (15%): mild prior weight (regression to mean)
+    const evidenceScore = 1 + cappedDeviation;
+    let score = evidenceScore * 0.85 + theo * 0.15;
+    if (sampleN === 0) score = theo; // no data at all → pure theoretical
 
     // ===== FACTOR 1: Recent active (mild adaptive signal — NOT a chase) =====
     // Appearing more than 80% of theoretical recently → mild evidence the wheel
@@ -1314,9 +1342,14 @@ function scoreCandidates(
       selectionReason: "", // filled after ranking
       // Full debug fields:
       observedFrequency: longFreq,
-      blendedFrequency: blendedFreq,
-      relativeDeviation: deviation,
+      blendedFrequency: rawBlendedFreq,
+      relativeDeviation: rawDeviation,
       evidenceScorePreMultiplier: evidenceScore,
+      sampleN,
+      observedCount: combinedCount,
+      smoothedFrequency: smoothedFreq,
+      rawDeviation,
+      stabilizedDeviation,
     });
   }
 

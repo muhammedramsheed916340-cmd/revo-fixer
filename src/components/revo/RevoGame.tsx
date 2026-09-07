@@ -1382,26 +1382,29 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
 
         {/* Per-outcome breakdown table — ALL 8 outcomes with full debug fields */}
         <div className="overflow-x-auto revo-scroll">
-          <table className="w-full min-w-[1000px] text-center text-[9px]">
+          <table className="w-full min-w-[1100px] text-center text-[9px]">
             <thead>
               <tr className="border-b border-[#1e2240] bg-[#0d1020]/60">
                 <th className="px-1.5 py-2 text-left">Outcome</th>
                 <th className="px-1.5 py-2">Base Prior</th>
+                <th className="px-1.5 py-2">N</th>
                 <th className="px-1.5 py-2">Observed</th>
-                <th className="px-1.5 py-2">Blended</th>
-                <th className="px-1.5 py-2">Rel. Dev.</th>
+                <th className="px-1.5 py-2">Smoothed</th>
+                <th className="px-1.5 py-2">Raw Dev.</th>
+                <th className="px-1.5 py-2">Stabilized</th>
                 <th className="px-1.5 py-2">Evidence</th>
-                <th className="px-1.5 py-2">Final Score</th>
+                <th className="px-1.5 py-2">Final</th>
                 <th className="px-1.5 py-2">Rank</th>
                 <th className="px-1.5 py-2">Sel</th>
-                <th className="px-1.5 py-2 text-left">Reason</th>
               </tr>
             </thead>
             <tbody>
               {sorted.map((c, i) => {
                 const isTop4 = i < 4;
-                const devPct = (c.relativeDeviation * 100);
-                const devColor = devPct > 5 ? "#2ed573" : devPct < -5 ? "#ff4757" : "#5a6a99";
+                const rawDevPct = (c.rawDeviation * 100);
+                const stabDevPct = (c.stabilizedDeviation * 100);
+                const rawColor = rawDevPct > 5 ? "#ff4757" : rawDevPct < -5 ? "#00d4ff" : "#5a6a99";
+                const stabColor = stabDevPct > 5 ? "#2ed573" : stabDevPct < -5 ? "#ff4757" : "#5a6a99";
                 return (
                   <tr
                     key={c.game.name}
@@ -1414,10 +1417,14 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
                       {c.game.isBonus && <span className="ml-0.5 text-[7px] text-[#FFD700]">★</span>}
                     </td>
                     <td className="px-1.5 py-1.5 text-[#448AFF]">{(c.basePrior * 100).toFixed(1)}%</td>
+                    <td className="px-1.5 py-1.5 text-[#5a6a99]">{c.sampleN}</td>
                     <td className="px-1.5 py-1.5 text-[#00d4ff]">{(c.observedFrequency * 100).toFixed(1)}%</td>
-                    <td className="px-1.5 py-1.5 text-[#8899cc]">{(c.blendedFrequency * 100).toFixed(1)}%</td>
-                    <td className="px-1.5 py-1.5" style={{ color: devColor }}>
-                      {devPct > 0 ? "+" : ""}{devPct.toFixed(0)}%
+                    <td className="px-1.5 py-1.5 text-[#8899cc]">{(c.smoothedFrequency * 100).toFixed(1)}%</td>
+                    <td className="px-1.5 py-1.5" style={{ color: rawColor }}>
+                      {rawDevPct > 0 ? "+" : ""}{rawDevPct.toFixed(0)}%
+                    </td>
+                    <td className="px-1.5 py-1.5" style={{ color: stabColor }}>
+                      {stabDevPct > 0 ? "+" : ""}{stabDevPct.toFixed(0)}%
                     </td>
                     <td className="px-1.5 py-1.5 text-[#a78bfa]">{c.evidenceScorePreMultiplier.toFixed(3)}</td>
                     <td className="px-1.5 py-1.5 font-black text-[#2ed573]">{(c.finalAIScore * 100).toFixed(2)}</td>
@@ -1438,9 +1445,6 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
                       ) : (
                         <i className="fas fa-xmark text-[10px] text-[#5a6a99]" />
                       )}
-                    </td>
-                    <td className="px-1.5 py-1.5 text-left text-[8px] text-[#8899cc]">
-                      {c.selectionReason || "—"}
                     </td>
                   </tr>
                 );
