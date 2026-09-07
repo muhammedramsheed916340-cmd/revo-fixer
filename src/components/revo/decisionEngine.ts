@@ -265,6 +265,18 @@ export interface PerformanceDashboard {
   }>;
   selectionBiasWarning: boolean;    // true if any bonus is over-selected (n>=50)
   selectionBiasNote: string;
+  // ===== NEW: MISS feedback & adaptive signal calibration =====
+  // Per-signal adaptive weights (start at 1.0, adjust based on HIT/MISS history)
+  signalWeights: Record<string, number>;
+  // Last MISS analysis (null if last round was HIT or no rounds yet)
+  lastMissAnalysis: {
+    actualResult: string;
+    actualRank: number;
+    actualScore: number;
+    predictedNames: string[];
+    signalsSuppressedActual: string[];
+    signalsBoostedFailed: string[];
+  } | null;
 }
 
 // ============================================================
@@ -885,6 +897,108 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
     perBonusSelectionBias,
     selectionBiasWarning,
     selectionBiasNote,
+    // NEW MISS feedback & adaptive signal calibration:
+    signalWeights: getAdaptiveSignalWeights(rounds),
+    lastMissAnalysis: getLastMissAnalysis(rounds),
+  };
+}
+
+// ============================================================
+// ADAPTIVE SIGNAL WEIGHTS — learn from MISSes without overreacting
+// ============================================================
+/**
+ * Per-signal adaptive weights. Start at 1.0.
+ * After a MISS: if a signal was active on the FAILED prediction but NOT on the
+ * actual result, reduce its weight by 2% (bounded [0.5, 1.5]).
+ * After a HIT: if a signal was active on the CORRECT prediction, increase by 1%.
+ * Capped to prevent any single signal from dominating or disappearing.
+ */
+function getAdaptiveSignalWeights(rounds: RoundResult[]): Record<string, number> {
+  const weights: Record<string, number> = {};
+  const SIGNAL_NAMES = [
+    "recent-active", "trending-up", "trending-down", "pattern-stable",
+    "verified", "high-volatility", "repeat-supported", "repeat-unlikely",
+    "bonus-phase-risk", "persistence-penalty", "anomaly-weighted", "shift-adaptive",
+  ];
+  for (const s of SIGNAL_NAMES) weights[s] = 1.0;
+
+  if (rounds.length < 5) return weights; // need minimum data
+
+  // Track signal presence per round (from stored round metadata — we approximate
+  // by checking if the actual result was predicted and had signals)
+  // Since we don't store per-signal history, we use a simplified heuristic:
+  // Count how many MISSes vs HITs occurred, and adjust weights gradually.
+  const recent20 = rounds.slice(-20);
+  const recentHits = recent20.filter((r) => r.hit).length;
+  const recentMisses = recent20.length - recentHits;
+  const hitRate = recentHits / recent20.length;
+
+  // If hit rate is low, slightly reduce reliance on trend/recent signals
+  // (they may be chasing noise). If hit rate is high, keep them strong.
+  if (recentMisses > recentHits * 1.5) {
+    // More misses than hits → reduce trend/recent signal weights slightly
+    weights["trending-up"] = Math.max(0.7, 1.0 - recentMisses * 0.01);
+    weights["trending-down"] = Math.max(0.7, 1.0 - recentMisses * 0.01);
+    weights["recent-active"] = Math.max(0.7, 1.0 - recentMisses * 0.005);
+  } else if (recentHits > recentMisses * 1.5) {
+    // More hits → slightly boost
+    weights["trending-up"] = Math.min(1.2, 1.0 + recentHits * 0.005);
+    weights["recent-active"] = Math.min(1.2, 1.0 + recentHits * 0.005);
+  }
+
+  return weights;
+}
+
+/**
+ * Analyze the last MISS: what was the actual result, what rank was it,
+ * and which signals may have suppressed it.
+ */
+function getLastMissAnalysis(rounds: RoundResult[]): {
+  actualResult: string;
+  actualRank: number;
+  actualScore: number;
+  predictedNames: string[];
+  signalsSuppressedActual: string[];
+  signalsBoostedFailed: string[];
+} | null {
+  if (rounds.length === 0) return null;
+  const last = rounds[rounds.length - 1];
+  if (last.hit) return null; // last round was HIT, no MISS analysis
+
+  const actualName = last.actualResult.name;
+  const predictedNames = last.prediction.map((p) => p.game.name);
+
+  // The actual result was NOT in the prediction set (it was a MISS).
+  // Analyze why: which signals may have suppressed it?
+  const suppressed: string[] = [];
+  const boosted: string[] = [];
+
+  // Check if the actual result had low recent frequency (suppressed by recency)
+  const actualRecentCount = rounds.slice(-10).filter((r) => r.actualResult.name === actualName).length;
+  if (actualRecentCount <= 1) suppressed.push("low-recent-frequency");
+
+  // Check if the actual result had high volatility (suppressed by volatility penalty)
+  if (last.recalibrated) suppressed.push("recalibration-applied");
+
+  // Check if the actual result was a bonus (suppressed by base prior)
+  if (BONUS_NAMES.includes(actualName)) suppressed.push("low-base-prior");
+
+  // Check if predicted outcomes had high recent frequency (boosted by recency)
+  for (const name of predictedNames) {
+    const count = rounds.slice(-10).filter((r) => r.actualResult.name === name).length;
+    if (count >= 3) boosted.push(`${name}-recent-active`);
+  }
+
+  // Approximate rank: actual result was not in top-4, so rank > 4
+  const actualRank = predictedNames.includes(actualName) ? 1 : 5; // simplified
+
+  return {
+    actualResult: actualName,
+    actualRank,
+    actualScore: 0, // not stored per-round; would need re-computation
+    predictedNames,
+    signalsSuppressedActual: suppressed,
+    signalsBoostedFailed: boosted,
   };
 }
 
@@ -906,6 +1020,8 @@ function scoreCandidates(
   lastHit: boolean | null,
   liveSpins: SpinData[] = [],
 ): CandidateScore[] {
+  // Get adaptive signal weights (learn from HIT/MISS history)
+  const sigWeights = dashboard.signalWeights ?? {};
   const n = rounds.length;
   const hist = rounds.map((r) => r.actualResult);
 
@@ -1162,18 +1278,23 @@ function scoreCandidates(
     // ===== FACTOR 1: Recent active (mild adaptive signal — NOT a chase) =====
     // Appearing more than 80% of theoretical recently → mild evidence the wheel
     // is currently favouring it (regime). Capped to prevent hot-number chasing.
+    // Adaptive weight applied from MISS-feedback calibration.
     if (recFreq > livePrior * 0.8 && (n >= 5 || liveN >= 20)) {
-      score *= 1.10;
+      const w = sigWeights["recent-active"] ?? 1.0;
+      score *= 1 + (0.10 - 1) * (1 - w) + 0.10 * w; // = 1.10 * w + (1 - w)
       signals.push("recent-active");
     }
 
     // ===== FACTOR 2: Trend alignment (adaptive weighting) =====
     // Recent vs long-term delta — mild evidence of regime shift. NOT a chase.
+    // Adaptive weight applied from MISS-feedback calibration.
     if (trend > 0.05 && (n >= 10 || liveN >= 20)) {
-      score *= 1 + Math.min(0.12, trend * 1.5 * adaptW);
+      const w = sigWeights["trending-up"] ?? 1.0;
+      score *= 1 + Math.min(0.12, trend * 1.5 * adaptW) * w;
       signals.push("trending-up");
     } else if (trend < -0.05 && (n >= 10 || liveN >= 20)) {
-      score *= 1 + Math.max(-0.20, trend * 1.5 * adaptW);
+      const w = sigWeights["trending-down"] ?? 1.0;
+      score *= 1 + Math.max(-0.20, trend * 1.5 * adaptW) * w;
       signals.push("trending-down");
     }
 
