@@ -72,24 +72,36 @@ interface RoundResult {
   calibrationNote?: string; // human-readable reason for recalibration
 }
 
-// ===== DECISION ENGINE OUTPUT (Step 6 format) =====
+// ===== ADVANCED DECISION ENGINE (Opposite-Signal Logic) =====
 interface DecisionEngineOutput {
-  status: "READY" | "WAIT" | "HOLD";
-  nextAnalysis: string[]; // 4 candidate outcome names OR empty if WAIT
-  confidence: number; // calculated 0-100
-  confidenceLabel: string; // STRONG / MODERATE / LOW / INSUFFICIENT
-  whyThisMove: string; // short explanation
+  status: "READY" | "WAIT" | "HOLD" | "RECALIBRATE";
+  nextSignal: string[]; // 4 ranked candidates OR empty if WAIT
+  nextSignalLabels: string[]; // "strongest" / "second" / "alternative" / "defensive"
+  confidence: number;
+  confidenceLabel: string;
   riskLevel: "LOW" | "MEDIUM" | "HIGH";
-  validationCriteria: string; // what must be observed before treating prediction as successful
-  previousResult: string; // actual result name
-  previousPrediction: string[]; // previous prediction names
+  decision: "BET" | "WAIT" | "RECALIBRATE";
+  lastResult: string;
+  previousPrediction: string[];
   result: "HIT" | "MISS" | "—";
-  rcaNote?: string; // root cause analysis on MISS
+  rcaNote?: string;
+  rcaCause?: string; // specific cause category
+  excludedAnalysis?: string[]; // outcomes NOT in previous prediction
+  oppositeAnalysis?: string; // analysis of excluded outcomes
+  consecutiveMisses: number;
+  whyThisMove: string;
+  validationCriteria: string;
 }
 
 /**
- * Run the full Decision Engine analysis on the round history.
- * Implements: RCA → No Loss Chasing → Multi-Factor Verification → Decision Gate → Output.
+ * Advanced Prediction Decision Engine with Opposite-Signal Logic.
+ *
+ * Implements:
+ * 1. Mandatory opposite-signal detection on MISS
+ * 2. RCA with specific cause categories (pattern shift, outlier, trend change, etc.)
+ * 3. No forced predictions — WAIT if confidence is low
+ * 4. Consecutive MISS recalibration (recent data weighted higher)
+ * 5. Ranked 4-candidate output (strongest → defensive)
  */
 function runDecisionEngine(rounds: RoundResult[]): DecisionEngineOutput | null {
   if (rounds.length === 0) return null;
@@ -99,11 +111,18 @@ function runDecisionEngine(rounds: RoundResult[]): DecisionEngineOutput | null {
   const actualName = last.actualResult.name;
   const hit = last.hit;
 
-  // STEP 1 — ROOT CAUSE ANALYSIS (RCA) on MISS
+  // ===== Consecutive MISS tracking =====
+  let consecutiveMisses = 0;
+  for (let i = rounds.length - 1; i >= 0; i--) {
+    if (!rounds[i].hit) consecutiveMisses++;
+    else break;
+  }
+
+  // ===== STEP 1: ROOT CAUSE ANALYSIS (RCA) =====
   let rcaNote = "";
+  let rcaCause = "";
   if (!hit) {
     const recentResults = rounds.slice(-8).map((r) => r.actualResult.name);
-    const allActuals = rounds.map((r) => r.actualResult.name);
 
     // Check for streaks
     let streak = 1;
@@ -112,129 +131,227 @@ function runDecisionEngine(rounds: RoundResult[]): DecisionEngineOutput | null {
       else break;
     }
 
-    // Check for pattern shift
+    // Check recent frequency vs historical
     const recentFreq: Record<string, number> = {};
     for (const r of recentResults) recentFreq[r] = (recentFreq[r] ?? 0) + 1;
 
-    // Check sample size
+    // Check if actual was an outlier (rare outcome)
+    const allActuals = rounds.map((r) => r.actualResult.name);
+    const actualCount = allActuals.filter((a) => a === actualName).length;
+    const actualFreq = actualCount / allActuals.length;
+    const theoreticalProb =
+      actualName === "1" ? 0.3889 :
+      actualName === "2" ? 0.2407 :
+      actualName === "5" ? 0.1296 :
+      actualName === "10" ? 0.0741 :
+      actualName === "COIN FLIP" ? 0.0741 :
+      actualName === "PACHINKO" ? 0.0370 :
+      actualName === "CASH HUNT" ? 0.0370 :
+      actualName === "CRAZY TIME" ? 0.0185 : 0.1;
+
+    // Determine cause
     if (rounds.length < 5) {
-      rcaNote = "INSUFFICIENT DATA — sample too small for pattern analysis.";
+      rcaCause = "INSUFFICIENT DATA";
+      rcaNote = "Sample too small for reliable pattern analysis. Cannot determine root cause.";
+    } else if (consecutiveMisses >= 3) {
+      rcaCause = "PATTERN SHIFT";
+      rcaNote = `${consecutiveMisses} consecutive misses detected. Model may be overfit to stale pattern. Recent trend has shifted from prediction model.`;
     } else if (streak >= 3) {
-      rcaNote = `STREAK DETECTED — ${actualName} appeared ${streak}× consecutively. Pattern shift likely.`;
-    } else if (actualName && !prevPredNames.includes(actualName)) {
-      const wasOverdue = !prevPredNames.includes(actualName);
-      rcaNote = wasOverdue
-        ? `OUTCOME ANOMALY — ${actualName} was not in prediction set. Z-score analysis may indicate overdue segment.`
-        : "UNKNOWN / INSUFFICIENT DATA — root cause not identifiable from available history.";
+      rcaCause = "VOLATILITY / STREAK";
+      rcaNote = `${actualName} appeared ${streak}× consecutively. Volatile streak — model didn't account for repeated outcomes.`;
+    } else if (actualFreq < theoreticalProb * 0.5) {
+      rcaCause = "OUTLIER / ANOMALY";
+      rcaNote = `${actualName} is statistically rare (actual ${(actualFreq * 100).toFixed(1)}% vs theoretical ${(theoreticalProb * 100).toFixed(1)}%). Random outlier — not a predictable pattern.`;
+    } else if (actualFreq > theoreticalProb * 1.5) {
+      rcaCause = "TREND CHANGE";
+      rcaNote = `${actualName} is overperforming (actual ${(actualFreq * 100).toFixed(1)}% vs theoretical ${(theoreticalProb * 100).toFixed(1)}%). Recent trend favors this outcome — model didn't catch the shift.`;
     } else {
-      rcaNote = "UNKNOWN / INSUFFICIENT DATA — no clear pattern deviation detected.";
+      rcaCause = "OVERFITTING";
+      rcaNote = `Prediction set [${prevPredNames.join(", ")}] didn't include ${actualName}. Model may be overfit to historical frequency. No strong evidence for specific cause.`;
     }
   }
 
-  // STEP 3 — MULTI-FACTOR VERIFICATION
+  // ===== STEP 3: OPPOSITE / EXCLUDED OUTCOME ANALYSIS =====
+  const allGameNames = GAMES.map((g) => g.name);
+  const excludedOutcomes = allGameNames.filter((n) => !prevPredNames.includes(n));
+  let oppositeAnalysis = "";
+  if (!hit && excludedOutcomes.length > 0) {
+    // Analyze the excluded outcomes — which ones have evidence?
+    const recentResults = rounds.slice(-10).map((r) => r.actualResult.name);
+    const recentFreq: Record<string, number> = {};
+    for (const r of recentResults) recentFreq[r] = (recentFreq[r] ?? 0) + 1;
+    const evidenceParts: string[] = [];
+    for (const ex of excludedOutcomes) {
+      const count = recentFreq[ex] ?? 0;
+      if (count > 0) {
+        evidenceParts.push(`${ex} (${count}× in last 10)`);
+      }
+    }
+    if (evidenceParts.length > 0) {
+      oppositeAnalysis = `Excluded outcomes with recent evidence: ${evidenceParts.join(", ")}. These will be prioritized in next analysis if data supports.`;
+    } else {
+      oppositeAnalysis = `Excluded outcomes [${excludedOutcomes.join(", ")}] have no recent evidence. No forced opposite selection — will use data-driven analysis only.`;
+    }
+  }
+
+  // ===== STEP 4: MULTI-FACTOR VERIFICATION =====
   const totalRounds = rounds.length;
   const totalHits = rounds.filter((r) => r.hit).length;
   const hitRate = totalRounds > 0 ? totalHits / totalRounds : 0;
   const recentSlice = rounds.slice(-5);
   const recentHits = recentSlice.filter((r) => r.hit).length;
   const recentHitRate = recentSlice.length > 0 ? recentHits / recentSlice.length : 0;
-
-  // Data integrity check
   const dataIntegrity = totalRounds >= 10 ? "SUFFICIENT" : totalRounds >= 3 ? "MARGINAL" : "INSUFFICIENT";
 
-  // Model confidence calculation
+  // ===== Confidence calculation =====
   let confidence: number;
   let confidenceLabel: string;
   if (totalRounds < 3) {
-    confidence = 20 + Math.floor(Math.random() * 10);
+    confidence = 15 + Math.floor(Math.random() * 10);
     confidenceLabel = "INSUFFICIENT DATA";
   } else if (totalRounds < 10) {
-    confidence = Math.min(45, Math.round(hitRate * 50 + 10));
-    confidenceLabel = confidence >= 35 ? "LOW CONFIDENCE" : "INSUFFICIENT DATA";
+    confidence = Math.min(40, Math.round(hitRate * 45 + 5));
+    // Dampen further on consecutive misses
+    confidence = Math.max(15, confidence - consecutiveMisses * 5);
+    confidenceLabel = confidence >= 30 ? "LOW CONFIDENCE" : "INSUFFICIENT DATA";
   } else {
     confidence = Math.round(hitRate * 100);
-    if (!hit) confidence = Math.max(20, confidence - 10); // dampen after MISS
-    confidence = Math.max(20, Math.min(85, confidence));
-    confidenceLabel = confidence >= 70 ? "STRONG" : confidence >= 45 ? "MODERATE" : "LOW CONFIDENCE";
+    // Consecutive MISS dampening — more aggressive
+    confidence = Math.max(15, confidence - consecutiveMisses * 8);
+    if (!hit) confidence = Math.max(15, confidence - 5);
+    confidence = Math.max(15, Math.min(80, confidence));
+    confidenceLabel = confidence >= 65 ? "STRONG" : confidence >= 40 ? "MODERATE" : "LOW CONFIDENCE";
   }
 
-  // STEP 4 — DECISION GATE
-  const SAFE_THRESHOLD = 35;
-  let status: "READY" | "WAIT" | "HOLD";
-  if (confidence < SAFE_THRESHOLD || dataIntegrity === "INSUFFICIENT") {
-    status = totalRounds < 3 ? "HOLD" : "WAIT";
+  // ===== STEP 5: DECISION GATE =====
+  const SAFE_THRESHOLD = 30;
+  let status: "READY" | "WAIT" | "HOLD" | "RECALIBRATE";
+  let decision: "BET" | "WAIT" | "RECALIBRATE";
+
+  if (consecutiveMisses >= 3) {
+    // Force recalibration on 3+ consecutive misses
+    status = "RECALIBRATE";
+    decision = "RECALIBRATE";
+  } else if (totalRounds < 3 || dataIntegrity === "INSUFFICIENT") {
+    status = "HOLD";
+    decision = "WAIT";
+  } else if (confidence < SAFE_THRESHOLD) {
+    status = "WAIT";
+    decision = "WAIT";
   } else {
     status = "READY";
+    decision = "BET";
   }
 
-  // STEP 2 — NO LOSS CHASING
-  // Even on MISS, don't force predictions — only provide if confidence is sufficient.
-  let nextAnalysis: string[] = [];
-  if (status === "READY") {
-    // Build prediction from history (same as buildHistoryInformedPredictions but simplified)
+  // ===== STEP 6: NEXT SIGNAL GENERATION =====
+  let nextSignal: string[] = [];
+  let nextSignalLabels: string[] = [];
+  if (status === "READY" || status === "RECALIBRATE") {
+    // Build weighted prediction using frequency + gap + opposite analysis
     const hist = rounds.map((r) => r.actualResult);
-    const freq = new Map<string, number>();
-    for (const g of GAMES) freq.set(g.name, 0);
-    for (const h of hist) freq.set(h.name, (freq.get(h.name) ?? 0) + 1);
-    const maxFreq = Math.max(...freq.values(), 1);
+
+    // Recent data weighted higher (especially on recalibration)
+    const recentWeight = status === "RECALIBRATE" ? 0.7 : 0.4;
+    const historicalWeight = status === "RECALIBRATE" ? 0.3 : 0.6;
+
+    const recentHist = hist.slice(-10);
+    const recentFreq = new Map<string, number>();
+    const histFreq = new Map<string, number>();
+    for (const g of GAMES) {
+      recentFreq.set(g.name, 0);
+      histFreq.set(g.name, 0);
+    }
+    for (const h of recentHist) recentFreq.set(h.name, (recentFreq.get(h.name) ?? 0) + 1);
+    for (const h of hist) histFreq.set(h.name, (histFreq.get(h.name) ?? 0) + 1);
+
+    const recentMax = Math.max(...recentFreq.values(), 1);
+    const histMax = Math.max(...histFreq.values(), 1);
+
     const weighted = GAMES.map((g, i) => {
       const base = WEIGHTS[i] - (i === 0 ? 0 : WEIGHTS[i - 1]);
-      const f = freq.get(g.name) ?? 0;
-      const gap = (maxFreq - f) / maxFreq;
-      return { game: g, w: base * (0.5 + gap) };
-    });
-    const pool = [...weighted];
-    for (let i = 0; i < SIGNAL_COUNT && pool.length > 0; i++) {
-      const sumW = pool.reduce((s, w) => s + w.w, 0);
-      const rand = Math.random() * sumW;
-      let acc = 0;
-      let pickIdx = 0;
-      for (let j = 0; j < pool.length; j++) {
-        acc += pool[j].w;
-        if (rand <= acc) { pickIdx = j; break; }
+      const rf = recentFreq.get(g.name) ?? 0;
+      const hf = histFreq.get(g.name) ?? 0;
+      // Gap-filling: lower frequency → higher weight
+      const recentGap = (recentMax - rf) / recentMax;
+      const histGap = (histMax - hf) / histMax;
+      // Combined weight: recent data has more influence on recalibration
+      let w = base * (historicalWeight * (0.5 + histGap) + recentWeight * (0.5 + recentGap));
+
+      // Opposite-signal boost: if outcome was EXCLUDED from previous prediction
+      // AND has recent evidence, boost it
+      if (!hit && excludedOutcomes.includes(g.name) && rf > 0) {
+        w *= 1.3; // data-supported excluded outcome gets boost
       }
-      nextAnalysis.push(pool.splice(pickIdx, 1)[0].game.name);
-    }
+
+      // On consecutive MISS, suppress previously predicted outcomes slightly
+      if (consecutiveMisses >= 2 && prevPredNames.includes(g.name)) {
+        w *= 0.7; // don't blindly repeat previous prediction
+      }
+
+      return { game: g, w: Math.max(w, 0.01) };
+    });
+
+    // Sort by weight (strongest first) then pick top 4
+    const sorted = [...weighted].sort((a, b) => b.w - a.w);
+    const picked = sorted.slice(0, SIGNAL_COUNT);
+    nextSignal = picked.map((p) => p.game.name);
+    nextSignalLabels = ["strongest validated signal", "second strongest", "alternative signal", "defensive / low-probability"];
   }
 
-  // Risk level
+  // ===== Risk Level =====
   let riskLevel: "LOW" | "MEDIUM" | "HIGH";
-  if (confidence >= 60 && hitRate >= 0.5) riskLevel = "LOW";
-  else if (confidence >= 35) riskLevel = "MEDIUM";
-  else riskLevel = "HIGH";
+  if (status === "RECALIBRATE" || consecutiveMisses >= 2) {
+    riskLevel = "HIGH";
+  } else if (confidence >= 50 && hitRate >= 0.4) {
+    riskLevel = "LOW";
+  } else if (confidence >= 30) {
+    riskLevel = "MEDIUM";
+  } else {
+    riskLevel = "HIGH";
+  }
 
-  // Why this move
+  // ===== Why This Move =====
   const parts: string[] = [];
   if (status === "HOLD") {
-    parts.push("Insufficient verified data — holding for more rounds before predicting.");
+    parts.push("Insufficient verified data — holding for more rounds.");
   } else if (status === "WAIT") {
-    parts.push(`Confidence ${confidence}% below safe threshold ${SAFE_THRESHOLD}%. Waiting for stronger signal.`);
+    parts.push(`Confidence ${confidence}% below threshold ${SAFE_THRESHOLD}%. No forced prediction.`);
+  } else if (status === "RECALIBRATE") {
+    parts.push(`${consecutiveMisses} consecutive MISS — model recalibrating with recent data weighted higher.`);
+    parts.push(`Old pattern weight reduced. Recent 10 spins prioritized.`);
   } else {
-    if (hit) parts.push("Previous prediction HIT — continuing with trend-based analysis.");
-    else parts.push("Previous MISS — recalibrated with updated frequency weights.");
+    if (hit) parts.push("Previous HIT — continuing trend-based analysis.");
+    else parts.push("Previous MISS — RCA completed, opposite-signal analysis applied.");
     parts.push(`Hit-rate: ${Math.round(hitRate * 100)}% (${totalHits}/${totalRounds})`);
     parts.push(`Recent: ${Math.round(recentHitRate * 100)}% (${recentHits}/${recentSlice.length})`);
     parts.push(`Data: ${dataIntegrity}`);
   }
 
-  // Validation criteria
-  const validationCriteria = status === "READY"
-    ? `Next actual result must match one of [${nextAnalysis.join(", ")}] to count as HIT. ` +
-      `If result is outside this set, MISS will trigger RCA + recalibration.`
-    : "Accumulate 3+ verified rounds with consistent data before generating predictions.";
+  // ===== Validation Criteria =====
+  const validationCriteria = (status === "READY" || status === "RECALIBRATE") && nextSignal.length > 0
+    ? `Next actual result must match one of [${nextSignal.join(", ")}] for HIT. ` +
+      `Any other result = MISS → triggers RCA + opposite-signal analysis. ` +
+      `3+ consecutive misses → forced recalibration.`
+    : "Accumulate 3+ verified rounds with consistent data. Confidence must exceed 30% before generating signals.";
 
   return {
     status,
-    nextAnalysis,
+    nextSignal,
+    nextSignalLabels,
     confidence,
     confidenceLabel,
-    whyThisMove: parts.join(" • "),
     riskLevel,
-    validationCriteria,
-    previousResult: actualName,
+    decision,
+    lastResult: actualName,
     previousPrediction: prevPredNames,
     result: hit ? "HIT" : "MISS",
     rcaNote: hit ? undefined : rcaNote,
+    rcaCause: hit ? undefined : rcaCause,
+    excludedAnalysis: hit ? undefined : excludedOutcomes,
+    oppositeAnalysis: hit ? undefined : oppositeAnalysis,
+    consecutiveMisses,
+    whyThisMove: parts.join(" • "),
+    validationCriteria,
   };
 }
 
@@ -1186,84 +1303,147 @@ export function RevoGame() {
           </div>
         </div>
 
-        {/* ===== DECISION ENGINE OUTPUT (Step 6 format) ===== */}
+        {/* ===== ADVANCED DECISION ENGINE (Opposite-Signal Logic) ===== */}
         {decisionOutput && (
           <div className="revo-card mt-4 overflow-hidden">
             <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#a78bfa]/10 to-transparent px-4 py-3">
               <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
                 <i className="fas fa-microchip text-[#a78bfa]" /> Decision Engine
               </span>
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
-                  decisionOutput.status === "READY"
-                    ? "bg-[#2ed573]/15 text-[#2ed573]"
-                    : decisionOutput.status === "WAIT"
-                      ? "bg-[#ffa502]/15 text-[#ffa502]"
-                      : "bg-[#ff4757]/15 text-[#ff4757]"
-                }`}
-              >
-                {decisionOutput.status}
-              </span>
+              <div className="flex items-center gap-1.5">
+                {decisionOutput.consecutiveMisses > 0 && (
+                  <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#ff4757]">
+                    {decisionOutput.consecutiveMisses}× MISS
+                  </span>
+                )}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                    decisionOutput.status === "READY"
+                      ? "bg-[#2ed573]/15 text-[#2ed573]"
+                      : decisionOutput.status === "WAIT"
+                        ? "bg-[#ffa502]/15 text-[#ffa502]"
+                        : decisionOutput.status === "RECALIBRATE"
+                          ? "bg-[#a78bfa]/15 text-[#a78bfa]"
+                          : "bg-[#ff4757]/15 text-[#ff4757]"
+                  }`}
+                >
+                  {decisionOutput.status}
+                </span>
+              </div>
             </div>
 
             <div className="space-y-3 p-4">
-              {/* STATUS + CONFIDENCE + RISK */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
-                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Confidence</div>
-                  <div className="text-lg font-black" style={{
-                    color: decisionOutput.confidence >= 70 ? "#2ed573" : decisionOutput.confidence >= 45 ? "#448AFF" : "#ffa502",
-                  }}>
-                    {decisionOutput.confidence}%
-                  </div>
-                  <div className="text-[8px] font-bold uppercase text-[#5a6a99]">
-                    {decisionOutput.confidenceLabel}
-                  </div>
-                </div>
-                <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
-                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Risk Level</div>
-                  <div className="text-lg font-black" style={{
-                    color: decisionOutput.riskLevel === "LOW" ? "#2ed573" : decisionOutput.riskLevel === "MEDIUM" ? "#ffa502" : "#ff4757",
-                  }}>
-                    {decisionOutput.riskLevel}
-                  </div>
-                  <div className="text-[8px] font-bold uppercase text-[#5a6a99]">
-                    {decisionOutput.riskLevel === "LOW" ? "Safe zone" : decisionOutput.riskLevel === "MEDIUM" ? "Caution" : "Dangerous"}
-                  </div>
-                </div>
+              {/* LAST RESULT + STATUS + DECISION */}
+              <div className="grid grid-cols-4 gap-2">
                 <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
                   <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Last Result</div>
-                  <div className="text-lg font-black" style={{
+                  <div className="text-sm font-black text-white">{decisionOutput.lastResult}</div>
+                </div>
+                <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
+                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Status</div>
+                  <div className="text-sm font-black" style={{
                     color: decisionOutput.result === "HIT" ? "#2ed573" : "#ff4757",
-                  }}>
-                    {decisionOutput.result}
-                  </div>
-                  <div className="text-[8px] font-bold uppercase text-[#5a6a99]">
-                    {decisionOutput.previousResult}
-                  </div>
+                  }}>{decisionOutput.result}</div>
+                </div>
+                <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
+                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Confidence</div>
+                  <div className="text-sm font-black" style={{
+                    color: decisionOutput.confidence >= 65 ? "#2ed573" : decisionOutput.confidence >= 40 ? "#448AFF" : "#ffa502",
+                  }}>{decisionOutput.confidence}%</div>
+                  <div className="text-[7px] text-[#5a6a99]">{decisionOutput.confidenceLabel}</div>
+                </div>
+                <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5 text-center">
+                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Decision</div>
+                  <div className="text-sm font-black" style={{
+                    color: decisionOutput.decision === "BET" ? "#2ed573" : decisionOutput.decision === "WAIT" ? "#ffa502" : "#a78bfa",
+                  }}>{decisionOutput.decision}</div>
                 </div>
               </div>
 
-              {/* NEXT ANALYSIS (4 candidates or WAIT) */}
+              {/* RISK LEVEL */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">Risk:</span>
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" style={{
+                  background: decisionOutput.riskLevel === "LOW" ? "#2ed57315" : decisionOutput.riskLevel === "MEDIUM" ? "#ffa50215" : "#ff475715",
+                  color: decisionOutput.riskLevel === "LOW" ? "#2ed573" : decisionOutput.riskLevel === "MEDIUM" ? "#ffa502" : "#ff4757",
+                }}>
+                  {decisionOutput.riskLevel}
+                </span>
+              </div>
+
+              {/* PREVIOUS PREDICTION vs ACTUAL */}
               <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
-                  Next Analysis
+                  Previous Prediction → Actual Result
                 </div>
-                {decisionOutput.status === "READY" && decisionOutput.nextAnalysis.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {decisionOutput.nextAnalysis.map((name, i) => {
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  {decisionOutput.previousPrediction.map((name) => (
+                    <span key={name} className={`rounded px-1.5 py-0.5 font-bold ${
+                      name === decisionOutput.lastResult ? "bg-[#2ed573]/20 text-[#2ed573]" : "bg-[#1e2240] text-[#8899cc]"
+                    }`}>{name}</span>
+                  ))}
+                  <span className="text-[#5a6a99]">→</span>
+                  <span className="rounded bg-[#448AFF]/20 px-1.5 py-0.5 font-bold text-[#448AFF]">
+                    {decisionOutput.lastResult}
+                  </span>
+                </div>
+              </div>
+
+              {/* RCA — only on MISS */}
+              {decisionOutput.rcaNote && (
+                <div className="rounded-lg border border-[#ff4757]/30 bg-[#ff4757]/8 p-3">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#ff4757]">
+                      <i className="fas fa-magnifying-glass" /> RCA
+                    </span>
+                    <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]">
+                      {decisionOutput.rcaCause}
+                    </span>
+                  </div>
+                  <div className="text-xs text-[#bcc6e0]">{decisionOutput.rcaNote}</div>
+                </div>
+              )}
+
+              {/* OPPOSITE / EXCLUDED ANALYSIS — only on MISS */}
+              {decisionOutput.oppositeAnalysis && (
+                <div className="rounded-lg border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-3">
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#00d4ff]">
+                    <i className="fas fa-arrows-left-right" /> Opposite / Excluded Analysis
+                  </div>
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {decisionOutput.excludedAnalysis?.map((name) => {
                       const game = GAMES.find((g) => g.name === name);
                       return (
-                        <span
-                          key={name}
-                          className={`rounded-lg border px-2 py-1 text-xs font-bold ${
-                            game?.isBonus
-                              ? "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]"
-                              : "border-[#448AFF]/40 bg-[#448AFF]/10 text-[#448AFF]"
-                          }`}
-                        >
-                          {i + 1}. {name}
-                        </span>
+                        <span key={name} className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                          game?.isBonus ? "bg-[#FFD700]/10 text-[#FFD700]" : "bg-[#00d4ff]/10 text-[#00d4ff]"
+                        }`}>{name}</span>
+                      );
+                    })}
+                  </div>
+                  <div className="text-xs text-[#8899cc]">{decisionOutput.oppositeAnalysis}</div>
+                </div>
+              )}
+
+              {/* NEXT SIGNAL — ranked 4 candidates */}
+              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                  Next Signal
+                </div>
+                {decisionOutput.nextSignal.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {decisionOutput.nextSignal.map((name, i) => {
+                      const game = GAMES.find((g) => g.name === name);
+                      const label = decisionOutput.nextSignalLabels[i] ?? "";
+                      return (
+                        <div key={name} className="flex items-center gap-2">
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#a78bfa] text-[9px] font-black text-white">
+                            {i + 1}
+                          </span>
+                          <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${
+                            game?.isBonus ? "bg-[#FFD700]/10 text-[#FFD700]" : "bg-[#448AFF]/10 text-[#448AFF]"
+                          }`}>{name}</span>
+                          <span className="text-[9px] text-[#5a6a99]">{label}</span>
+                        </div>
                       );
                     })}
                   </div>
@@ -1271,8 +1451,10 @@ export function RevoGame() {
                   <div className="text-sm text-[#ffa502]">
                     <i className="fas fa-hourglass-half mr-1" />
                     {decisionOutput.status === "HOLD"
-                      ? "HOLD — Insufficient data. Select more actual results to build history."
-                      : "WAIT — Confidence below safe threshold. Waiting for stronger signal."}
+                      ? "HOLD — Insufficient data. Select more actual results."
+                      : decisionOutput.status === "RECALIBRATE"
+                        ? "RECALIBRATE — Consecutive misses. Model recalibrating with recent data."
+                        : "WAIT — Confidence below threshold. No forced prediction."}
                   </div>
                 )}
               </div>
@@ -1282,57 +1464,15 @@ export function RevoGame() {
                 <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
                   Why This Move
                 </div>
-                <div className="text-xs text-[#bcc6e0]">
-                  {decisionOutput.whyThisMove}
-                </div>
+                <div className="text-xs text-[#bcc6e0]">{decisionOutput.whyThisMove}</div>
               </div>
-
-              {/* RCA (Root Cause Analysis) — only on MISS */}
-              {decisionOutput.rcaNote && (
-                <div className="rounded-lg border border-[#ff4757]/30 bg-[#ff4757]/8 p-3">
-                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#ff4757]">
-                    <i className="fas fa-magnifying-glass" /> Root Cause Analysis (RCA)
-                  </div>
-                  <div className="text-xs text-[#bcc6e0]">
-                    {decisionOutput.rcaNote}
-                  </div>
-                </div>
-              )}
 
               {/* VALIDATION CRITERIA */}
               <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
                 <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
                   Validation Criteria
                 </div>
-                <div className="text-xs text-[#8899cc]">
-                  {decisionOutput.validationCriteria}
-                </div>
-              </div>
-
-              {/* PREVIOUS PREDICTION vs ACTUAL */}
-              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
-                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
-                  Previous Round
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-[#5a6a99]">Predicted:</span>
-                  {decisionOutput.previousPrediction.map((name) => (
-                    <span
-                      key={name}
-                      className={`rounded px-1.5 py-0.5 font-bold ${
-                        name === decisionOutput.previousResult
-                          ? "bg-[#2ed573]/20 text-[#2ed573]"
-                          : "bg-[#1e2240] text-[#8899cc]"
-                      }`}
-                    >
-                      {name}
-                    </span>
-                  ))}
-                  <span className="text-[#5a6a99]">→ Actual:</span>
-                  <span className="rounded bg-[#448AFF]/20 px-1.5 py-0.5 font-bold text-[#448AFF]">
-                    {decisionOutput.previousResult}
-                  </span>
-                </div>
+                <div className="text-xs text-[#8899cc]">{decisionOutput.validationCriteria}</div>
               </div>
             </div>
           </div>
