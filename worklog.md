@@ -906,3 +906,72 @@ Stage Summary:
 - No fixed signals, no last-hit carryover, no HOT/OVERDUE bias — pure multi-factor evidence with hybrid selection.
 - Lint clean, no errors, agent-browser QA green with 100% live accuracy.
 
+
+---
+
+Task ID: 24 (user request — REVISE HYBRID PREDICTION LOGIC)
+Agent: Z.ai Code
+Task: User requested removal of the deterministic top-2 lock (which manufactured artificial accuracy) and implementation of pure evidence-ranked top-4 selection with honest confidence. No fixed slots, no weighted random, no last-hit/HOT/OVERDUE bias, no fake 100% from a few HITs.
+
+Root Cause Found:
+- The hybrid `sampleWeighted` (Task 23) always picked the top 2 outcomes deterministically (almost always "1" + "2") then weighted-sampled slots 3-4. This created artificial accuracy (4/4 HITs = 100%) by always selecting the highest-frequency outcomes, NOT proving real predictive performance.
+- Confidence showed "70% STRONG" after just 4 rounds — fake high confidence from a few HITs.
+- No sample-size validation tiers; no honest disclaimer that 4 rounds is insufficient.
+
+Fixes Applied:
+
+1. **`decisionEngine.ts` + `aiStats.ts` — Replaced `sampleWeighted` with `selectTopByEvidence`**:
+   - Pure evidence-ranked top-4: rank ALL 8 candidates by complete AI evidence score, take top 4.
+   - NO always-fixed top 2 (e.g., never lock "1" and "2").
+   - NO weighted random sampling (deterministic rank instead).
+   - NO last-hit / HOT / OVERDUE bias.
+   - NO rare-number automatic suppression (rare outcomes CAN enter if multiple independent signals support them).
+   - NO previous prediction carry-over.
+   - Top 4 changes NATURALLY when evidence changes.
+
+2. **`decisionEngine.ts` — Rewrote `honestConfidence` with strict sample-size tier caps**:
+   - n < 5 → return 24 (INSUFFICIENT DATA)
+   - n < 10 → cap 40% (LOW CONFIDENCE only)
+   - n < 20 → cap 55% (MODERATE only with strong evidence)
+   - n < 50 → cap 70% (can reach STRONG with proven record)
+   - n < 100 → cap 78% (large sample)
+   - n >= 100 → cap 85% (only very large samples)
+   - Removed HIT-streak boost (+5) — a few HITs must NOT inflate confidence.
+   - Wilson lower bound remains the honest base (4/4 → Wilson ~34%, NOT 100%).
+
+3. **`decisionEngine.ts` — Updated `confidenceLabelOf`**:
+   - STRONG requires both confidence >= 70 AND sample size >= 20.
+   - 4/4 HIT now produces "INSUFFICIENT DATA" label (not STRONG).
+
+4. **`decisionEngine.ts` — Updated "Why This Move" panel**:
+   - Added "Sample tier: [tier label] (n=N)" disclosure.
+   - Added "FRESH evidence-ranked top-4 — no fixed slots, no last-hit/HOT/OVERDUE bias."
+   - Added "Honest disclaimer: N rounds is INSUFFICIENT for any accuracy claim — early data only." when n < 20.
+
+5. **`RevoGame.tsx` — Added sample-size validation UI**:
+   - "EARLY DATA — sample size N/20" orange warning with tier-specific message.
+   - 5 validation tier progress bars (5 / 10 / 20 / 50 / 100+) with ✓ when reached.
+   - "A few HITs do NOT prove predictive accuracy." disclaimer.
+
+6. **`aiStats.ts` — Updated prediction method label**:
+   - "Evidence-ranked top-4 (pure multi-factor score — no fixed slots, no last-hit/HOT/OVERDUE bias)".
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- 5 fresh predictions all produce the same evidence-ranked top-4: [1, 2, 10, COIN FLIP] — deterministic, no random variation, no fixed top-2 lock (top 4 is purely evidence-driven).
+- After 90s live (4 rounds, 4 HITs): confidence stays at 24% (INSUFFICIENT DATA) — NOT inflated to 70% STRONG. Honest.
+- Why This Move panel: "Sample tier: INSUFFICIENT (<5) (n=4) • ... • FRESH evidence-ranked top-4 — no fixed slots, no last-hit/HOT/OVERDUE bias. • Honest disclaimer: 4 rounds is INSUFFICIENT for any accuracy claim — early data only."
+- Verified Accuracy panel: "EARLY DATA — sample size 4/20. Insufficient for any accuracy claim. Predictions are exploratory. A few HITs do NOT prove predictive accuracy."
+- 5 validation tier progress bars (5/10/20/50/100+) render with ✓ when reached.
+- VLM confirmed: 5 tier bars + orange EARLY DATA warning visible.
+
+Stage Summary:
+- Hybrid top-2 lock COMPLETELY REMOVED — replaced with pure evidence-ranked top-4.
+- Confidence is HONEST: strict sample-size tier caps (5/10/20/50/100+). 4/4 HIT → 24% INSUFFICIENT DATA (not 100%).
+- STRONG label requires n >= 20 AND confidence >= 70.
+- No fixed slots, no weighted random, no last-hit/HOT/OVERDUE bias, no rare-number suppression.
+- Every round is a FRESH, independent recalculation from complete evidence.
+- Sample-size validation tiers + honest disclaimers in UI.
+- Lint clean, no errors, agent-browser QA green.
+

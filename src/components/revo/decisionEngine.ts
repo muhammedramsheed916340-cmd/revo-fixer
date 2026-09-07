@@ -817,70 +817,28 @@ function scoreCandidates(
 }
 
 // ============================================================
-// HYBRID SELECTION — deterministic top + weighted variety
+// EVIDENCE-RANKED TOP SELECTION (pure, no fixed slots)
 // ============================================================
 /**
- * Pick `count` unique candidates using a hybrid approach:
+ * Pick `count` candidates by ranking ALL candidates using the complete AI
+ * evidence score, then selecting the top `count`.
  *
- *   1. DETERMINISTIC TOP: Always pick the top `floor(count/2)` candidates by
- *      evidence score. These are the highest-probability outcomes — picking
- *      them deterministically maximizes coverage (and HIT rate).
+ * KEY RULES (per user spec — REVISED hybrid logic):
+ *   - NO always-fixed top 2 (e.g., never lock "1" and "2")
+ *   - NO weighted random sampling (deterministic rank instead)
+ *   - NO last-hit repetition / HOT / OVERDUE bias
+ *   - NO rare-number automatic suppression (rare outcomes CAN enter if
+ *     multiple independent signals support them)
+ *   - NO previous prediction carry-over
  *
- *   2. WEIGHTED SAMPLING: Pick the remaining `ceil(count/2)` candidates via
- *      weighted random sampling (without replacement) from the rest. Weight
- *      = rawScore^2 (squared — sharpens distribution toward higher-evidence
- *      outcomes, so rare outcomes get picked less often).
+ * The top 4 changes NATURALLY when the evidence changes. Every round is a
+ * fresh, independent recalculation from the complete available evidence.
  *
- * Why this works:
- *   - The top 2 outcomes (almost always "1" + "2") cover ~63% of all spins.
- *     Picking them deterministically guarantees that base coverage.
- *   - The weighted-sampled slots 3-4 allow intelligent variety (5, 10,
- *     COIN FLIP, occasionally a bonus round) based on real evidence — not
- *     the exact same 4 every time, but still favoring higher-probability
- *     outcomes.
- *   - Squaring the weights (rawScore^2) makes rare outcomes (CRAZY TIME 1.85%,
- *     PACHINKO 3.7%) much less likely to be sampled — they'd only get picked
- *     when their evidence is genuinely strong, not randomly.
- *
- * Result: ~80-83% theoretical coverage (near-optimal) + natural variety.
+ * Returns the top `count` candidates, sorted by evidence rank (strongest first).
  */
-function sampleWeighted(candidates: CandidateScore[], count: number): CandidateScore[] {
-  // Candidates must already be sorted by rawScore descending (done in scoreCandidates).
-  const sorted = [...candidates].sort((a, b) => b.rawScore - a.rawScore);
-  const chosen: CandidateScore[] = [];
-  const chosenNames = new Set<string>();
-
-  // Step 1: Deterministic top floor(count/2).
-  const topCount = Math.floor(count / 2);
-  for (let i = 0; i < topCount && i < sorted.length; i++) {
-    chosen.push(sorted[i]);
-    chosenNames.add(sorted[i].game.name);
-  }
-
-  // Step 2: Weighted sampling for the remaining slots.
-  const remaining = sorted.filter((c) => !chosenNames.has(c.game.name));
-  const varietyCount = count - chosen.length;
-  for (let i = 0; i < varietyCount && remaining.length > 0; i++) {
-    // Squared weights → sharper distribution, rare outcomes picked less often.
-    const sumW = remaining.reduce((s, c) => s + c.rawScore * c.rawScore, 0);
-    if (sumW <= 0) {
-      chosen.push(remaining.splice(0, 1)[0]);
-      continue;
-    }
-    const rand = Math.random() * sumW;
-    let acc = 0;
-    let pickIdx = 0;
-    for (let j = 0; j < remaining.length; j++) {
-      acc += remaining[j].rawScore * remaining[j].rawScore;
-      if (rand <= acc) {
-        pickIdx = j;
-        break;
-      }
-    }
-    chosen.push(remaining.splice(pickIdx, 1)[0]);
-  }
-
-  return chosen;
+function selectTopByEvidence(candidates: CandidateScore[], count: number): CandidateScore[] {
+  // Already sorted by rawScore descending in scoreCandidates(). Take top N.
+  return candidates.slice(0, count);
 }
 
 function hitLabel(sampleSize: number, rate: number): string {
@@ -891,38 +849,64 @@ function hitLabel(sampleSize: number, rate: number): string {
 }
 
 // ============================================================
-// HONEST CONFIDENCE (sample-size-aware, never fake)
+// HONEST CONFIDENCE — strictly sample-size-aware, never fake 100%
 // ============================================================
+/**
+ * Confidence is HONEST: it never reports 70%, 90%, or 100% merely because
+ * the last few rounds were HITs. Confidence caps are tied to sample-size
+ * tiers (5/10/20/50/100+ rounds):
+ *
+ *   n < 5        → INSUFFICIENT DATA, cap 25% (honest low)
+ *   n < 10       → cap 40% (early data, LOW CONFIDENCE)
+ *   n < 20       → cap 55% (MODERATE only with strong evidence)
+ *   n < 50       → cap 70% (can reach STRONG with proven record)
+ *   n < 100      → cap 78% (large sample, higher trust)
+ *   n >= 100     → cap 85% (only very large samples approach high confidence)
+ *
+ * 4/4 HIT must NEVER be treated as proof of 100% predictive accuracy.
+ * Wilson lower bound is used as the honest base (penalizes tiny samples).
+ */
 function honestConfidence(dashboard: PerformanceDashboard, triggered: boolean): number {
   const n = dashboard.sampleSize;
-  if (n < 3) {
-    // Insufficient data — honestly low confidence.
-    // Deterministic value (NO Math.random) to avoid SSR hydration mismatch.
-    return 24;
+  // ===== Sample-size tier caps (strict — prevents fake high confidence) =====
+  let maxConf: number;
+  if (n < 5) {
+    return 24; // INSUFFICIENT DATA — too few rounds for any confidence claim
+  } else if (n < 10) {
+    maxConf = 40; // early data — LOW CONFIDENCE only
+  } else if (n < 20) {
+    maxConf = 55; // MODERATE only with strong evidence
+  } else if (n < 50) {
+    maxConf = 70; // can reach STRONG with proven record
+  } else if (n < 100) {
+    maxConf = 78; // large sample, higher trust
+  } else {
+    maxConf = 85; // only very large samples approach high confidence
   }
   // Use Wilson lower bound of long-term hit-rate as the honest base.
-  // This naturally penalizes small samples.
+  // This naturally penalizes small samples (4/4 → Wilson ~34%, NOT 100%).
   const wilson = wilsonLowerBound(dashboard.hits, n);
-  // Blend with recent hit-rate (adaptive weighting).
+  // Blend with recent hit-rate (adaptive weighting) — but recent is capped.
   const adaptive = dashboard.adaptiveWeight;
   const blended = wilson * (1 - adaptive * 0.4) + dashboard.recentHitRate * (adaptive * 0.4);
   let conf = Math.round(blended * 100);
-  // With 10+ verified rounds, allow higher confidence ceiling.
-  const maxConf = n >= 10 ? 85 : 70;
   // After a MISS, dampen (model just failed, recalibrating).
-  if (triggered) conf -= 10;
-  // After a HIT streak (recentHitRate > 60%), mild boost.
-  if (!triggered && dashboard.recentHitRate > 0.6) conf += 5;
+  if (triggered) conf -= 8;
   // Penalize instability.
   if (dashboard.modelStability < 40) conf -= 5;
   // Penalize anomaly/pattern shift.
   if (dashboard.anomalyDetected || dashboard.patternShiftDetected) conf -= 5;
+  // NOTE: No HIT-streak boost — a few HITs must NOT inflate confidence.
   return Math.max(15, Math.min(maxConf, conf));
 }
 
 function confidenceLabelOf(confidence: number, n: number): { label: string; color: string } {
-  if (n < 3) return { label: "INSUFFICIENT DATA", color: "#5a6a99" };
-  if (confidence >= 70) return { label: "STRONG", color: "#2ed573" };
+  // STRONG requires both high confidence AND sufficient sample size.
+  // 4/4 HIT must NEVER produce a STRONG label.
+  if (n < 5) return { label: "INSUFFICIENT DATA", color: "#5a6a99" };
+  if (n < 20 && confidence < 55) return { label: "LOW CONFIDENCE", color: "#ffa502" };
+  if (n < 50 && confidence < 70) return { label: confidence >= 45 ? "MODERATE" : "LOW CONFIDENCE", color: confidence >= 45 ? "#448AFF" : "#ffa502" };
+  if (confidence >= 70 && n >= 20) return { label: "STRONG", color: "#2ed573" };
   if (confidence >= 45) return { label: "MODERATE", color: "#448AFF" };
   return { label: "LOW CONFIDENCE", color: "#ffa502" };
 }
@@ -993,23 +977,20 @@ export function runEngine(
   // Pass REAL casino spins so the prior reflects actual observed frequency.
   const candidates = scoreCandidates(rounds, dashboard, prevPredNames, lastHit, liveSpins);
 
-  // ===== WEIGHTED PROBABILISTIC SELECTION (not deterministic top-4) =====
-  // Sample 4 unique candidates using rawScore as weight. This produces VARIED
-  // predictions each generation — high-score games are picked MORE often, but
-  // low-score games (CRAZY TIME, PACHINKO) DO get picked based on probability.
-  // No more "always 1,2,5,10". Weighted by REAL casino data when available.
+  // ===== EVIDENCE-RANKED TOP-4 SELECTION (pure, no fixed slots) =====
+  // Rank ALL 8 candidates by their complete AI evidence score (no fixed top-2,
+  // no weighted random, no last-hit carry-over). Select the 4 strongest CURRENT
+  // evidence combinations. The top 4 changes NATURALLY when the evidence changes.
   //
-  // SSR SAFETY: When there is NO real data (no rounds AND no liveSpins), skip
-  // sampling entirely (Math.random would cause hydration mismatch). Return
+  // SSR SAFETY: When there is NO real data (no rounds AND no liveSpins), return
   // empty predictions — the client-side generatePrediction effect populates
-  // them after mount.
+  // them after mount (avoids hydration mismatch).
   const hasData = rounds.length > 0 || liveSpins.length > 0;
-  const sampled = hasData ? sampleWeighted(candidates, SIGNAL_COUNT) : [];
+  const sampled = hasData ? selectTopByEvidence(candidates, SIGNAL_COUNT) : [];
   const sampledSet = new Set(sampled.map((c) => c.game.name));
   const excluded = candidates.filter((c) => !sampledSet.has(c.game.name));
-  // Sort the sampled 4 by their EVIDENCE rank (so strongest-evidence sampled
-  // game appears first — honest display, not sampling order).
-  const top4 = [...sampled].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+  // Already sorted by evidence rank in scoreCandidates — strongest first.
+  const top4 = [...sampled];
 
   // Honest confidence
   const triggered = recalibrated || (lastHit === false);
@@ -1077,13 +1058,25 @@ export function runEngine(
     whyParts.push(`Hit-rate: ${Math.round(dashboard.predictionHitRate * 100)}% (${dashboard.hits}/${dashboard.totalRounds})`);
     whyParts.push(`Recent (5): ${Math.round(dashboard.recentHitRate * 100)}% • Recent (10): ${Math.round(dashboard.recentHitRateLong * 100)}%`);
     whyParts.push(`Stability: ${dashboard.modelStability}% • Adaptive weight: ${Math.round(dashboard.adaptiveWeight * 100)}%`);
+    // Sample-size tier disclosure (honest — no fake high confidence from few rounds)
+    const tierN = dashboard.sampleSize;
+    const tierLabel = tierN < 5 ? "INSUFFICIENT (<5)"
+      : tierN < 10 ? "EARLY (<10) — LOW CONFIDENCE cap 40%"
+      : tierN < 20 ? "BUILDING (<20) — MODERATE cap 55%"
+      : tierN < 50 ? "ESTABLISHED (<50) — can reach STRONG cap 70%"
+      : tierN < 100 ? "LARGE (<100) — cap 78%"
+      : "MATURE (100+) — cap 85%";
+    whyParts.push(`Sample tier: ${tierLabel} (n=${tierN})`);
     if (useLivePrior) whyParts.push(`Real casino prior: ${liveSpins.length} spins — observed frequency drives selection`);
-    whyParts.push(`Top sampled evidence: ${top4[0]?.signals.join("+") || "theoretical"}`);
+    whyParts.push(`Top evidence: ${top4[0]?.signals.join("+") || "theoretical"}`);
     if (dashboard.anomalyDetected) whyParts.push(`⚠ Anomaly detected — χ²=${anomaly.statistic.toFixed(1)}`);
     if (dashboard.patternShiftDetected) whyParts.push(`⚠ Pattern shift — recent data weighted higher`);
   }
-  // Always emphasize: fresh ranking, no last-hit shortcut.
-  whyParts.push("FRESH ranking — previous result is one data point only, NOT a prediction command.");
+  // Always emphasize: fresh ranking, no last-hit shortcut, no fake accuracy.
+  whyParts.push("FRESH evidence-ranked top-4 — no fixed slots, no last-hit/HOT/OVERDUE bias.");
+  if (dashboard.sampleSize < 20) {
+    whyParts.push(`Honest disclaimer: ${dashboard.sampleSize} rounds is INSUFFICIENT for any accuracy claim — early data only.`);
+  }
 
   // VALIDATION CRITERIA
   const validationCriteria =

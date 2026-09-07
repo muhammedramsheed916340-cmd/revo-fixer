@@ -776,7 +776,7 @@ export function RevoGame() {
                 <i className="fas fa-circle-check text-[#2ed573]" /> Verified Accuracy
               </span>
               <span className="text-[10px] text-[#5a6a99]">
-                from {verifiedRounds} manual result{verifiedRounds !== 1 ? "s" : ""}
+                from {verifiedRounds} result{verifiedRounds !== 1 ? "s" : ""}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -792,6 +792,50 @@ export function RevoGame() {
                 <div className="text-xl font-black text-[#ff4757]">{verifiedRounds - hits}</div>
                 <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Misses</div>
               </div>
+            </div>
+            {/* Sample-size validation tier — honest disclaimer */}
+            {verifiedRounds < 20 && (
+              <div className="mt-3 rounded-lg border border-[#ffa502]/30 bg-[#ffa502]/8 p-2.5 text-[10px] text-[#ffa502]">
+                <i className="fas fa-triangle-exclamation mr-1" />
+                <b>EARLY DATA — sample size {verifiedRounds}/20.</b>{" "}
+                {verifiedRounds < 5
+                  ? "Insufficient for any accuracy claim. Predictions are exploratory."
+                  : verifiedRounds < 10
+                    ? "Low confidence — need 10+ rounds for LOW CONFIDENCE tier."
+                    : verifiedRounds < 20
+                      ? "Moderate tier — need 20+ rounds for STRONG label."
+                      : ""}
+                {" "}A few HITs do NOT prove predictive accuracy.
+              </div>
+            )}
+            {/* Validation tier progress bars: 5 / 10 / 20 / 50 / 100+ */}
+            <div className="mt-3 grid grid-cols-5 gap-1.5">
+              {[
+                { tier: 5, label: "5" },
+                { tier: 10, label: "10" },
+                { tier: 20, label: "20" },
+                { tier: 50, label: "50" },
+                { tier: 100, label: "100+" },
+              ].map((t) => {
+                const reached = verifiedRounds >= t.tier;
+                const pct = Math.min(100, (verifiedRounds / t.tier) * 100);
+                return (
+                  <div key={t.tier} className="text-center">
+                    <div className="mx-auto mb-0.5 h-1.5 w-full overflow-hidden rounded-full bg-[#1e2240]">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${pct}%`,
+                          background: reached ? "#2ed573" : "#448AFF",
+                        }}
+                      />
+                    </div>
+                    <div className={`text-[8px] font-bold ${reached ? "text-[#2ed573]" : "text-[#5a6a99]"}`}>
+                      {t.label}{reached ? " ✓" : ""}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

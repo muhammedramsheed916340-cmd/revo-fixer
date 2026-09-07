@@ -457,52 +457,29 @@ function scoreEvidence(
 }
 
 // ============================================================
-// HYBRID SELECTION — deterministic top + weighted variety
+// EVIDENCE-RANKED TOP SELECTION (pure, no fixed slots)
 // ============================================================
-/** Pick `count` unique segments using a hybrid approach:
- *   1. DETERMINISTIC TOP: Always pick the top floor(count/2) by evidence score.
- *   2. WEIGHTED SAMPLING: Pick remaining via weighted random sampling without
- *      replacement. Weight = evidenceScore^2 (squared → sharper distribution,
- *      rare outcomes picked less often).
- * This maximizes coverage (~80-83%) while allowing intelligent variety.
- * No fixed signals — selection emerges from statistical evidence. */
-function sampleWeighted(
+/**
+ * Pick `count` segments by ranking ALL segments using the complete AI
+ * evidence score, then selecting the top `count`.
+ *
+ * KEY RULES (per user spec — REVISED hybrid logic):
+ *   - NO always-fixed top 2
+ *   - NO weighted random sampling
+ *   - NO last-hit repetition / HOT / OVERDUE bias
+ *   - NO rare-number automatic suppression
+ *   - NO previous prediction carry-over
+ *
+ * The top 4 changes NATURALLY when the evidence changes. Every round is a
+ * fresh, independent recalculation from the complete available evidence.
+ */
+function selectTopByEvidence(
   segments: SegmentStat[],
   count: number,
 ): SegmentStat[] {
+  // Sort by evidenceScore descending — strongest first.
   const sorted = [...segments].sort((a, b) => b.evidenceScore - a.evidenceScore);
-  const chosen: SegmentStat[] = [];
-  const chosenNames = new Set<string>();
-
-  // Step 1: Deterministic top floor(count/2).
-  const topCount = Math.floor(count / 2);
-  for (let i = 0; i < topCount && i < sorted.length; i++) {
-    chosen.push(sorted[i]);
-    chosenNames.add(sorted[i].segment);
-  }
-
-  // Step 2: Weighted sampling for the remaining slots (squared weights).
-  const remaining = sorted.filter((s) => !chosenNames.has(s.segment));
-  const varietyCount = count - chosen.length;
-  for (let i = 0; i < varietyCount && remaining.length > 0; i++) {
-    const sumW = remaining.reduce((s, c) => s + c.evidenceScore * c.evidenceScore, 0);
-    if (sumW <= 0) {
-      chosen.push(remaining.splice(0, 1)[0]);
-      continue;
-    }
-    const rand = Math.random() * sumW;
-    let acc = 0;
-    let pickIdx = 0;
-    for (let j = 0; j < remaining.length; j++) {
-      acc += remaining[j].evidenceScore * remaining[j].evidenceScore;
-      if (rand <= acc) {
-        pickIdx = j;
-        break;
-      }
-    }
-    chosen.push(remaining.splice(pickIdx, 1)[0]);
-  }
-  return chosen;
+  return sorted.slice(0, count);
 }
 
 // ============================================================
@@ -710,12 +687,13 @@ export function analyzeSpins(spins: SpinData[]): AnalysisResult {
     predictionConfidence = 24;
     predictionMethod = "INSUFFICIENT DATA — need 10+ spins for evidence-based prediction";
   } else {
-    const sampled = sampleWeighted(segments, 4);
+    // Pure evidence-ranked top-4 (no fixed slots, no weighted random).
+    const sampled = selectTopByEvidence(segments, 4);
     prediction = sampled.map((s) => s.segment);
     predictionConfidence = Math.round(
       sampled.reduce((s, seg) => s + seg.confidence, 0) / sampled.length,
     );
-    predictionMethod = `Weighted probabilistic sampling from 10-signal evidence scores (no fixed signals)`;
+    predictionMethod = `Evidence-ranked top-4 (pure multi-factor score — no fixed slots, no last-hit/HOT/OVERDUE bias)`;
   }
 
   // ===== Hottest / Coldest / Overdue =====
