@@ -2115,3 +2115,46 @@ Verification:
 - Log Ev column shows log-scaled evidence.
 - Pushed to GitHub (commit 87b0c31).
 
+
+---
+
+Task ID: 43 (user request — THE REAL OBJECTIVE IS 4-OUTCOME COVERAGE)
+Agent: Z.ai Code
+Task: Verify the engine optimizes for Top-4 COVERAGE (not single-signal accuracy). The 70-combination optimizer must select the highest-coverage 4-outcome set. No code changes — pure verification.
+
+AUDIT RESULT: The engine ALREADY implements exactly what the user describes. NO CODE CHANGES NEEDED.
+
+Verification:
+
+1. 70-COMBINATION OPTIMIZER (already implemented, Task 42):
+   - Evaluates ALL 70 C(8,4) combinations.
+   - For each: expected coverage = sum of 4 calibrated probabilities.
+   - Selects the combination with highest expected coverage.
+   - The optimizer result is the AUTHORITATIVE Top-4 (no re-sort/re-slice after).
+   - Console debug shows: all 8 calibrated probs, top-4-by-score vs optimizer result, top-3 combos, match check.
+
+2. CALIBRATED PROBABILITIES (already implemented):
+   - All 8 outcomes get calibratedProbability = rawScore / totalScore.
+   - Sum to ~100%.
+   - Shown in debug table "Cal. Prob" column + console.
+
+3. TOP-4 COVERAGE METRIC (already tracked):
+   - predictionHitRate = hits / totalRounds.
+   - One HIT/MISS per round (actual ∈ Top-4 = HIT, else MISS).
+   - Performance Ledger: Total / HIT / MISS / Hit Rate.
+   - Rolling windows: Last 5/10/25/50/100.
+   - NOT individual outcome accuracy — IS set-level coverage.
+
+4. EVENT DEBUG LOG (already implemented):
+   - Per-round: Event# / Actual / Old Pred (LOCKED) / H-M / N Before / N After / New Pred / Pred# / Lock.
+   - Proves old prediction settled before history update.
+
+5. DATA PIPELINE (already verified):
+   - OLD LOCKED TOP-4 → actual result → check ∈ TOP-4 → HIT/MISS → append to history → recalculate all 8 → evaluate all 70 → select best → LOCK.
+   - No data leakage (old prediction settled BEFORE history update).
+
+6. NO FORCED SELECTION (already verified):
+   - No [1,2,5,10] fallback, no bonus quota, no diversity rule, no fixed slots, no random selection, no previous-result bias.
+
+Conclusion: The engine already optimizes for maximum real-world Top-4 coverage across all 8 outcomes using the 70-combination subset optimizer. The primary metric is Top-4 Coverage Hit Rate (actual ∈ locked Top-4 / total rounds). No changes needed.
+
