@@ -167,6 +167,17 @@ export interface PerformanceDashboard {
   bonusTrend: number;                  // recent - long-term (positive = increasing)
   bonusBursts: number;                 // count of bonus clusters (2+ in 3 spins)
   bonusActive: boolean;                // bonus appeared in last 3 spins
+  // ===== NEW: Normal vs Bonus result performance validation =====
+  normalResultHitRate: number;         // HIT rate when actual result was a NUMBER
+  bonusResultHitRate: number;          // HIT rate when actual result was a BONUS
+  normalResultMissRate: number;        // MISS rate when actual result was a NUMBER
+  bonusResultMissRate: number;         // MISS rate when actual result was a BONUS
+  normalResultCount: number;           // count of number-result rounds
+  bonusResultCount: number;            // count of bonus-result rounds
+  // ===== NEW: Excluded risk breakdown =====
+  excludedNormalRisk: number;          // theoretical prob of excluded number outcomes
+  excludedBonusRisk: number;           // theoretical prob of excluded bonus outcomes (= bonusOutcomeRisk)
+  totalMissExposure: number;            // total MISS exposure (excluded normal + excluded bonus)
 }
 
 // ============================================================
@@ -566,6 +577,43 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
   const last3Combined = combinedBonusSeq.slice(-3);
   const bonusActive = last3Combined.some((n) => BONUS_NAMES.includes(n));
 
+  // ===== NEW: Normal vs Bonus result performance validation =====
+  // Track HIT/MISS rates separately for number-result rounds vs bonus-result rounds.
+  // This reveals whether the model is genuinely improving or merely selecting
+  // high-frequency number outcomes.
+  let normalResultCount = 0;
+  let bonusResultCount = 0;
+  let normalResultHits = 0;
+  let bonusResultHits = 0;
+  for (const r of rounds) {
+    const isBonusResult = BONUS_NAMES.includes(r.actualResult.name);
+    if (isBonusResult) {
+      bonusResultCount++;
+      if (r.hit) bonusResultHits++;
+    } else {
+      normalResultCount++;
+      if (r.hit) normalResultHits++;
+    }
+  }
+  const normalResultHitRate = normalResultCount > 0 ? normalResultHits / normalResultCount : 0;
+  const bonusResultHitRate = bonusResultCount > 0 ? bonusResultHits / bonusResultCount : 0;
+  const normalResultMissRate = normalResultCount > 0 ? 1 - normalResultHitRate : 0;
+  const bonusResultMissRate = bonusResultCount > 0 ? 1 - bonusResultHitRate : 0;
+
+  // ===== NEW: Excluded risk breakdown =====
+  // Excluded normal risk = theoretical prob of excluded NUMBER outcomes.
+  // Excluded bonus risk = theoretical prob of excluded BONUS outcomes.
+  // Total miss exposure = excluded normal + excluded bonus.
+  const excludedNumberNames = GAMES
+    .filter((g) => !BONUS_NAMES.includes(g.name) && !activePredNames.includes(g.name))
+    .map((g) => g.name);
+  const excludedNormalRisk = excludedNumberNames.reduce(
+    (s, n) => s + (THEORETICAL[n] ?? 0),
+    0,
+  );
+  const excludedBonusRisk = bonusOutcomeRisk; // already computed
+  const totalMissExposure = excludedNormalRisk + excludedBonusRisk;
+
   return {
     totalRounds,
     hits,
@@ -609,6 +657,17 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
     bonusTrend,
     bonusBursts,
     bonusActive,
+    // NEW normal vs bonus result performance:
+    normalResultHitRate,
+    bonusResultHitRate,
+    normalResultMissRate,
+    bonusResultMissRate,
+    normalResultCount,
+    bonusResultCount,
+    // NEW excluded risk breakdown:
+    excludedNormalRisk,
+    excludedBonusRisk,
+    totalMissExposure,
   };
 }
 
@@ -909,41 +968,54 @@ function scoreCandidates(
       // If repeat rate is near baseline → NO boost, NO penalty. Fresh ranking.
     }
 
-    // ===== FACTOR 7: BONUS-AWARE SCORING (no bonus blind spot) =====
-    // Bonus outcomes are scored EQUALLY with number outcomes. If bonus
-    // activity is elevated (recent bonus rate > long-term baseline), bonus
-    // outcomes get a mild evidence boost. This is NOT "bonus appeared →
-    // predict bonus next" — it's "bonus activity is currently elevated, so
-    // bonus outcomes have slightly stronger evidence right now".
+    // ===== FACTOR 7: BONUS-AWARE SCORING (no bonus blind spot, no forced bonus) =====
+    // Bonus outcomes are scored EQUALLY with number outcomes. Bonus evidence
+    // must be STATISTICALLY MEANINGFUL before affecting the score — a single
+    // small burst does NOT aggressively change the prediction.
+    //
+    // Per user spec:
+    //   - 2 bonus in 3 rounds = mild signal (requires 15+ combined sample)
+    //   - 3 bonus in 5 rounds = stronger signal (requires 20+ combined sample)
+    //   - Recent bonus rate vs long-term rate = trend signal
+    //   - A small burst must NOT aggressively change prediction
     //
     // This eliminates the [1,2,5,10] blind spot: when bonus evidence is
-    // strong enough, a bonus outcome CAN enter the Top-4.
+    // strong enough, a bonus outcome CAN enter the Top-4. But it's NEVER
+    // forced — bonus must out-compete numbers on complete evidence.
     if (isBonusGame(g.name)) {
-      // Boost if recent bonus rate is elevated vs long-term
+      // Boost only with statistically meaningful sample (15+ combined spins)
       if (combinedSeq.length >= 15 && recentBonusRate > combinedBonusRate * 1.3) {
         const elevation = (recentBonusRate - combinedBonusRate) / Math.max(combinedBonusRate, 0.01);
-        score *= 1 + Math.min(0.20, elevation * 0.3);
+        score *= 1 + Math.min(0.15, elevation * 0.25); // capped +15% (was +20%)
         signals.push(`bonus-elevated (${Math.round(recentBonusRate * 100)}%)`);
       }
-      // Boost if this specific bonus appeared recently (last 10)
+      // Boost if this specific bonus appeared recently (last 10) — requires 20+ sample
       const thisBonusRecent = bonusRecentFreq[g.name] ?? 0;
-      if (thisBonusRecent > 0 && recentCombined.length > 0) {
+      if (combinedSeq.length >= 20 && thisBonusRecent > 0 && recentCombined.length > 0) {
         const thisBonusRate = thisBonusRecent / recentCombined.length;
         const thisBonusTheo = theo;
         if (thisBonusRate > thisBonusTheo * 1.5) {
-          score *= 1.10;
+          score *= 1.08; // capped +8% (was +10%)
           signals.push("bonus-recent-active");
         }
       }
-      // Mild boost if bonus clustering detected (bursts)
-      if (bonusBursts >= 2 && bonusActive) {
-        score *= 1.05;
+      // Mild boost if bonus clustering detected — requires 2+ bursts AND 20+ sample
+      if (combinedSeq.length >= 20 && bonusBursts >= 2 && bonusActive) {
+        score *= 1.04; // capped +4% (was +5%)
         signals.push("bonus-clustering");
+      }
+      // Stronger boost if 3+ bonuses in last 5 rounds (meaningful cluster)
+      const last5Combined = combinedSeq.slice(-5);
+      const bonusInLast5 = last5Combined.filter(isBonusGame).length;
+      if (combinedSeq.length >= 20 && bonusInLast5 >= 3) {
+        score *= 1.10; // capped +10%
+        signals.push("bonus-cluster-3in5");
       }
     } else {
       // For NUMBER outcomes: if bonus risk is high, numbers are slightly
       // less reliable (the wheel is in a "bonus phase"). Mild dampening.
-      if (combinedSeq.length >= 15 && recentBonusRate > combinedBonusRate * 1.5) {
+      // Requires 20+ sample AND recent bonus > 1.5× long-term.
+      if (combinedSeq.length >= 20 && recentBonusRate > combinedBonusRate * 1.5) {
         score *= 0.97;
         signals.push("bonus-phase-risk");
       }

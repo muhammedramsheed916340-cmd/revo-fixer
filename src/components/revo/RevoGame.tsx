@@ -916,6 +916,17 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
     bonusTrend,
     bonusBursts,
     bonusActive,
+    // NEW normal vs bonus result performance:
+    normalResultHitRate,
+    bonusResultHitRate,
+    normalResultMissRate,
+    bonusResultMissRate,
+    normalResultCount,
+    bonusResultCount,
+    // NEW excluded risk breakdown:
+    excludedNormalRisk,
+    excludedBonusRisk,
+    totalMissExposure,
   } = dashboard;
 
   return (
@@ -1073,6 +1084,59 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
             <b className="text-white">No bonus blind spot:</b> ALL 8 outcomes (numbers + bonuses) are scored
             equally. If bonus evidence is strong, a bonus CAN enter the Top-4 — no
             fixed [1,2,5,10]. Bonus risk = probability of MISS from excluded bonus outcomes.
+          </div>
+
+          {/* ===== Excluded Risk Breakdown ===== */}
+          <div className="mt-2 rounded-lg border border-[#ff4757]/20 bg-[#0d1020]/40 p-2">
+            <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+              Excluded Risk Breakdown (MISS exposure)
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="rounded bg-[#448AFF]/5 px-1.5 py-1 text-center">
+                <div className="text-[8px] text-[#5a6a99]">Excl. Normal</div>
+                <div className="text-[11px] font-bold text-[#448AFF]">{(excludedNormalRisk * 100).toFixed(1)}%</div>
+              </div>
+              <div className="rounded bg-[#FFD700]/5 px-1.5 py-1 text-center">
+                <div className="text-[8px] text-[#5a6a99]">Excl. Bonus</div>
+                <div className="text-[11px] font-bold text-[#FFD700]">{(excludedBonusRisk * 100).toFixed(1)}%</div>
+              </div>
+              <div className="rounded bg-[#ff4757]/8 px-1.5 py-1 text-center">
+                <div className="text-[8px] text-[#5a6a99]">Total Exposure</div>
+                <div className="text-[11px] font-bold text-[#ff4757]">{(totalMissExposure * 100).toFixed(1)}%</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ===== Normal vs Bonus Result Performance Validation ===== */}
+          <div className="mt-2 rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-2">
+            <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+              Result-Type Performance (reveals genuine improvement)
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {/* Normal results */}
+              <div className="rounded border border-[#448AFF]/30 bg-[#448AFF]/5 p-1.5">
+                <div className="mb-0.5 text-[8px] font-bold uppercase text-[#448AFF]">Normal Results</div>
+                <div className="flex items-center justify-between text-[9px]">
+                  <span className="text-[#2ed573]">HIT {Math.round(normalResultHitRate * 100)}%</span>
+                  <span className="text-[#ff4757]">MISS {Math.round(normalResultMissRate * 100)}%</span>
+                </div>
+                <div className="text-[7px] text-[#5a6a99]">n={normalResultCount} rounds</div>
+              </div>
+              {/* Bonus results */}
+              <div className="rounded border border-[#FFD700]/30 bg-[#FFD700]/5 p-1.5">
+                <div className="mb-0.5 text-[8px] font-bold uppercase text-[#FFD700]">Bonus Results</div>
+                <div className="flex items-center justify-between text-[9px]">
+                  <span className="text-[#2ed573]">HIT {Math.round(bonusResultHitRate * 100)}%</span>
+                  <span className="text-[#ff4757]">MISS {Math.round(bonusResultMissRate * 100)}%</span>
+                </div>
+                <div className="text-[7px] text-[#5a6a99]">n={bonusResultCount} rounds</div>
+              </div>
+            </div>
+            <div className="mt-1 text-[8px] text-[#5a6a99]">
+              <i className="fas fa-circle-info mr-0.5" />
+              Reveals whether the model genuinely improves or merely selects high-frequency numbers.
+              Low bonus-result HIT rate = bonus blind spot persists.
+            </div>
           </div>
         </div>
 
