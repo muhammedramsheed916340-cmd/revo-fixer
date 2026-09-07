@@ -10,6 +10,9 @@ import {
   type EngineOutput,
   type CandidateScore,
   type PerformanceDashboard,
+  WHEEL_SEGMENTS,
+  WHEEL_TOTAL_SEGMENTS,
+  THEORETICAL,
   buildInitial,
   recalibrate,
 } from "./decisionEngine";
@@ -731,6 +734,9 @@ export function RevoGame() {
         {/* ===== PERFORMANCE DASHBOARD (NEW — unified engine data) ===== */}
         <PerformanceDashboardPanel dashboard={view.dashboard} />
 
+        {/* ===== WHEEL BASE-PROBABILITY MODEL (54 segments) ===== */}
+        <WheelProbabilityPanel candidateScores={view.candidateScores} />
+
         {/* ===== ADVANCED DECISION ENGINE ===== */}
         <DecisionEnginePanel engine={view} />
 
@@ -1219,6 +1225,147 @@ function Kpi({ label, value, color }: { label: string; value: string; color: str
         {value}
       </div>
       <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">{label}</div>
+    </div>
+  );
+}
+
+// ============================================================
+// WHEEL BASE-PROBABILITY MODEL PANEL (54 segments)
+// ============================================================
+function WheelProbabilityPanel({ candidateScores }: { candidateScores: CandidateScore[] }) {
+  // Sort by final AI score descending (same as evidence ranking)
+  const sorted = [...candidateScores].sort((a, b) => b.finalAIScore - a.finalAIScore);
+  const totalCoverage = sorted.slice(0, 4).reduce((s, c) => s + c.basePrior, 0);
+
+  return (
+    <div className="revo-card mt-4 overflow-hidden">
+      <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#FFD700]/10 to-transparent px-4 py-3">
+        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+          <i className="fas fa-circle-nodes text-[#FFD700]" /> Wheel Base-Probability Model
+        </span>
+        <span className="rounded-full bg-[#FFD700]/15 px-2 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+          {WHEEL_TOTAL_SEGMENTS} segments
+        </span>
+      </div>
+
+      <div className="space-y-3 p-4">
+        {/* Header explanation */}
+        <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-2.5 text-[10px] text-[#8899cc]">
+          <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
+          <b className="text-white">54-segment wheel = BASE PRIOR.</b>{" "}
+          Live data = EVIDENCE. AI combines both. Base probability is NEVER used
+          directly as a live prediction — only as the prior for evidence combination.
+          <b className="text-[#FFD700]"> 83.33% coverage ≠ 83.33% accuracy.</b>
+        </div>
+
+        {/* Per-outcome breakdown table */}
+        <div className="overflow-x-auto revo-scroll">
+          <table className="w-full min-w-[640px] text-center text-[10px]">
+            <thead>
+              <tr className="border-b border-[#1e2240] bg-[#0d1020]/60">
+                <th className="px-2 py-2 text-left">Outcome</th>
+                <th className="px-2 py-2">Segments</th>
+                <th className="px-2 py-2">Base Prior</th>
+                <th className="px-2 py-2">Live Observed</th>
+                <th className="px-2 py-2">Adjustment</th>
+                <th className="px-2 py-2">Final AI Score</th>
+                <th className="px-2 py-2">Rank</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((c, i) => {
+                const isTop4 = i < 4;
+                const adjPct = ((c.modelAdjustment - 1) * 100);
+                const adjColor = adjPct > 5 ? "#2ed573" : adjPct < -5 ? "#ff4757" : "#5a6a99";
+                return (
+                  <tr
+                    key={c.game.name}
+                    className={`border-b border-[#1e2240]/40 ${isTop4 ? "bg-[#2ed573]/5" : "hover:bg-white/[0.02]"}`}
+                  >
+                    <td className="px-2 py-2 text-left">
+                      <div className="flex items-center gap-1.5">
+                        {isTop4 && <i className="fas fa-check-circle text-[10px] text-[#2ed573]" />}
+                        <span className={`font-bold ${c.game.isBonus ? "text-[#FFD700]" : "text-white"}`}>
+                          {c.game.name}
+                        </span>
+                        {c.game.isBonus && <span className="text-[8px] text-[#FFD700]">★</span>}
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 text-[#5a6a99]">
+                      {c.segmentCount}/{WHEEL_TOTAL_SEGMENTS}
+                    </td>
+                    <td className="px-2 py-2 text-[#448AFF]">
+                      {(c.basePrior * 100).toFixed(2)}%
+                    </td>
+                    <td className="px-2 py-2 text-[#00d4ff]">
+                      {(c.liveObservedRate * 100).toFixed(2)}%
+                    </td>
+                    <td className="px-2 py-2" style={{ color: adjColor }}>
+                      {adjPct > 0 ? "+" : ""}{adjPct.toFixed(1)}%
+                    </td>
+                    <td className="px-2 py-2 font-black text-[#2ed573]">
+                      {(c.finalAIScore * 100).toFixed(2)}
+                    </td>
+                    <td className="px-2 py-2">
+                      <span className={`grid h-5 w-5 place-items-center rounded-full text-[8px] font-black ${
+                        i === 0 ? "bg-[#2ed573] text-white"
+                          : i === 1 ? "bg-[#448AFF] text-white"
+                          : i === 2 ? "bg-[#FFD700] text-black"
+                          : i === 3 ? "bg-[#00d4ff] text-black"
+                          : "bg-[#1e2240] text-[#5a6a99]"
+                      }`}>
+                        {i + 1}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Theoretical coverage bar */}
+        <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
+          <div className="mb-1 flex items-center justify-between text-[10px]">
+            <span className="font-bold uppercase tracking-wider text-[#5a6a99]">
+              Theoretical Coverage (Top-4 by base prior)
+            </span>
+            <span className="font-black text-[#FFD700]">{(totalCoverage * 100).toFixed(2)}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-[#1e2240]">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${totalCoverage * 100}%`,
+                background: "linear-gradient(90deg,#448AFF,#FFD700,#2ed573)",
+              }}
+            />
+          </div>
+          <div className="mt-1 text-[9px] text-[#5a6a99]">
+            <i className="fas fa-triangle-exclamation mr-1 text-[#ffa502]" />
+            <b>83.33% coverage ≠ 83.33% accuracy.</b> Theoretical wheel coverage is a
+            mathematical baseline — NOT a guaranteed prediction accuracy. Each spin is
+            independent RNG.
+          </div>
+        </div>
+
+        {/* RTP disclaimer */}
+        <div className="rounded-lg border border-[#ff4757]/20 bg-[#ff4757]/5 p-2.5 text-[10px] text-[#8899cc]">
+          <i className="fas fa-ban mr-1 text-[#ff4757]" />
+          <b className="text-[#ff4757]">RTP rule:</b> RTP is a long-term payout/return statistic.
+          RTP ≠ next-spin probability. Next-result probability uses wheel segment distribution
+          as the base prior — NOT RTP.
+        </div>
+
+        {/* Sample-size protection */}
+        <div className="rounded-lg border border-[#448AFF]/20 bg-[#448AFF]/5 p-2.5 text-[10px] text-[#8899cc]">
+          <i className="fas fa-shield-halved mr-1 text-[#448AFF]" />
+          <b className="text-[#448AFF]">Sample-size protection:</b> Small-sample deviations are
+          NOT treated as real probability shifts. E.g., CRAZY TIME (1.85% base) appearing 2-3×
+          in a small sample does NOT mean its probability permanently increased. Sufficient
+          evidence is required before any major probability adjustment.
+        </div>
+      </div>
     </div>
   );
 }

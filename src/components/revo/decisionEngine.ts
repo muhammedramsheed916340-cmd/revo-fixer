@@ -77,6 +77,40 @@ export const WEIGHTS = [0.22, 0.42, 0.6, 0.75, 0.85, 0.92, 0.97, 1.0];
 
 export const SIGNAL_COUNT = 4;
 
+// ============================================================
+// 54-SEGMENT WHEEL BASE-PROBABILITY MODEL (Crazy Time)
+// ============================================================
+// The Crazy Time wheel has 54 segments total. Each outcome's BASE PRIOR is
+// its segment count / 54. This is the mathematical baseline — NEVER used
+// directly as a live prediction, only as the prior for evidence combination.
+//
+//   1          = 21 segments = 38.89%
+//   2          = 13 segments = 24.07%
+//   5          =  7 segments = 12.96%
+//   10         =  4 segments =  7.41%
+//   COIN FLIP  =  4 segments =  7.41%
+//   CASH HUNT  =  2 segments =  3.70%
+//   PACHINKO   =  2 segments =  3.70%
+//   CRAZY TIME =  1 segment  =  1.85%
+//   TOTAL      = 54 segments = 100.00%
+//
+// Theoretical coverage of top-4 by base prob (1+2+5+10) = 83.33%.
+// This is WHEEL COVERAGE only — NOT guaranteed prediction accuracy.
+// ============================================================
+
+export const WHEEL_TOTAL_SEGMENTS = 54;
+
+export const WHEEL_SEGMENTS: Record<string, number> = {
+  "1": 21,
+  "2": 13,
+  "5": 7,
+  "10": 4,
+  "COIN FLIP": 4,
+  "CASH HUNT": 2,
+  "PACHINKO": 2,
+  "CRAZY TIME": 1,
+};
+
 // Theoretical probabilities for each Crazy Time segment (54-segment wheel).
 export const THEORETICAL: Record<string, number> = {
   "1": 0.3889, "2": 0.2407, "5": 0.1296, "10": 0.0741,
@@ -119,6 +153,12 @@ export interface CandidateScore {
   isCold: boolean;
   rank?: number;              // 1-based rank in next signal (1..4)
   label: string;              // human-readable rank label
+  // ===== NEW: Wheel base-probability model breakdown =====
+  basePrior: number;          // 54-segment theoretical probability (0..1)
+  segmentCount: number;       // number of wheel segments (e.g. "1" = 21)
+  liveObservedRate: number;   // observed frequency in live data (0..1)
+  modelAdjustment: number;    // multiplicative adjustment from base prior (e.g. 1.15 = +15%)
+  finalAIScore: number;        // final combined AI score (= rawScore)
 }
 
 // ============================================================
@@ -1051,6 +1091,13 @@ function scoreCandidates(
       if (!signals.includes("shift-adaptive")) signals.push("shift-adaptive");
     }
 
+    // ===== Wheel base-probability model breakdown =====
+    const basePrior = THEORETICAL[g.name] ?? 0.1;
+    const segmentCount = WHEEL_SEGMENTS[g.name] ?? 1;
+    const liveObservedRate = longFreq; // observed frequency (blended live + user)
+    // Model adjustment = ratio of final score to base prior (how much evidence shifted it)
+    const modelAdjustment = basePrior > 0 ? score / basePrior : 1;
+
     scores.push({
       game: g,
       rawScore: Math.max(score, 0.001),
@@ -1068,6 +1115,12 @@ function scoreCandidates(
       isHot,
       isCold,
       label: "",
+      // Wheel model breakdown:
+      basePrior,
+      segmentCount,
+      liveObservedRate,
+      modelAdjustment,
+      finalAIScore: Math.max(score, 0.001),
     });
   }
 

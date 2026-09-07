@@ -1149,3 +1149,55 @@ Stage Summary:
 - Bonus cluster detection requires statistically meaningful samples — small bursts don't aggressively change prediction.
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 28 (user request — WHEEL BASE-PROBABILITY MODEL 54 SEGMENTS)
+Agent: Z.ai Code
+Task: User requested fixing the prediction engine's mathematical base probability to the 54-segment wheel structure. Base probability is PRIOR only — never used directly as live prediction. Add UI showing BASE PRIOR vs LIVE OBSERVED vs MODEL ADJUSTMENT vs FINAL AI SCORE per outcome.
+
+Fixes Applied:
+
+1. **`decisionEngine.ts` — Added 54-segment wheel structure**:
+   - `WHEEL_TOTAL_SEGMENTS = 54`
+   - `WHEEL_SEGMENTS` record: 1=21, 2=13, 5=7, 10=4, COIN FLIP=4, CASH HUNT=2, PACHINKO=2, CRAZY TIME=1
+   - Documented: theoretical coverage of top-4 (1+2+5+10) = 83.33% — WHEEL COVERAGE only, NOT guaranteed accuracy.
+   - RTP rule documented: RTP ≠ next-spin probability. Wheel segment distribution is the base prior.
+
+2. **`decisionEngine.ts` — Added wheel model breakdown to `CandidateScore`**:
+   - `basePrior` — 54-segment theoretical probability (0..1)
+   - `segmentCount` — number of wheel segments (e.g. "1" = 21)
+   - `liveObservedRate` — observed frequency in live data (0..1)
+   - `modelAdjustment` — multiplicative adjustment from base prior (ratio)
+   - `finalAIScore` — final combined AI score (= rawScore)
+   - Computed in the scoring loop and pushed with each candidate.
+
+3. **`RevoGame.tsx` — Added `WheelProbabilityPanel` component**:
+   - Per-outcome table: Outcome / Segments / Base Prior / Live Observed / Adjustment / Final AI Score / Rank
+   - Top-4 rows highlighted with green check + colored rank badges.
+   - Theoretical Coverage bar (Top-4 by base prior) — shows 83.33% with gradient.
+   - Disclaimer: "83.33% coverage ≠ 83.33% accuracy. Theoretical wheel coverage is a mathematical baseline — NOT guaranteed prediction accuracy. Each spin is independent RNG."
+   - RTP rule panel: "RTP is a long-term payout/return statistic. RTP ≠ next-spin probability."
+   - Sample-size protection panel: "Small-sample deviations are NOT treated as real probability shifts. CRAZY TIME (1.85% base) appearing 2-3× in small sample does NOT permanently increase its probability."
+
+4. **Imported `WHEEL_SEGMENTS`, `WHEEL_TOTAL_SEGMENTS`, `THEORETICAL`** into RevoGame.tsx for the panel.
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Wheel Base-Probability Model panel renders with "54 segments" badge.
+- Per-outcome table shows correct 54-segment values: 1=21/54=38.89%, 2=13/54=24.07%, 5=7/54=12.96%, etc.
+- Theoretical Coverage bar shows 83.33%.
+- RTP rule + Sample-size protection disclaimers render.
+- VLM confirmed: panel + table columns + coverage bar + disclaimers all visible.
+
+Stage Summary:
+- 54-segment wheel base-probability model fixed and documented.
+- Base probability is PRIOR only — NEVER used directly as live prediction.
+- AI combines BASE PRIOR + LIVE EVIDENCE + STATISTICAL CONFIDENCE for final score.
+- Per-outcome breakdown (Base Prior / Live Observed / Adjustment / Final AI Score) visible in UI.
+- 83.33% coverage ≠ 83.33% accuracy — clearly disclaimed.
+- RTP ≠ next-spin probability — clearly disclaimed.
+- Sample-size protection: small-sample deviations not treated as real probability shifts.
+- Lint clean, no errors, agent-browser QA green.
+
