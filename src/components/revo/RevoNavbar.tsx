@@ -6,6 +6,7 @@ import { RevoNotificationsBell } from "./RevoNotificationsBell";
 const NAV = [
   { id: "home", label: "Home", icon: "fa-house" },
   { id: "packages", label: "Packages", icon: "fa-crown" },
+  { id: "recommender", label: "Picker", icon: "fa-wand-magic-sparkles" },
   { id: "compare", label: "Compare", icon: "fa-table-columns" },
   { id: "revenue", label: "Revenue", icon: "fa-chart-line" },
   { id: "converter", label: "Converter", icon: "fa-right-left" },

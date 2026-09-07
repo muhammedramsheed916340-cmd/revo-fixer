@@ -142,3 +142,31 @@ Stage Summary:
 - All data remains 100% real from live Firebase — zero mock.
 - Lint clean, dev log clean, all 8 GET APIs healthy, agent-browser QA green across desktop + mobile.
 - Next phase candidates: dark/light theme toggle, admin write operations (Firebase service-account), live notifications WebSocket, export-to-PDF for transaction history, package recommendation engine.
+
+---
+
+Task ID: 5 (cron round 5)
+Agent: Z.ai Code (webDevReview)
+Task: Round-5 review — QA current state, fix bugs, then add Package Recommendation Engine, Export-to-PDF, Live Activity Ticker, scroll-reveal animations + styling polish. All real data only.
+
+Work Log:
+- Read worklog; confirmed rounds 1-4 stable (9 APIs, 12 sections, lint clean).
+- agent-browser QA: 12 sections render, no console/runtime errors, license verify (banned + used) passes, dashboard loads 70 real entries, mobile responsive. No bugs found.
+- Built `RevoRecommender.tsx`: smart package picker. Budget slider (₹7,000→₹40,000) + hours-needed slider/chips (1/2/4/8/24h). Scores all 5 real packages by ₹/hr value + budget fit + hours coverage + popularity boost. Top recommendation card (gold) + all-ranked list with progress bars + affordability tags. "Affordable packages" counter. Verified: top rec = "2 Hours" (popular plan), 5 ranked rows.
+- Built `/api/export-pdf` API route: generates a vector PDF transaction-history report via ReportLab (Python subprocess via spawnSync, temp-file output). Includes summary (total transactions, approved revenue, generated timestamp) + full transaction log table (date/type/package/method/amount/status) with color-coded status cells. All data real (packagePayments + transferRequests). Fixed ₹→"Rs" (Helvetica lacks rupee glyph). Verified: 2-page PDF, 6KB, 48 real transactions with real dates/amounts/methods.
+- Added "Export PDF" button to Activity section header (opens /api/export-pdf in new tab).
+- Built `RevoTicker.tsx`: live activity marquee below hero. Polls /api/activity every 30s, merges payments + transfers into a single timeline, renders as a seamless scrolling marquee with edge-fade masks + "● Live" badge. 80 items (40 × 2 for loop). Ticker animation verified running.
+- Built `RevoReveal.tsx`: scroll-reveal wrapper using IntersectionObserver. Wraps all 10 content sections — they fade + slide up on first scroll-into-view (opacity 0→1, translateY 24px→0, 600ms ease).
+- Styling polish: added `revo-reveal` CSS class + `.is-visible` state. Added `*:focus-visible` accessibility outline (blue ring). Added `.revo-card:hover` border-color transition (blue tint). Card depth shadows. Navbar expanded 12→13 items (Picker added), footer nav 12→13.
+- Wired new sections into RevoApp: Hero → Ticker → Packages → Recommender → Compare → Revenue → Converter → Stats → Deposit → Payments → Activity → FAQ → Divider → Admin → Terms. All wrapped in RevoReveal for scroll animation.
+- `bun run lint` → **0 errors**.
+- agent-browser QA: 13 sections render, no console/runtime errors. Ticker: 80 items scrolling with Live badge. Recommender: 2 sliders, top rec "2 Hours", 5 ranked bars, budget slider updates affordable count. Export PDF: button present, downloads valid 2-page PDF (6KB, 48 real transactions, "Rs 18,900" revenue). License verify (banned) passes. Dashboard regression: 70 real entries. Mobile (375×812): 13 sections + ticker visible. All 9 APIs healthy (200).
+
+Stage Summary:
+- 3 new real-data features shipped: Package Recommendation Engine (budget/hours → scored suggestions), Export-to-PDF (ReportLab transaction report), Live Activity Ticker (marquee).
+- 1 new API route (`/api/export-pdf` — ReportLab PDF generation), 3 new components (`RevoRecommender`, `RevoTicker`, `RevoReveal`), 1 export button added to Activity.
+- Scroll-reveal animations on all 10 content sections, focus-visible accessibility, card hover depth.
+- Navbar expanded 12→13, footer nav 12→13.
+- All data remains 100% real from live Firebase — zero mock.
+- Lint clean, dev log clean, all 9 APIs healthy (200), agent-browser QA green across desktop + mobile.
+- Next phase candidates: dark/light theme toggle, admin write operations (Firebase service-account), live notifications WebSocket, CSV export, package revenue deep-dive PDF.

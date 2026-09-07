@@ -20,6 +20,9 @@ import { RevoComparison } from "./RevoComparison";
 import { RevoDeposit } from "./RevoDeposit";
 import { RevoScrollTop, RevoDivider } from "./RevoScrollTop";
 import { RevoTerms } from "./RevoTerms";
+import { RevoRecommender } from "./RevoRecommender";
+import { RevoTicker } from "./RevoTicker";
+import { RevoReveal } from "./RevoReveal";
 
 import type {
   AppSettings,
@@ -267,42 +270,74 @@ export function RevoApp() {
             />
           )}
 
-          <RevoPackages
-            packages={packages}
-            settings={settings}
-            onBuy={handleBuy}
-          />
+          <RevoTicker />
 
-          <RevoComparison packages={packages} onBuy={handlePickPackage} />
+          <RevoReveal>
+            <RevoPackages
+              packages={packages}
+              settings={settings}
+              onBuy={handleBuy}
+            />
+          </RevoReveal>
 
-          <RevoRevenue />
+          <RevoReveal>
+            <RevoRecommender
+              packages={packages}
+              settings={settings}
+              onPick={handlePickPackage}
+            />
+          </RevoReveal>
 
-          <RevoConverter settings={settings} />
+          <RevoReveal>
+            <RevoComparison packages={packages} onBuy={handlePickPackage} />
+          </RevoReveal>
 
-          <RevoStats stats={stats} settings={settings} />
+          <RevoReveal>
+            <RevoRevenue />
+          </RevoReveal>
 
-          <RevoDeposit
-            settings={settings}
-            packages={packages}
-            methods={methods}
-            onPickPackage={handlePickPackage}
-          />
+          <RevoReveal>
+            <RevoConverter settings={settings} />
+          </RevoReveal>
 
-          <RevoPayments methods={methods} loading={loadingPayments} />
+          <RevoReveal>
+            <RevoStats stats={stats} settings={settings} />
+          </RevoReveal>
 
-          <RevoActivity
-            data={activity}
-            notifications={notifications}
-            loading={loadingActivity}
-          />
+          <RevoReveal>
+            <RevoDeposit
+              settings={settings}
+              packages={packages}
+              methods={methods}
+              onPickPackage={handlePickPackage}
+            />
+          </RevoReveal>
 
-          <RevoFaq settings={settings} />
+          <RevoReveal>
+            <RevoPayments methods={methods} loading={loadingPayments} />
+          </RevoReveal>
+
+          <RevoReveal>
+            <RevoActivity
+              data={activity}
+              notifications={notifications}
+              loading={loadingActivity}
+            />
+          </RevoReveal>
+
+          <RevoReveal>
+            <RevoFaq settings={settings} />
+          </RevoReveal>
 
           <RevoDivider icon="fa-user-shield" color="#a78bfa" />
 
-          <RevoAdminGate />
+          <RevoReveal>
+            <RevoAdminGate />
+          </RevoReveal>
 
-          <RevoTerms settings={settings} />
+          <RevoReveal>
+            <RevoTerms settings={settings} />
+          </RevoReveal>
         </main>
 
         <RevoFooter settings={settings} onGo={scrollTo} />
