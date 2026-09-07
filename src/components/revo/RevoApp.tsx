@@ -25,6 +25,7 @@ import { RevoReveal } from "./RevoReveal";
 import { RevoTestimonials } from "./RevoTestimonials";
 import { RevoCommandPalette } from "./RevoCommandPalette";
 import { RevoGame } from "./RevoGame";
+import { RevoLiveResults } from "./RevoLiveResults";
 
 import type {
   AppSettings,
@@ -181,6 +182,10 @@ export function RevoApp() {
 
           <RevoReveal>
             <RevoGame />
+          </RevoReveal>
+
+          <RevoReveal>
+            <RevoLiveResults />
           </RevoReveal>
 
           <RevoReveal>

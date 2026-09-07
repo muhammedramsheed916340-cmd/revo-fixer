@@ -79,6 +79,7 @@ export function RevoFooter({
               {[
                 { id: "home", label: "Home" },
                 { id: "game", label: "Live Game" },
+                { id: "live-results", label: "Live Results" },
                 { id: "packages", label: "Packages" },
                 { id: "recommender", label: "Picker" },
                 { id: "compare", label: "Compare" },
