@@ -160,6 +160,11 @@ export interface CandidateScore {
   modelAdjustment: number;    // multiplicative adjustment from base prior (e.g. 1.15 = +15%)
   finalAIScore: number;        // final combined AI score (= rawScore)
   selectionReason: string;    // specific reason this outcome was selected (or not)
+  // ===== NEW: Full debug fields for QA verification =====
+  observedFrequency: number;  // observed frequency in live data (0..1)
+  blendedFrequency: number;   // blended long-term + recent frequency (0..1)
+  relativeDeviation: number;  // (blended - prior) / prior
+  evidenceScorePreMultiplier: number; // 1 + cappedDeviation (pure relative evidence)
 }
 
 // ============================================================
@@ -1093,32 +1098,35 @@ function scoreCandidates(
 
     const signals: string[] = [];
 
-    // ===== BASE SCORE — NORMALIZED RELATIVE EVIDENCE (no absolute-frequency bias) =====
-    // CRITICAL: The base score must NOT use absolute frequency (which would
-    // permanently lock 1,2,5,10 due to their high theoretical probability).
-    // Instead, we compute how much the observed frequency DEVIATES from the
-    // base prior, and use that RELATIVE deviation as the score.
+    // ===== BASE SCORE — PURE RELATIVE EVIDENCE (no prior multiplication) =====
+    // CRITICAL FIX: The previous formula `prior * (1 + deviation)` STILL
+    // multiplied by the absolute prior, so high-prior outcomes (1, 2) always
+    // scored higher even with identical relative evidence.
     //
-    // This ensures ALL 8 outcomes compete on the SAME scale:
-    //   - "1" with 38.89% prior and 40% observed → mild positive deviation
-    //   - "CASH HUNT" with 3.70% prior and 8% observed → strong positive deviation
-    //   - "CRAZY TIME" with 1.85% prior and 5% observed → very strong positive deviation
+    // NEW FORMULA: `score = (1 + cappedDeviation) * 0.85 + livePrior * 0.15`
     //
-    // The base prior anchors the score (regression to mean), but the EVIDENCE
-    // (observed deviation) determines the ranking. A rare outcome with strong
-    // recent evidence CAN out-rank a common outcome with weak evidence.
+    // The PRIMARY signal (85%) is the RELATIVE DEVIATION — how strong is the
+    // evidence for this outcome relative to ITS OWN expected baseline?
+    // The SECONDARY signal (15%) is a mild prior weight (regression to mean).
     //
-    // Formula: score = prior * (1 + relativeDeviation)
-    //   where relativeDeviation = (blendedFreq - prior) / prior
-    // This keeps the score anchored to the prior but scaled by evidence.
+    // TEST 1 (control): identical deviation → identical primary score:
+    //   Outcome A: prior=40%, observed=44% → dev=+10% → primary=1.10
+    //   Outcome B: prior=4%,  observed=4.4%→ dev=+10% → primary=1.10
+    //   A total = 1.10*0.85 + 0.40*0.15 = 0.935 + 0.060 = 0.995
+    //   B total = 1.10*0.85 + 0.04*0.15 = 0.935 + 0.006 = 0.941
+    //   A is only 5.7% higher than B (due to mild prior weight) — NOT 10×.
+    //
+    // When deviations differ strongly:
+    //   A: prior=40%, observed=36% → dev=-10% → primary=0.90 → total=0.825
+    //   B: prior=4%,  observed=8%  → dev=+100%→ primary=2.00 → total=1.706
+    //   B out-ranks A (1.706 > 0.825) — strong evidence beats high prior. ✓
     const blendedFreq = (longFreq * longW + recFreq * adaptW);
     const deviation = livePrior > 0 ? (blendedFreq - livePrior) / livePrior : 0;
-    // Score = prior × (1 + deviation). When deviation=0, score=prior (neutral).
-    // When deviation=+0.5 (50% above prior), score = prior × 1.5.
-    // When deviation=-0.5, score = prior × 0.5.
     // Cap deviation to prevent extreme swings: [-0.6, +2.0]
     const cappedDeviation = Math.max(-0.6, Math.min(2.0, deviation));
-    let score = livePrior * (1 + cappedDeviation);
+    // Primary: relative evidence (85%), Secondary: mild prior weight (15%)
+    const evidenceScore = 1 + cappedDeviation; // pure relative evidence (pre-multiplier)
+    let score = evidenceScore * 0.85 + livePrior * 0.15;
     if (!useLivePrior && n === 0) score = theo; // no data at all → pure theoretical
 
     // ===== FACTOR 1: Recent active (mild adaptive signal — NOT a chase) =====
@@ -1255,20 +1263,21 @@ function scoreCandidates(
     void lastHit;
     void prevPredNames;
 
-    // ===== SIGNAL 9: Anomaly handling (normalized relative — no absolute bias) =====
-    // If anomaly detected, weight recent data even more (using relative deviation).
+    // ===== SIGNAL 9: Anomaly handling (pure relative — no prior multiplication) =====
     if (dashboard.anomalyDetected) {
       const anomalyDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
       const cappedAnomalyDev = Math.max(-0.6, Math.min(2.0, anomalyDeviation));
-      score = livePrior * (1 + cappedAnomalyDev * 1.5); // amplify deviation signal
+      const anomalyEvidence = 1 + cappedAnomalyDev * 1.5;
+      score = anomalyEvidence * 0.85 + livePrior * 0.15;
       if (!signals.includes("anomaly-weighted")) signals.push("anomaly-weighted");
     }
 
-    // ===== SIGNAL 10: Pattern shift handling (normalized relative) =====
+    // ===== SIGNAL 10: Pattern shift handling (pure relative) =====
     if (dashboard.patternShiftDetected) {
       const shiftDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
       const cappedShiftDev = Math.max(-0.6, Math.min(2.0, shiftDeviation));
-      score = livePrior * (1 + cappedShiftDev * 1.3); // amplify recent deviation
+      const shiftEvidence = 1 + cappedShiftDev * 1.3;
+      score = shiftEvidence * 0.85 + livePrior * 0.15;
       if (!signals.includes("shift-adaptive")) signals.push("shift-adaptive");
     }
 
@@ -1303,6 +1312,11 @@ function scoreCandidates(
       modelAdjustment,
       finalAIScore: Math.max(score, 0.001),
       selectionReason: "", // filled after ranking
+      // Full debug fields:
+      observedFrequency: longFreq,
+      blendedFrequency: blendedFreq,
+      relativeDeviation: deviation,
+      evidenceScorePreMultiplier: evidenceScore,
     });
   }
 

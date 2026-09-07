@@ -1428,3 +1428,65 @@ Stage Summary:
 - Specific selection reasons per outcome (not generic).
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 33 (user request — FINAL QA: VERIFY NORMALIZED SCORING IS FAIR)
+Agent: Z.ai Code
+Task: User correctly identified that `score = prior * (1 + deviation)` STILL multiplied by absolute prior, so high-prior outcomes always scored higher even with identical relative evidence. Fix: make RELATIVE DEVIATION the primary signal (85%), with only mild prior weight (15%) as secondary.
+
+Root Cause Found (confirmed by user):
+- Previous formula: `score = livePrior * (1 + cappedDeviation)` — STILL multiplied by absolute prior.
+- Example with identical +10% deviation:
+  - Outcome A (prior=40%): score = 0.40 * 1.10 = 0.440
+  - Outcome B (prior=4%):  score = 0.04 * 1.10 = 0.044
+  - A scores 10× higher than B despite IDENTICAL relative evidence. NOT fair.
+
+Fix Applied:
+
+**NEW FORMULA**: `score = (1 + cappedDeviation) * 0.85 + livePrior * 0.15`
+
+- PRIMARY (85%): `(1 + cappedDeviation)` — pure relative evidence, same for all outcomes with identical deviation.
+- SECONDARY (15%): `livePrior` — mild regression-to-mean weight.
+
+TEST 1 (control — identical +10% deviation):
+- A (prior=40%): (1.10)*0.85 + 0.40*0.15 = 0.935 + 0.060 = 0.995
+- B (prior=4%):  (1.10)*0.85 + 0.04*0.15 = 0.935 + 0.006 = 0.941
+- A is only 5.7% higher than B (due to mild prior weight) — NOT 10×. ✓
+
+TEST 2 (strong deviation beats high prior):
+- A (prior=40%, observed=36%): dev=-10% → (0.90)*0.85 + 0.06 = 0.825
+- B (prior=4%, observed=8%): dev=+100% → (2.00)*0.85 + 0.006 = 1.706
+- B out-ranks A (1.706 > 0.825). Strong evidence beats high prior. ✓
+
+Also updated anomaly/pattern-shift overrides to use same pure-relative formula.
+
+Added full debug fields to CandidateScore:
+- `observedFrequency` — observed frequency in live data
+- `blendedFrequency` — blended long-term + recent frequency
+- `relativeDeviation` — (blended - prior) / prior
+- `evidenceScorePreMultiplier` — 1 + cappedDeviation (pure relative evidence)
+
+Updated debug table UI with ALL 8 columns:
+Outcome | Base Prior | Observed | Blended | Rel. Dev. | Evidence | Final Score | Rank | Sel | Reason
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Prediction: [1, PACHINKO, CRAZY TIME, CASH HUNT] → then [5, PACHINKO, CRAZY TIME, 1] (changed with live data).
+- THREE bonus outcomes (PACHINKO, CRAZY TIME, CASH HUNT) in Top-4 — proves pure relative scoring works.
+- NOT [1,2,5,10] or [1,2,5,COIN FLIP] — the rotating bias is GONE.
+- Debug table shows ALL 8 outcomes with: Base Prior, Observed, Blended, Rel. Dev., Evidence, Final Score, Rank, Sel, Reason.
+- Selection reasons are specific per outcome (e.g., "+1606.1% vs prior · cash hunt-recent-active", "+2034.4% vs prior · recent-active+trending-up+repeat-unlikely (0%) · recent 46% > long 39%").
+- 8 fresh predictions all produce same Top-4 (deterministic given same evidence — correct, no random variation).
+
+Stage Summary:
+- BASE SCORE FORMULA FIXED: pure relative evidence (85%) + mild prior weight (15%).
+- Identical relative deviation → nearly identical scores (5.7% difference, not 10×).
+- Strong deviation beats high prior — rare outcomes CAN enter Top-4.
+- ALL 8 outcomes compete on the SAME relative scale.
+- Debug table proves all 8 evaluated every cycle with full transparency.
+- No fixed [1,2,5,10], no rotating combinations, no forced Coin Flip.
+- Prediction genuinely changes based on evidence — not locked to a fixed core.
+- Lint clean, no errors, agent-browser QA green.
+
