@@ -519,7 +519,12 @@ export function RevoGame() {
     duplicateCount: number;
   } | null>(null);
   const latencyHistoryRef = useRef<{ sourceToApp: number; totalToUI: number; totalToPred: number }[]>([]);
-  const [latencyAvg, setLatencyAvg] = useState<{ avgSrcToApp: number | null; minSrcToApp: number | null; maxSrcToApp: number | null }>({ avgSrcToApp: null, minSrcToApp: null, maxSrcToApp: null });
+  const [latencyAvg, setLatencyAvg] = useState<{ avgSrcToApp: number | null; minSrcToApp: number | null; maxSrcToApp: number | null; p95SrcToApp: number | null; avgAppToUI: number; avgAppToPred: number; minAppToUI: number; maxAppToUI: number; minAppToPred: number; maxAppToPred: number }>({
+    avgSrcToApp: null, minSrcToApp: null, maxSrcToApp: null, p95SrcToApp: null, avgAppToUI: 0, avgAppToPred: 0, minAppToUI: 0, maxAppToUI: 0, minAppToPred: 0, maxAppToPred: 0,
+  });
+  const staleCountRef = useRef(0);
+  const duplicateCountRef = useRef(0);
+  const [eventStats, setEventStats] = useState({ stale: 0, duplicate: 0, dropped: 0, total: 0 });
 
   useEffect(() => {
     const unsub = subscribeLiveResults((e: LiveResultEvent) => {
@@ -548,13 +553,27 @@ export function RevoGame() {
         // Track history for averages
         if (srcToApp !== null && totalSrcToUI !== null && totalSrcToPred !== null) {
           latencyHistoryRef.current.push({ sourceToApp: srcToApp, totalToUI: totalSrcToUI, totalToPred: totalSrcToPred });
-          if (latencyHistoryRef.current.length > 50) latencyHistoryRef.current.shift();
+          if (latencyHistoryRef.current.length > 100) latencyHistoryRef.current.shift();
           // Update averages via state (not ref during render)
           const hist = latencyHistoryRef.current;
-          const avg = hist.reduce((s, h) => s + h.sourceToApp, 0) / hist.length;
-          const min = Math.min(...hist.map((h) => h.sourceToApp));
-          const max = Math.max(...hist.map((h) => h.sourceToApp));
-          setLatencyAvg({ avgSrcToApp: avg, minSrcToApp: min, maxSrcToApp: max });
+          const avgS2A = hist.reduce((s, h) => s + h.sourceToApp, 0) / hist.length;
+          const minS2A = Math.min(...hist.map((h) => h.sourceToApp));
+          const maxS2A = Math.max(...hist.map((h) => h.sourceToApp));
+          // P95: sort and take the 95th percentile
+          const sortedS2A = [...hist.map((h) => h.sourceToApp)].sort((a, b) => a - b);
+          const p95Idx = Math.floor(sortedS2A.length * 0.95);
+          const p95S2A = sortedS2A[p95Idx] ?? maxS2A;
+          const avgA2U = hist.reduce((s, h) => s + h.totalToUI - h.sourceToApp, 0) / hist.length;
+          const avgA2P = hist.reduce((s, h) => s + h.totalToPred - h.sourceToApp, 0) / hist.length;
+          const minA2U = Math.min(...hist.map((h) => h.totalToUI - h.sourceToApp));
+          const maxA2U = Math.max(...hist.map((h) => h.totalToUI - h.sourceToApp));
+          const minA2P = Math.min(...hist.map((h) => h.totalToPred - h.sourceToApp));
+          const maxA2P = Math.max(...hist.map((h) => h.totalToPred - h.sourceToApp));
+          setLatencyAvg({
+            avgSrcToApp: avgS2A, minSrcToApp: minS2A, maxSrcToApp: maxS2A, p95SrcToApp: p95S2A,
+            avgAppToUI: avgA2U, avgAppToPred: avgA2P, minAppToUI: minA2U, maxAppToUI: maxA2U, minAppToPred: minA2P, maxAppToPred: maxA2P,
+          });
+          setEventStats((prev) => ({ ...prev, total: hist.length }));
         }
 
         const hist = latencyHistoryRef.current;
@@ -691,71 +710,100 @@ export function RevoGame() {
                 </span>
               </div>
             </div>
+            {/* Current latency (last event) */}
             <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-6">
-              {/* SOURCE → APP */}
               <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
-                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Source→App</div>
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Src→App (now)</div>
                 <div className="text-sm font-black" style={{
                   color: latencyStats.sourceToApp === null ? "#5a6a99" : latencyStats.sourceToApp < 3000 ? "#2ed573" : latencyStats.sourceToApp < 6000 ? "#448AFF" : "#ffa502",
                 }}>
                   {latencyStats.sourceToApp !== null ? `${(latencyStats.sourceToApp / 1000).toFixed(1)}s` : "—"}
                 </div>
               </div>
-              {/* APP → UI */}
               <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
-                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">App→UI</div>
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">App→UI (now)</div>
                 <div className="text-sm font-black" style={{
                   color: latencyStats.appToUI < 50 ? "#2ed573" : latencyStats.appToUI < 300 ? "#448AFF" : "#ffa502",
                 }}>
                   {latencyStats.appToUI}ms
                 </div>
               </div>
-              {/* APP → PREDICTION */}
               <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
-                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">App→Pred</div>
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">App→Pred (now)</div>
                 <div className="text-sm font-black" style={{
                   color: latencyStats.appToPrediction < 50 ? "#2ed573" : latencyStats.appToPrediction < 500 ? "#448AFF" : "#ffa502",
                 }}>
                   {latencyStats.appToPrediction}ms
                 </div>
               </div>
-              {/* TOTAL SOURCE → UI */}
               <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5 text-center">
-                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Src→UI (total)</div>
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Total→UI (now)</div>
                 <div className="text-sm font-black" style={{
                   color: latencyStats.totalSourceToUI === null ? "#5a6a99" : latencyStats.totalSourceToUI < 3000 ? "#2ed573" : latencyStats.totalSourceToUI < 6000 ? "#448AFF" : "#ffa502",
                 }}>
                   {latencyStats.totalSourceToUI !== null ? `${(latencyStats.totalSourceToUI / 1000).toFixed(1)}s` : "—"}
                 </div>
               </div>
-              {/* TOTAL SOURCE → PREDICTION */}
               <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5 text-center">
-                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Src→Pred (total)</div>
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Total→Pred (now)</div>
                 <div className="text-sm font-black" style={{
                   color: latencyStats.totalSourceToPrediction === null ? "#5a6a99" : latencyStats.totalSourceToPrediction < 3000 ? "#2ed573" : latencyStats.totalSourceToPrediction < 6000 ? "#448AFF" : "#ffa502",
                 }}>
                   {latencyStats.totalSourceToPrediction !== null ? `${(latencyStats.totalSourceToPrediction / 1000).toFixed(1)}s` : "—"}
                 </div>
               </div>
-              {/* AVERAGES */}
               <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
-                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Avg Src→App</div>
-                <div className="text-sm font-black text-[#a78bfa]">
-                  {latencyAvg.avgSrcToApp !== null ? `${(latencyAvg.avgSrcToApp / 1000).toFixed(1)}s` : "—"}
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Events</div>
+                <div className="text-sm font-black text-[#a78bfa]">{eventStats.total}</div>
+                <div className="text-[6px] text-[#5a6a99]">
+                  stale:{eventStats.stale} dup:{eventStats.duplicate}
                 </div>
-                {latencyAvg.minSrcToApp !== null && (
-                  <div className="text-[6px] text-[#5a6a99]">
-                    min {(latencyAvg.minSrcToApp / 1000).toFixed(1)}s · max {(latencyAvg.maxSrcToApp! / 1000).toFixed(1)}s
-                  </div>
-                )}
               </div>
             </div>
+            {/* Aggregated stats */}
+            {latencyAvg.avgSrcToApp !== null && (
+              <div className="border-t border-[#1e2240] px-3 py-2">
+                <div className="mb-1 text-[8px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                  Aggregated Live Statistics (genuine NEW events only, n={eventStats.total})
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[9px]">
+                  {/* Source → App */}
+                  <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5">
+                    <div className="text-[7px] font-bold uppercase text-[#00d4ff]">Source→App</div>
+                    <div className="grid grid-cols-2 gap-0.5 mt-0.5">
+                      <div>Avg: <span className="font-bold text-white">{(latencyAvg.avgSrcToApp / 1000).toFixed(1)}s</span></div>
+                      <div>P95: <span className="font-bold text-[#ffa502]">{(latencyAvg.p95SrcToApp! / 1000).toFixed(1)}s</span></div>
+                      <div>Min: <span className="font-bold text-[#2ed573]">{(latencyAvg.minSrcToApp! / 1000).toFixed(1)}s</span></div>
+                      <div>Max: <span className="font-bold text-[#ff4757]">{(latencyAvg.maxSrcToApp! / 1000).toFixed(1)}s</span></div>
+                    </div>
+                  </div>
+                  {/* App → UI */}
+                  <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5">
+                    <div className="text-[7px] font-bold uppercase text-[#2ed573]">App→UI</div>
+                    <div className="grid grid-cols-2 gap-0.5 mt-0.5">
+                      <div>Avg: <span className="font-bold text-white">{latencyAvg.avgAppToUI.toFixed(0)}ms</span></div>
+                      <div>Min: <span className="font-bold text-[#2ed573]">{latencyAvg.minAppToUI.toFixed(0)}ms</span></div>
+                      <div>Max: <span className="font-bold text-[#ff4757]">{latencyAvg.maxAppToUI.toFixed(0)}ms</span></div>
+                    </div>
+                  </div>
+                  {/* App → Prediction */}
+                  <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5">
+                    <div className="text-[7px] font-bold uppercase text-[#448AFF]">App→Prediction</div>
+                    <div className="grid grid-cols-2 gap-0.5 mt-0.5">
+                      <div>Avg: <span className="font-bold text-white">{latencyAvg.avgAppToPred.toFixed(0)}ms</span></div>
+                      <div>Min: <span className="font-bold text-[#2ed573]">{latencyAvg.minAppToPred.toFixed(0)}ms</span></div>
+                      <div>Max: <span className="font-bold text-[#ff4757]">{latencyAvg.maxAppToPred.toFixed(0)}ms</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Latency note */}
             <div className="border-t border-[#1e2240] px-4 py-1.5 text-[8px] text-[#5a6a99]">
               <i className="fas fa-circle-info mr-1" />
-              Source→App = time from casino result (settledAt) to app detection. Polling=2s, cache=3s.
+              No stale live-result cache. Polling=2s, API always fresh. Source→App = casino settledAt → app detection.
               App→UI = internal pipeline (target &lt;300ms). App→Pred = prediction generation (target &lt;500ms).
-              Total = source→app + internal.
+              Initial stale result excluded from stats. Dedup by timestamp, NOT by result name.
             </div>
           </div>
         )}

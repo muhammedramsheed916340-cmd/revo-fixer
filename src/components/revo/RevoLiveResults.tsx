@@ -32,12 +32,22 @@ export function RevoLiveResults() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const lastResultTime = useRef<string>("");
+  // Baseline: the latest known settledAt on page load. We DON'T count this
+  // as a live latency sample — it's a historical result that was already old.
+  // Latency measurement starts from the NEXT newer result.
+  const baselineSettledAt = useRef<string>("");
+  const isBaselineEstablished = useRef(false);
+  // Poll timing
+  const pollTimings = useRef<{ startedAt: number; responseAt: number } | null>(null);
 
   async function loadData() {
+    const pollStartedAt = performance.now();
     try {
-      // Fetch recent results for live analysis (reduced size for speed)
-      const res = await fetch("/api/crazy-time?type=recent&size=30&duration=24");
+      // Fetch recent results — NO server-side cache, always fresh
+      const res = await fetch(`/api/crazy-time?type=recent&size=30&duration=24&_t=${Date.now()}`);
       const rData = await res.json();
+      const responseAt = performance.now();
+      pollTimings.current = { startedAt: pollStartedAt, responseAt };
       const newResults = Array.isArray(rData) ? rData : [];
 
       // Only update + re-analyze if results actually changed (detect new spin)
@@ -61,6 +71,14 @@ export function RevoLiveResults() {
         const latest = newResults[0];
         const settledAt = latest?.data?.settledAt ?? "";
         if (settledAt && settledAt !== lastResultTime.current) {
+          // Establish baseline on first load — don't count this as live latency
+          if (!isBaselineEstablished.current) {
+            baselineSettledAt.current = settledAt;
+            isBaselineEstablished.current = true;
+            lastResultTime.current = settledAt;
+            return; // Skip broadcasting the initial stale result
+          }
+
           lastResultTime.current = settledAt;
           const sector =
             latest?.data?.result?.outcome?.wheelResult?.wheelSector ??
