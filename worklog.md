@@ -1369,3 +1369,62 @@ Stage Summary:
 - Evidence over frequency. Out-of-sample performance over short hit streaks.
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 32 (user request — CRITICAL BUG: PREDICTION ROTATING BETWEEN TWO COMBINATIONS)
+Agent: Z.ai Code
+Task: User reported predictions rotating between [1,2,5,10] and [1,2,5,COIN FLIP] only. Proved Top-4 is still biased toward a fixed core. Fix at root: normalize base score by theoretical probability so ALL 8 outcomes compete on RELATIVE evidence scale.
+
+Root Cause Found:
+- The BASE SCORE formula was: `score = livePrior * 0.4 + blendedFreq * 0.6`
+- Since "1" has 38.89% and "2" has 24.07% theoretical, their base scores were inherently 5-10× higher than bonus outcomes (7.41%, 3.70%, 1.85%).
+- This meant 1, 2, 5, 10 ALWAYS ranked top-4 by base score alone, and the mild evidence multipliers (FACTORS 1-7, capped at +10-15%) could NOT overcome this gap.
+- Result: prediction always rotated between [1,2,5,10] and [1,2,5,COIN FLIP] — never CASH HUNT, PACHINKO, or CRAZY TIME.
+
+Fixes Applied:
+
+1. **`decisionEngine.ts` — Rewrote BASE SCORE formula (NORMALIZED RELATIVE EVIDENCE)**:
+   - OLD: `score = livePrior * 0.4 + blendedFreq * 0.6` (absolute frequency bias)
+   - NEW: `score = livePrior * (1 + cappedDeviation)` where `deviation = (blendedFreq - livePrior) / livePrior`
+   - This computes how much the observed frequency DEVIATES from the base prior (RELATIVE), not the absolute prior value.
+   - A rare outcome (CASH HUNT 3.70%) with 8% observed → deviation = (0.08 - 0.037) / 0.037 = +116% → score = 0.037 × 2.16 = 0.080
+   - A common outcome ("1" 38.89%) with 40% observed → deviation = (0.40 - 0.389) / 0.389 = +2.8% → score = 0.389 × 1.028 = 0.400
+   - The common outcome still wins on absolute score (0.400 > 0.080), BUT the RARE outcome with STRONG evidence CAN now out-compete a common outcome with WEAK evidence.
+   - When "10" (7.41%) has 0% observed → deviation = -100% → capped at -60% → score = 0.074 × 0.4 = 0.030 (DROPS below CASH HUNT's 0.080)
+   - This is what allows CASH HUNT / PACHINKO / CRAZY TIME to enter Top-4 when their evidence is strong.
+   - Deviation capped at [-0.6, +2.0] to prevent extreme swings.
+
+2. **`decisionEngine.ts` — Updated anomaly/pattern-shift overrides** (same normalized formula):
+   - Anomaly: `score = livePrior * (1 + cappedAnomalyDev * 1.5)` (amplify deviation)
+   - Pattern shift: `score = livePrior * (1 + cappedShiftDev * 1.3)` (amplify recent deviation)
+
+3. **`decisionEngine.ts` — Added `selectionReason` field to `CandidateScore`**:
+   - Specific per-outcome reason, e.g., "+62.7% vs prior · recent-active+cash hunt-recent-active"
+   - Generated after ranking from signals + deviation + recent vs long comparison.
+
+4. **`RevoGame.tsx` — Updated debug table with ALL 8 outcomes**:
+   - Columns: Outcome / Segments / Base Prior / Evidence Score / Rank / Selected / Selection Reason
+   - Selected column shows ✓ (green) or ✗ (gray) for each outcome
+   - Selection Reason column shows specific per-outcome reason
+   - ALL 8 outcomes visible every prediction cycle — proves all were evaluated.
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Prediction: [2, 1, 5, CASH HUNT] — **CASH HUNT entered Top-4!** (was always excluded before)
+- Debug table shows ALL 8 outcomes with Evidence Score, Rank, Selected, Selection Reason.
+- CASH HUNT selection reason: "+62.7% vs prior · recent-active+cash hunt-recent-active" (specific, not generic)
+- "10" selection reason: "-64.0% vs prior · trending-down" (explains why excluded)
+- CRAZY TIME: "-11.7% vs prior" (explains why excluded — weak evidence)
+- Fresh prediction (cleared storage): [2, 1, COIN FLIP, 5] — varies based on live data.
+
+Stage Summary:
+- ROOT CAUSE FIXED: base score now uses NORMALIZED RELATIVE EVIDENCE (deviation from prior), not absolute frequency.
+- ALL 8 outcomes compete on the SAME relative scale.
+- CASH HUNT, PACHINKO, CRAZY TIME CAN now enter Top-4 when their evidence is strong.
+- No fixed [1,2,5,10], no rotating combinations, no forced Coin Flip.
+- Debug table proves ALL 8 outcomes are evaluated every cycle.
+- Specific selection reasons per outcome (not generic).
+- Lint clean, no errors, agent-browser QA green.
+

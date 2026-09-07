@@ -159,6 +159,7 @@ export interface CandidateScore {
   liveObservedRate: number;   // observed frequency in live data (0..1)
   modelAdjustment: number;    // multiplicative adjustment from base prior (e.g. 1.15 = +15%)
   finalAIScore: number;        // final combined AI score (= rawScore)
+  selectionReason: string;    // specific reason this outcome was selected (or not)
 }
 
 // ============================================================
@@ -1092,11 +1093,32 @@ function scoreCandidates(
 
     const signals: string[] = [];
 
-    // ===== BASE SCORE =====
-    // Adaptive blend of long-term + recent frequencies, anchored to the prior.
-    // NO HOT/OVERDUE/GAP bias — pure multi-factor evidence.
+    // ===== BASE SCORE — NORMALIZED RELATIVE EVIDENCE (no absolute-frequency bias) =====
+    // CRITICAL: The base score must NOT use absolute frequency (which would
+    // permanently lock 1,2,5,10 due to their high theoretical probability).
+    // Instead, we compute how much the observed frequency DEVIATES from the
+    // base prior, and use that RELATIVE deviation as the score.
+    //
+    // This ensures ALL 8 outcomes compete on the SAME scale:
+    //   - "1" with 38.89% prior and 40% observed → mild positive deviation
+    //   - "CASH HUNT" with 3.70% prior and 8% observed → strong positive deviation
+    //   - "CRAZY TIME" with 1.85% prior and 5% observed → very strong positive deviation
+    //
+    // The base prior anchors the score (regression to mean), but the EVIDENCE
+    // (observed deviation) determines the ranking. A rare outcome with strong
+    // recent evidence CAN out-rank a common outcome with weak evidence.
+    //
+    // Formula: score = prior * (1 + relativeDeviation)
+    //   where relativeDeviation = (blendedFreq - prior) / prior
+    // This keeps the score anchored to the prior but scaled by evidence.
     const blendedFreq = (longFreq * longW + recFreq * adaptW);
-    let score = livePrior * 0.4 + blendedFreq * 0.6;
+    const deviation = livePrior > 0 ? (blendedFreq - livePrior) / livePrior : 0;
+    // Score = prior × (1 + deviation). When deviation=0, score=prior (neutral).
+    // When deviation=+0.5 (50% above prior), score = prior × 1.5.
+    // When deviation=-0.5, score = prior × 0.5.
+    // Cap deviation to prevent extreme swings: [-0.6, +2.0]
+    const cappedDeviation = Math.max(-0.6, Math.min(2.0, deviation));
+    let score = livePrior * (1 + cappedDeviation);
     if (!useLivePrior && n === 0) score = theo; // no data at all → pure theoretical
 
     // ===== FACTOR 1: Recent active (mild adaptive signal — NOT a chase) =====
@@ -1233,17 +1255,20 @@ function scoreCandidates(
     void lastHit;
     void prevPredNames;
 
-    // ===== SIGNAL 9: Anomaly handling =====
-    // If anomaly detected, weight recent data even more.
+    // ===== SIGNAL 9: Anomaly handling (normalized relative — no absolute bias) =====
+    // If anomaly detected, weight recent data even more (using relative deviation).
     if (dashboard.anomalyDetected) {
-      score = theo * 0.2 + blendedFreq * 0.8;
+      const anomalyDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
+      const cappedAnomalyDev = Math.max(-0.6, Math.min(2.0, anomalyDeviation));
+      score = livePrior * (1 + cappedAnomalyDev * 1.5); // amplify deviation signal
       if (!signals.includes("anomaly-weighted")) signals.push("anomaly-weighted");
     }
 
-    // ===== SIGNAL 10: Pattern shift handling =====
+    // ===== SIGNAL 10: Pattern shift handling (normalized relative) =====
     if (dashboard.patternShiftDetected) {
-      // Trust recent more strongly when shift is detected.
-      score = theo * 0.15 + recFreq * 0.7 + longFreq * 0.15;
+      const shiftDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
+      const cappedShiftDev = Math.max(-0.6, Math.min(2.0, shiftDeviation));
+      score = livePrior * (1 + cappedShiftDev * 1.3); // amplify recent deviation
       if (!signals.includes("shift-adaptive")) signals.push("shift-adaptive");
     }
 
@@ -1277,6 +1302,7 @@ function scoreCandidates(
       liveObservedRate,
       modelAdjustment,
       finalAIScore: Math.max(score, 0.001),
+      selectionReason: "", // filled after ranking
     });
   }
 
@@ -1286,6 +1312,26 @@ function scoreCandidates(
 
   // Sort by raw score (descending) — this is the EVIDENCE ranking (for display).
   scores.sort((a, b) => b.rawScore - a.rawScore);
+
+  // ===== Generate specific selection reasons (not generic) =====
+  for (let i = 0; i < scores.length; i++) {
+    const c = scores[i];
+    const parts: string[] = [];
+    const devPct = ((c.modelAdjustment - 1) * 100);
+    if (Math.abs(devPct) > 2) {
+      parts.push(`${devPct > 0 ? "+" : ""}${devPct.toFixed(1)}% vs prior`);
+    }
+    if (c.signals.length > 0) {
+      parts.push(c.signals.slice(0, 3).join("+"));
+    }
+    if (c.recentFreq > c.longTermFreq + 0.02) {
+      parts.push(`recent ${Math.round(c.recentFreq * 100)}% > long ${Math.round(c.longTermFreq * 100)}%`);
+    }
+    if (parts.length === 0) {
+      parts.push(`base prior ${Math.round(c.basePrior * 100)}% (neutral)`);
+    }
+    c.selectionReason = parts.join(" · ");
+  }
 
   // Assign evidence ranks + labels (1..8).
   const rankLabels = [

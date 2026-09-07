@@ -1380,18 +1380,18 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
           <b className="text-[#FFD700]"> 83.33% coverage ≠ 83.33% accuracy.</b>
         </div>
 
-        {/* Per-outcome breakdown table */}
+        {/* Per-outcome breakdown table — ALL 8 outcomes with Selection Reason */}
         <div className="overflow-x-auto revo-scroll">
-          <table className="w-full min-w-[640px] text-center text-[10px]">
+          <table className="w-full min-w-[800px] text-center text-[10px]">
             <thead>
               <tr className="border-b border-[#1e2240] bg-[#0d1020]/60">
                 <th className="px-2 py-2 text-left">Outcome</th>
                 <th className="px-2 py-2">Segments</th>
                 <th className="px-2 py-2">Base Prior</th>
-                <th className="px-2 py-2">Live Observed</th>
-                <th className="px-2 py-2">Adjustment</th>
-                <th className="px-2 py-2">Final AI Score</th>
+                <th className="px-2 py-2">Evidence Score</th>
                 <th className="px-2 py-2">Rank</th>
+                <th className="px-2 py-2">Selected</th>
+                <th className="px-2 py-2 text-left">Selection Reason</th>
               </tr>
             </thead>
             <tbody>
@@ -1406,7 +1406,6 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
                   >
                     <td className="px-2 py-2 text-left">
                       <div className="flex items-center gap-1.5">
-                        {isTop4 && <i className="fas fa-check-circle text-[10px] text-[#2ed573]" />}
                         <span className={`font-bold ${c.game.isBonus ? "text-[#FFD700]" : "text-white"}`}>
                           {c.game.name}
                         </span>
@@ -1418,12 +1417,6 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
                     </td>
                     <td className="px-2 py-2 text-[#448AFF]">
                       {(c.basePrior * 100).toFixed(2)}%
-                    </td>
-                    <td className="px-2 py-2 text-[#00d4ff]">
-                      {(c.liveObservedRate * 100).toFixed(2)}%
-                    </td>
-                    <td className="px-2 py-2" style={{ color: adjColor }}>
-                      {adjPct > 0 ? "+" : ""}{adjPct.toFixed(1)}%
                     </td>
                     <td className="px-2 py-2 font-black text-[#2ed573]">
                       {(c.finalAIScore * 100).toFixed(2)}
@@ -1438,6 +1431,16 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
                       }`}>
                         {i + 1}
                       </span>
+                    </td>
+                    <td className="px-2 py-2">
+                      {isTop4 ? (
+                        <i className="fas fa-check-circle text-[12px] text-[#2ed573]" />
+                      ) : (
+                        <i className="fas fa-times-circle text-[12px] text-[#5a6a99]" />
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-left text-[9px] text-[#8899cc]" style={{ color: adjColor }}>
+                      {c.selectionReason || "—"}
                     </td>
                   </tr>
                 );
