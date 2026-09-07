@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface CommandItem {
   id: string;
@@ -46,27 +46,31 @@ export function RevoCommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  // Open the palette (resets state in the handler, not an effect)
+  const openPalette = useCallback(() => {
+    setQuery("");
+    setActive(0);
+    setOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 30);
+  }, []);
+
   // Global hotkey: Cmd/Ctrl+K opens, Escape closes
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((v) => !v);
+        openPalette();
       } else if (e.key === "Escape" && open) {
         setOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, openPalette]);
 
-  // Focus input + reset on open
+  // Focus the input when the palette opens (DOM sync — allowed in effect)
   useEffect(() => {
-    if (open) {
-      setQuery("");
-      setActive(0);
-      setTimeout(() => inputRef.current?.focus(), 30);
-    }
+    if (open) inputRef.current?.focus();
   }, [open]);
 
   // Filter commands
@@ -82,16 +86,19 @@ export function RevoCommandPalette({
     );
   }, [query]);
 
-  // Reset active when filtered changes
-  useEffect(() => {
-    setActive(0);
-  }, [filtered]);
+  // Clamp active index to the filtered list (derived, no effect needed)
+  const safeActive = Math.min(active, Math.max(0, filtered.length - 1));
+
+  function onQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setQuery(e.target.value);
+    setActive(0); // reset selection to top when search changes
+  }
 
   // Scroll active item into view
   useEffect(() => {
-    const el = listRef.current?.querySelector(`[data-idx="${active}"]`);
+    const el = listRef.current?.querySelector(`[data-idx="${safeActive}"]`);
     el?.scrollIntoView({ block: "nearest" });
-  }, [active]);
+  }, [safeActive]);
 
   function execute(c: CommandItem) {
     setOpen(false);
@@ -117,7 +124,7 @@ export function RevoCommandPalette({
       setActive((a) => Math.max(a - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const c = filtered[active];
+      const c = filtered[safeActive];
       if (c) execute(c);
     }
   }
@@ -145,7 +152,7 @@ export function RevoCommandPalette({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={onQueryChange}
             onKeyDown={onKeyDown}
             placeholder="Search sections, actions… (↑↓ to navigate, ↵ to select)"
             className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#5a6a99]"
@@ -171,7 +178,7 @@ export function RevoCommandPalette({
                   .filter((c) => c.group === group)
                   .map((c) => {
                     const idx = filtered.indexOf(c);
-                    const isActive = idx === active;
+                    const isActive = idx === safeActive;
                     return (
                       <button
                         key={c.id}

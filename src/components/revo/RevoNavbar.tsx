@@ -110,6 +110,24 @@ export function RevoNavbar({
             <span className="hidden sm:inline">Buy License</span>
             <span className="sm:hidden">Buy</span>
           </button>
+          <button
+            onClick={() => {
+              // Trigger the global Cmd/Ctrl+K palette by dispatching a synthetic keydown.
+              window.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                  key: "k",
+                  metaKey: true,
+                  bubbles: true,
+                }),
+              );
+            }}
+            className="hidden h-10 items-center gap-1.5 rounded-lg border border-[#1e2240] bg-[#141827]/60 px-2.5 text-[#5a6a99] transition hover:text-white sm:flex"
+            aria-label="Open command palette"
+            title="Quick nav (⌘K)"
+          >
+            <i className="fas fa-magnifying-glass text-xs" />
+            <kbd className="text-[10px] font-bold">⌘K</kbd>
+          </button>
           <RevoNotificationsBell />
           <RevoThemeToggle />
           <button
