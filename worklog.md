@@ -1201,3 +1201,64 @@ Stage Summary:
 - Sample-size protection: small-sample deviations not treated as real probability shifts.
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 29 (user request — MAIN BONUS MISS / FIXED 1-2-5-10 BIAS)
+Agent: Z.ai Code
+Task: User reported CASH HUNT, PACHINKO, CRAZY TIME being systematically excluded from predictions. Add per-bonus performance tracking, bonus underrepresentation detection, model-bias warning. No fixed [1,2,5,10], no forced bonus, no blind spot.
+
+Fixes Applied:
+
+1. **`decisionEngine.ts` — Added per-bonus performance tracking** (`PerformanceDashboard`):
+   - `perBonusPerformance` record: for each bonus (COIN FLIP, CASH HUNT, PACHINKO, CRAZY TIME):
+     - `predictedCount` — how many rounds this bonus was in the prediction
+     - `actualCount` — how many rounds this bonus was the actual result
+     - `hitCount` — predicted AND was actual result
+     - `missCount` — was actual result but NOT predicted
+     - `predictedRate` / `actualRate` — normalized rates
+     - `hitRate` — hitCount / predictedCount
+     - `underrepresented` — actualRate > predictedRate × 1.5 (with 10+ sample)
+
+2. **`decisionEngine.ts` — Added bonus underrepresentation detection**:
+   - `bonusUnderrepresented` — true if ANY bonus is significantly under-predicted
+   - `bonusUnderrepresentationNote` — lists which bonuses are under-predicted with pred/actual rates
+   - Triggers when actualRate > predictedRate × 1.5 with 10+ sample and 2+ actual occurrences
+
+3. **`decisionEngine.ts` — Added model-bias warning**:
+   - `modelBiasWarning` — true if 2+ bonuses repeatedly appear in actuals while being excluded from predictions
+   - `modelBiasNote` — "MODEL BIAS WARNING: N bonuses (...) are repeatedly appearing in actual results while being excluded from predictions. Recalibration needed — do NOT keep selecting [1,2,5,10]."
+   - Triggers when 2+ bonuses have missCount >= 2 AND predictedRate < actualRate × 0.5 (with 10+ sample)
+
+4. **`RevoGame.tsx` — Added Per-Bonus Performance panel** (gold-tinted):
+   - 4-column grid: COIN FLIP / CASH HUNT / PACHINKO / CRAZY TIME
+   - Each shows: Pred / Act / HIT / MISS counts
+   - Under-predicted bonuses highlighted with red border + "⚠ Under-predicted" badge
+
+5. **`RevoGame.tsx` — Added Model-Bias Warning panel** (red, conditionally shown):
+   - Shows when modelBiasWarning is true
+   - "Model Bias Detected" header with warning icon
+   - Full note explaining which bonuses are being excluded
+
+6. **`RevoGame.tsx` — Added Bonus Underrepresentation panel** (orange, conditionally shown):
+   - Shows when bonusUnderrepresented is true (and no model-bias warning)
+   - "Bonus Underrepresentation" header
+   - Lists underrepresented bonuses with pred/actual rates
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Per-Bonus Performance panel renders with all 4 bonuses (COIN FLIP, CASH HUNT, PACHINKO, CRAZY TIME).
+- After 90s live (7 rounds, 6 HITs): per-bonus tracking shows Pred/Act/HIT/MISS counts.
+- One bonus had Act:1/MISS:1 (appeared as actual but wasn't predicted) — blind spot detected and tracked.
+- Model-bias warning and underrepresentation panels render conditionally.
+
+Stage Summary:
+- Per-bonus performance tracking: Predicted / Actual / HIT / MISS for each bonus separately.
+- Bonus underrepresentation detection: triggers when actualRate > 1.5× predictedRate (10+ sample).
+- Model-bias warning: triggers when 2+ bonuses repeatedly excluded while appearing in actuals.
+- No fixed [1,2,5,10] — all 8 outcomes compete on the same evidence scale.
+- No forced bonus — bonus enters Top-4 ONLY when evidence supports it.
+- No last-hit carryover, no HOT/OVERDUE chasing, no gambler's fallacy.
+- Lint clean, no errors, agent-browser QA green.
+

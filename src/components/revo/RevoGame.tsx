@@ -933,6 +933,12 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
     excludedNormalRisk,
     excludedBonusRisk,
     totalMissExposure,
+    // NEW per-bonus performance:
+    perBonusPerformance,
+    bonusUnderrepresented,
+    bonusUnderrepresentationNote,
+    modelBiasWarning,
+    modelBiasNote,
   } = dashboard;
 
   return (
@@ -1144,6 +1150,60 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
               Low bonus-result HIT rate = bonus blind spot persists.
             </div>
           </div>
+
+          {/* ===== Per-Bonus Performance Tracking ===== */}
+          <div className="mt-2 rounded-lg border border-[#FFD700]/20 bg-[#0d1020]/40 p-2">
+            <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+              Per-Bonus Performance (Predicted / Actual / HIT / MISS)
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {["COIN FLIP", "CASH HUNT", "PACHINKO", "CRAZY TIME"].map((bonusName) => {
+                const p = perBonusPerformance[bonusName];
+                if (!p) return null;
+                return (
+                  <div
+                    key={bonusName}
+                    className={`rounded border p-1.5 ${
+                      p.underrepresented
+                        ? "border-[#ff4757]/40 bg-[#ff4757]/8"
+                        : "border-[#1e2240] bg-[#0d1020]/60"
+                    }`}
+                  >
+                    <div className="text-[8px] font-bold uppercase text-[#FFD700]">{bonusName}</div>
+                    <div className="mt-0.5 grid grid-cols-2 gap-0.5 text-[8px]">
+                      <div className="text-[#5a6a99]">Pred: <span className="font-bold text-white">{p.predictedCount}</span></div>
+                      <div className="text-[#5a6a99]">Act: <span className="font-bold text-white">{p.actualCount}</span></div>
+                      <div className="text-[#2ed573]">HIT: <span className="font-bold">{p.hitCount}</span></div>
+                      <div className="text-[#ff4757]">MISS: <span className="font-bold">{p.missCount}</span></div>
+                    </div>
+                    {p.underrepresented && (
+                      <div className="mt-0.5 text-[7px] font-bold uppercase text-[#ff4757]">
+                        ⚠ Under-predicted
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ===== Model-Bias Warning ===== */}
+          {modelBiasWarning && (
+            <div className="mt-2 rounded-lg border border-[#ff4757]/40 bg-[#ff4757]/10 p-2.5">
+              <div className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#ff4757]">
+                <i className="fas fa-triangle-exclamation" /> Model Bias Detected
+              </div>
+              <div className="text-[10px] text-[#bcc6e0]">{modelBiasNote}</div>
+            </div>
+          )}
+          {bonusUnderrepresented && !modelBiasWarning && (
+            <div className="mt-2 rounded-lg border border-[#ffa502]/30 bg-[#ffa502]/8 p-2.5">
+              <div className="mb-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#ffa502]">
+                <i className="fas fa-circle-exclamation" /> Bonus Underrepresentation
+              </div>
+              <div className="text-[10px] text-[#bcc6e0]">{bonusUnderrepresentationNote}</div>
+            </div>
+          )}
         </div>
 
         {/* Pattern shift + anomaly alerts */}

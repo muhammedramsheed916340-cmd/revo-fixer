@@ -218,6 +218,25 @@ export interface PerformanceDashboard {
   excludedNormalRisk: number;          // theoretical prob of excluded number outcomes
   excludedBonusRisk: number;           // theoretical prob of excluded bonus outcomes (= bonusOutcomeRisk)
   totalMissExposure: number;            // total MISS exposure (excluded normal + excluded bonus)
+  // ===== NEW: Per-bonus performance tracking =====
+  // For each bonus outcome: how often was it predicted, how often did it
+  // actually appear, HIT/MISS counts, and underrepresentation detection.
+  perBonusPerformance: Record<string, {
+    predictedCount: number;        // how many rounds this bonus was in the prediction
+    actualCount: number;            // how many rounds this bonus was the actual result
+    hitCount: number;               // how many times predicted AND was the actual result
+    missCount: number;              // how many times it was the actual result but NOT predicted
+    predictedRate: number;          // predictedCount / totalRounds
+    actualRate: number;             // actualCount / totalRounds
+    hitRate: number;                // hitCount / predictedCount
+    underrepresented: boolean;      // actualRate > predictedRate * 1.5 (with sufficient sample)
+  }>;
+  // ===== NEW: Bonus underrepresentation detection =====
+  bonusUnderrepresented: boolean;    // true if any bonus is significantly under-predicted
+  bonusUnderrepresentationNote: string;
+  // ===== NEW: Model-bias warning =====
+  modelBiasWarning: boolean;         // true if bonuses repeatedly appear in actuals while excluded from predictions
+  modelBiasNote: string;
 }
 
 // ============================================================
@@ -654,6 +673,67 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
   const excludedBonusRisk = bonusOutcomeRisk; // already computed
   const totalMissExposure = excludedNormalRisk + excludedBonusRisk;
 
+  // ===== NEW: Per-bonus performance tracking =====
+  // For each bonus: predictedCount, actualCount, hitCount, missCount, rates, underrepresented.
+  const perBonusPerformance: Record<string, {
+    predictedCount: number;
+    actualCount: number;
+    hitCount: number;
+    missCount: number;
+    predictedRate: number;
+    actualRate: number;
+    hitRate: number;
+    underrepresented: boolean;
+  }> = {};
+  for (const bonusName of BONUS_NAMES) {
+    let predictedCount = 0;
+    let actualCount = 0;
+    let hitCount = 0;
+    let missCount = 0;
+    for (const r of rounds) {
+      const wasPredicted = r.prediction.some((p) => p.game.name === bonusName);
+      const wasActual = r.actualResult.name === bonusName;
+      if (wasPredicted) predictedCount++;
+      if (wasActual) actualCount++;
+      if (wasPredicted && wasActual) hitCount++;
+      if (!wasPredicted && wasActual) missCount++;
+    }
+    const predictedRate = totalRounds > 0 ? predictedCount / totalRounds : 0;
+    const actualRate = totalRounds > 0 ? actualCount / totalRounds : 0;
+    const hitRate = predictedCount > 0 ? hitCount / predictedCount : 0;
+    // Underrepresented = actual appears 1.5× more than predicted (with 10+ sample)
+    const underrepresented = totalRounds >= 10 && actualRate > predictedRate * 1.5 && actualCount >= 2;
+    perBonusPerformance[bonusName] = {
+      predictedCount,
+      actualCount,
+      hitCount,
+      missCount,
+      predictedRate,
+      actualRate,
+      hitRate,
+      underrepresented,
+    };
+  }
+
+  // ===== NEW: Bonus underrepresentation detection =====
+  // True if ANY bonus is significantly under-predicted (actual > 1.5× predicted, 10+ sample).
+  const underrepresentedBonuses = BONUS_NAMES.filter((b) => perBonusPerformance[b].underrepresented);
+  const bonusUnderrepresented = underrepresentedBonuses.length > 0;
+  const bonusUnderrepresentationNote = bonusUnderrepresented
+    ? `Underrepresented: ${underrepresentedBonuses.map((b) => `${b} (pred ${Math.round(perBonusPerformance[b].predictedRate * 100)}% / actual ${Math.round(perBonusPerformance[b].actualRate * 100)}%)`).join(", ")}. Model may be under-selecting bonuses.`
+    : "No bonus underrepresentation detected.";
+
+  // ===== NEW: Model-bias warning =====
+  // True if 2+ bonuses repeatedly appear in actuals while being excluded from predictions.
+  const biasBonuses = BONUS_NAMES.filter((b) => {
+    const p = perBonusPerformance[b];
+    return totalRounds >= 10 && p.missCount >= 2 && p.predictedRate < p.actualRate * 0.5;
+  });
+  const modelBiasWarning = biasBonuses.length >= 2;
+  const modelBiasNote = modelBiasWarning
+    ? `MODEL BIAS WARNING: ${biasBonuses.length} bonuses (${biasBonuses.join(", ")}) are repeatedly appearing in actual results while being excluded from predictions. Recalibration needed — do NOT keep selecting [1,2,5,10].`
+    : "No model bias detected.";
+
   return {
     totalRounds,
     hits,
@@ -708,6 +788,12 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
     excludedNormalRisk,
     excludedBonusRisk,
     totalMissExposure,
+    // NEW per-bonus performance:
+    perBonusPerformance,
+    bonusUnderrepresented,
+    bonusUnderrepresentationNote,
+    modelBiasWarning,
+    modelBiasNote,
   };
 }
 
