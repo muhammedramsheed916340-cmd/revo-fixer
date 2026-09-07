@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { RevoNotificationsBell } from "./RevoNotificationsBell";
+import { RevoThemeToggle } from "./RevoThemeToggle";
 
 const NAV = [
   { id: "home", label: "Home", icon: "fa-house" },
@@ -13,6 +14,7 @@ const NAV = [
   { id: "deposit", label: "Deposit", icon: "fa-money-bill-transfer" },
   { id: "payments", label: "Payments", icon: "fa-wallet" },
   { id: "stats", label: "Live Stats", icon: "fa-signal" },
+  { id: "reviews", label: "Reviews", icon: "fa-star" },
   { id: "activity", label: "Activity", icon: "fa-bolt" },
   { id: "faq", label: "FAQ", icon: "fa-circle-question" },
   { id: "terms", label: "Terms", icon: "fa-scale-balanced" },
@@ -107,6 +109,7 @@ export function RevoNavbar({
             <span className="sm:hidden">Buy</span>
           </button>
           <RevoNotificationsBell />
+          <RevoThemeToggle />
           <button
             onClick={() => setOpen((v) => !v)}
             className="grid h-10 w-10 place-items-center rounded-lg border border-[#1e2240] bg-[#141827]/60 text-[#bcc6e0] xl:hidden"

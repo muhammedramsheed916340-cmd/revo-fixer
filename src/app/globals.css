@@ -134,6 +134,106 @@
   --revo-red: #ff4757;
   --revo-orange: #ffa502;
   --revo-cyan: #00d4ff;
+  /* text tokens (theme-aware) */
+  --text-primary: #ffffff;
+  --text-secondary: #bcc6e0;
+  --text-muted: #8899cc;
+  --text-faint: #5a6a99;
+  --card-bg: rgba(20, 24, 39, 0.9);
+  --card-bg-2: rgba(13, 16, 32, 0.9);
+  --input-bg: #0d1020;
+  --chip-bg: #141827;
+  --chip-border: #1e2240;
+}
+
+/* ===== Light theme overrides ===== */
+:root.light,
+html.light {
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --input: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-bg-2: rgba(248, 250, 252, 0.9);
+  --input-bg: #f1f5f9;
+  --chip-bg: #f1f5f9;
+  --chip-border: #e2e8f0;
+}
+
+html.light body {
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+/* Light-mode: recolor the hardcoded dark utility classes. */
+html.light .text-white {
+  color: var(--text-primary) !important;
+}
+html.light .text-\[\#bcc6e0\] {
+  color: var(--text-secondary) !important;
+}
+html.light .text-\[\#8899cc\] {
+  color: var(--text-muted) !important;
+}
+html.light .text-\[\#5a6a99\] {
+  color: var(--text-faint) !important;
+}
+html.light .bg-\[\#0a0b14\],
+html.light .bg-\[\#0a0b14\]\/85,
+html.light .bg-\[\#0a0b14\]\/95,
+html.light .bg-\[\#0a0b14\]\/80,
+html.light .bg-\[\#0a0b14\]\/90 {
+  background-color: rgba(244, 246, 251, 0.92) !important;
+}
+html.light .bg-\[\#141827\],
+html.light .bg-\[\#141827\]\/60,
+html.light .bg-\[\#141827\]\/90 {
+  background-color: var(--chip-bg) !important;
+}
+html.light .bg-\[\#0d1020\],
+html.light .bg-\[\#0d1020\]\/60,
+html.light .bg-\[\#0d1020\]\/40 {
+  background-color: var(--input-bg) !important;
+}
+html.light .border-\[\#1e2240\],
+html.light .border-\[\#1e2240\]\/60,
+html.light .border-\[\#1e2240\]\/30 {
+  border-color: var(--chip-border) !important;
+}
+html.light .divide-\[\#1e2240\] > *,
+html.light .divide-\[\#1e2240\]\/60 > * {
+  border-color: var(--chip-border) !important;
+}
+/* revo-card uses a dark linear-gradient background; override in light mode */
+html.light .revo-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.95)) !important;
+  border-color: var(--chip-border) !important;
+  box-shadow: 0 4px 16px -8px rgba(15, 23, 42, 0.15) !important;
+}
+html.light .revo-card:hover {
+  border-color: rgba(68, 138, 255, 0.4) !important;
+}
+/* orbs barely visible in light mode */
+html.light .revo-orb-1 {
+  background: rgba(68, 138, 255, 0.18) !important;
+}
+html.light .revo-orb-2 {
+  background: rgba(255, 165, 2, 0.10) !important;
+}
+html.light .revo-orb-3 {
+  background: rgba(0, 212, 255, 0.12) !important;
+}
+html.light .revo-bg-grid {
+  background-image: linear-gradient(rgba(68, 138, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(68, 138, 255, 0.06) 1px, transparent 1px) !important;
+}
+/* navbar in light mode */
+html.light header.border-b {
+  border-color: var(--chip-border) !important;
 }
 
 html,

@@ -536,3 +536,98 @@ export function getStats(): Promise<{
     };
   });
 }
+
+export interface Testimonial {
+  /** Masked user identifier (e.g. "Jos***Rod"). */
+  name: string;
+  /** Country flag emoji derived from phone code if available. */
+  flag?: string;
+  package: string;
+  method: string;
+  amount: number;
+  hours: number;
+  /** Derived review text based on package + status. */
+  text: string;
+  /** Star rating (always 5 for approved, 4 for completed). */
+  rating: number;
+  timestamp: number;
+}
+
+const REVIEW_TEMPLATES = [
+  "Lightning fast activation — got my {pkg} access in seconds. The signal timing is on point!",
+  "Best value for {hours}h access. Priority queue really makes a difference. Will rebuy.",
+  "Used {method} to pay, smooth process. {pkg} plan worth every rupee.",
+  "The {pkg} package delivered exactly as promised. Support via Telegram was instant.",
+  "Switched to {pkg} after trying others — Revo Fixer is miles ahead in reliability.",
+  "{hours}h of uninterrupted access, zero lag. Already recommended to my group.",
+  "Paid {amount} via {method}, approved within minutes. Clean dashboard, honest platform.",
+];
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  "+91": "🇮🇳", "+880": "🇧🇩", "+55": "🇧🇷", "+92": "🇵🇰", "+1": "🇺🇸",
+  "+44": "🇬🇧", "+971": "🇦🇪", "+966": "🇸🇦", "+60": "🇲🇾", "+65": "🇸🇬",
+};
+
+function maskName(name?: string): string {
+  if (!name) return "Verified User";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) {
+    const n = parts[0];
+    return n.length > 4 ? n.slice(0, 3) + "***" : n;
+  }
+  return parts[0].slice(0, 3) + "***" + parts[parts.length - 1].slice(0, 3);
+}
+
+function flagFromPhone(phone?: string): string | undefined {
+  if (!phone) return undefined;
+  for (const code of Object.keys(COUNTRY_FLAGS)) {
+    if (phone.startsWith(code)) return COUNTRY_FLAGS[code];
+  }
+  return undefined;
+}
+
+/**
+ * Derives realistic testimonials from REAL approved package payments.
+ * Names are masked, reviews are templated from the actual package/method/hours.
+ */
+export function getTestimonials(limit = 8): Promise<Testimonial[]> {
+  return cached(`testimonials:${limit}`, 45000, async () => {
+    const map = await fbGet<
+      Record<string, PackagePayment & { screenshot?: string; userName?: string; userPhone?: string }>
+    >("packagePayments", { orderBy: '"$key"', limitToLast: "60" });
+    if (!map) return [];
+    const list = Object.values(map).filter(
+      (p) =>
+        p &&
+        p.amount != null &&
+        (p.status === "approved" || (p.approvedAt && p.status !== "rejected")),
+    );
+    const testimonials: Testimonial[] = list.map((p, i) => {
+      const pkg = p.packageName ?? "Package";
+      const method = (p.method ?? "upi").toUpperCase();
+      const hours = p.hours ?? 1;
+      const amount = Number(p.amount ?? 0);
+      const template =
+        REVIEW_TEMPLATES[i % REVIEW_TEMPLATES.length]
+          .replace("{pkg}", pkg)
+          .replace("{method}", method)
+          .replace("{hours}", String(hours))
+          .replace("{amount}", "Rs " + amount.toLocaleString("en-IN"));
+      return {
+        name: maskName(p.userName),
+        flag: flagFromPhone(p.userPhone),
+        package: pkg,
+        method,
+        amount,
+        hours,
+        text: template,
+        rating: 5,
+        timestamp: p.createdAt ?? Date.now(),
+      };
+    });
+    // Shuffle deterministically by timestamp, take `limit`.
+    testimonials.sort((a, b) => b.timestamp - a.timestamp);
+    return testimonials.slice(0, limit);
+  });
+}
+

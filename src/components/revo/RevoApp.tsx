@@ -23,6 +23,7 @@ import { RevoTerms } from "./RevoTerms";
 import { RevoRecommender } from "./RevoRecommender";
 import { RevoTicker } from "./RevoTicker";
 import { RevoReveal } from "./RevoReveal";
+import { RevoTestimonials } from "./RevoTestimonials";
 
 import type {
   AppSettings,
@@ -302,6 +303,10 @@ export function RevoApp() {
 
           <RevoReveal>
             <RevoStats stats={stats} settings={settings} />
+          </RevoReveal>
+
+          <RevoReveal>
+            <RevoTestimonials />
           </RevoReveal>
 
           <RevoReveal>

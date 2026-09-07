@@ -86,6 +86,7 @@ export function RevoFooter({
                 { id: "deposit", label: "Deposit" },
                 { id: "payments", label: "Payments" },
                 { id: "stats", label: "Live Stats" },
+                { id: "reviews", label: "Reviews" },
                 { id: "activity", label: "Activity" },
                 { id: "faq", label: "FAQ" },
                 { id: "terms", label: "Terms" },

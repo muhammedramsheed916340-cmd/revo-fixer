@@ -112,7 +112,15 @@ export function RevoActivity({
               rel="noopener noreferrer"
               className="revo-btn flex items-center gap-2 self-center rounded-lg px-4 py-2.5 text-xs font-bold"
             >
-              <i className="fas fa-file-pdf" /> Export PDF
+              <i className="fas fa-file-pdf" /> PDF
+            </a>
+            <a
+              href="/api/export-csv"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 self-center rounded-lg border border-[#2ed573]/40 bg-[#2ed573]/10 px-4 py-2.5 text-xs font-bold text-[#2ed573] transition hover:bg-[#2ed573]/20"
+            >
+              <i className="fas fa-file-csv" /> CSV
             </a>
           </div>
         </div>
