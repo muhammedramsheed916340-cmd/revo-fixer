@@ -16,8 +16,8 @@ let recentCache: { data: unknown; at: number } | null = null;
 let statsCache: { data: unknown; at: number } | null = null;
 let recentFetching = false;
 let statsFetching = false;
-const RECENT_TTL = 8000; // 8 seconds
-const STATS_TTL = 30000; // 30 seconds
+const RECENT_TTL = 3000; // 3 seconds — faster live result detection
+const STATS_TTL = 15000; // 15 seconds
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);

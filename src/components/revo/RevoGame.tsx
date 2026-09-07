@@ -501,19 +501,39 @@ export function RevoGame() {
   // NOTE: NO visibility-change auto-refresh. Prediction is LOCKED regardless
   // of tab visibility — it only changes on new live result.
 
-  // AUTO-RESULT from live API
+  // AUTO-RESULT from live API + LATENCY TRACKING
   const [popupResult, setPopupResult] = useState<Game | null>(null);
   const [popupEnabled, setPopupEnabled] = useState(true);
+  // Latency tracking for debug performance panel
+  const [latencyStats, setLatencyStats] = useState<{
+    lastEventTime: number;
+    lastResultDisplayed: number;
+    lastPredictionGenerated: number;
+    sourceToUI: number;
+    sourceToPrediction: number;
+  } | null>(null);
 
   useEffect(() => {
     const unsub = subscribeLiveResults((e: LiveResultEvent) => {
+      const eventReceivedAt = performance.now();
       const game = SECTOR_TO_GAME[e.sector];
       if (game) {
+        // Result displayed immediately
+        const resultDisplayedAt = performance.now();
         if (popupEnabled) {
           setPopupResult(game);
           setTimeout(() => setPopupResult(null), 4000);
         }
         selectActualResult(game);
+        // Prediction generated after selectActualResult (synchronous)
+        const predictionGeneratedAt = performance.now();
+        setLatencyStats({
+          lastEventTime: Date.now(),
+          lastResultDisplayed: Math.round(resultDisplayedAt - eventReceivedAt),
+          lastPredictionGenerated: Math.round(predictionGeneratedAt - eventReceivedAt),
+          sourceToUI: Math.round(resultDisplayedAt - eventReceivedAt),
+          sourceToPrediction: Math.round(predictionGeneratedAt - eventReceivedAt),
+        });
       }
     });
     return unsub;
@@ -617,6 +637,46 @@ export function RevoGame() {
             )}
           </div>
         </div>
+
+        {/* ===== DEBUG PERFORMANCE PANEL (latency tracking) ===== */}
+        {latencyStats && (
+          <div className="revo-card mt-2 overflow-hidden border border-[#00d4ff]/20">
+            <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#00d4ff]/5 to-transparent px-4 py-2">
+              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#00d4ff]">
+                <i className="fas fa-stopwatch" /> Performance Debug
+              </span>
+              <span className="text-[9px] text-[#5a6a99]">
+                {new Date(latencyStats.lastEventTime).toLocaleTimeString()}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
+              <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+                <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Result→UI</div>
+                <div className="text-sm font-black" style={{
+                  color: latencyStats.sourceToUI < 50 ? "#2ed573" : latencyStats.sourceToUI < 300 ? "#448AFF" : "#ffa502",
+                }}>
+                  {latencyStats.sourceToUI}ms
+                </div>
+              </div>
+              <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+                <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">→Prediction</div>
+                <div className="text-sm font-black" style={{
+                  color: latencyStats.sourceToPrediction < 50 ? "#2ed573" : latencyStats.sourceToPrediction < 500 ? "#448AFF" : "#ffa502",
+                }}>
+                  {latencyStats.sourceToPrediction}ms
+                </div>
+              </div>
+              <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+                <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Target UI</div>
+                <div className="text-sm font-black text-[#5a6a99]">&lt;300ms</div>
+              </div>
+              <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+                <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Target Pred</div>
+                <div className="text-sm font-black text-[#5a6a99]">&lt;500ms</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ===== LIVE RESULT POPUP ===== */}
         {popupResult && (

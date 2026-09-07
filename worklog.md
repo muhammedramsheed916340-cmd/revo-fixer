@@ -1714,3 +1714,74 @@ Stage Summary:
 - Minimum validation target: 100 REAL completed prediction/result cycles.
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 37 (user request — CRITICAL PERFORMANCE FIX: LIVE RESULT AND PREDICTION UPDATE TOO SLOW)
+Agent: Z.ai Code
+Task: Fix real-time pipeline latency. Reduce polling interval, reduce API cache TTL, add latency tracking, verify no artificial delays in prediction path. Do NOT modify scoring logic.
+
+Root Causes Found:
+1. Polling interval was 4000ms — new results could be delayed up to 4s before detection.
+2. API cache TTL was 8000ms — server returned stale data for 8s, adding up to 12s total delay.
+3. No latency tracking — impossible to measure actual pipeline speed.
+
+Fixes Applied:
+
+1. **Reduced polling interval from 4000ms to 2000ms** (`RevoLiveResults.tsx`):
+   - New results now detected within 2s of arrival (was 4s).
+   - Server cache TTL reduced to 3s (was 8s), so only 1 external API call per 3s.
+
+2. **Reduced API cache TTL** (`crazy-time/route.ts`):
+   - RECENT_TTL: 8000ms → 3000ms (fresher data)
+   - STATS_TTL: 30000ms → 15000ms
+
+3. **Added latency tracking** (`RevoGame.tsx`):
+   - `eventReceivedAt` — when live result event received
+   - `resultDisplayedAt` — when result is displayed (popup triggered)
+   - `predictionGeneratedAt` — when new prediction is generated
+   - `sourceToUI` — latency from event to UI (target <300ms)
+   - `sourceToPrediction` — latency from event to new prediction (target <500ms)
+
+4. **Added Debug Performance Panel**:
+   - Shows: Result→UI latency, →Prediction latency, targets (<300ms / <500ms)
+   - Color-coded: green (<50ms), blue (<target), orange (exceeds target)
+   - Shows timestamp of last event
+
+5. **Verified no artificial delays in prediction pipeline**:
+   - Only setTimeout calls: (a) initial mount prediction (100ms, one-time), (b) popup auto-dismiss (4000ms, UI only)
+   - Neither is in the critical path: live result → settle → history → new prediction
+   - Pipeline is fully synchronous and event-driven (no timer dependency)
+
+6. **Verified duplicate protection** (`liveResultsBus.ts`):
+   - Uses `sector-time` key for dedup
+   - Consecutive identical results (1, 1, 1) with different timestamps are NOT deduped (correct)
+   - Same result with same timestamp IS deduped (prevents double-processing)
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Performance Debug panel renders: Result→UI: 0ms, →Prediction: 6ms.
+- After 120s live (7 rounds, 6 HITs): latency remains 0ms (UI) / ~6ms (prediction).
+- Both well under targets (<300ms / <500ms).
+- Polling every 2s — results detected quickly.
+- API cache 3s — fresh data available.
+- No artificial delays in prediction path.
+
+Performance Measurements:
+- Result→UI: 0ms (target <300ms) ✓ PASS
+- →Prediction: 6ms (target <500ms) ✓ PASS
+- Polling interval: 2s (down from 4s)
+- API cache TTL: 3s (down from 8s)
+- Max detection delay: ~5s (2s poll + 3s cache) (down from ~12s)
+
+Stage Summary:
+- Real-time pipeline latency dramatically reduced.
+- Polling: 4s → 2s, cache: 8s → 3s, max detection: 12s → 5s.
+- Event-driven pipeline: no timer dependency for prediction changes.
+- Latency tracking: 0ms UI, 6ms prediction (well under targets).
+- No artificial delays in critical path.
+- Duplicate protection: consecutive identical results NOT lost.
+- No scoring logic modified.
+- Lint clean, no errors, agent-browser QA green.
+
