@@ -1139,21 +1139,21 @@ export function RevoGame() {
   // and AI recalibration — fully automatic, no manual interaction needed.
   // Also shows a popup with the result.
   const [popupResult, setPopupResult] = useState<Game | null>(null);
+  const [popupEnabled, setPopupEnabled] = useState(true);
 
   useEffect(() => {
     const unsub = subscribeLiveResults((e: LiveResultEvent) => {
       const game = SECTOR_TO_GAME[e.sector];
       if (game) {
-        // Show popup immediately
-        setPopupResult(game);
-        // Auto-hide popup after 4 seconds
-        setTimeout(() => setPopupResult(null), 4000);
-        // Auto-select the live result — same flow as manual touch
+        if (popupEnabled) {
+          setPopupResult(game);
+          setTimeout(() => setPopupResult(null), 4000);
+        }
         selectActualResult(game);
       }
     });
     return unsub;
-  }, [selectActualResult]);
+  }, [selectActualResult, popupEnabled]);
 
   // The most recently selected actual result (for the highlighted display).
   const lastActual = roundHistory[roundHistory.length - 1]?.actualResult ?? null;
@@ -1192,6 +1192,19 @@ export function RevoGame() {
               {clock && (
                 <span className="text-[11px] text-[#5a6a99]">• {clock}</span>
               )}
+              {/* Popup on/off toggle */}
+              <button
+                onClick={() => setPopupEnabled((v) => !v)}
+                className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase transition ${
+                  popupEnabled
+                    ? "bg-[#2ed573]/15 text-[#2ed573]"
+                    : "bg-[#1e2240] text-[#5a6a99]"
+                }`}
+                title={popupEnabled ? "Popup ON — click to disable" : "Popup OFF — click to enable"}
+              >
+                <i className={`fas ${popupEnabled ? "fa-bell" : "fa-bell-slash"}`} />
+                {popupEnabled ? "Popup ON" : "Popup OFF"}
+              </button>
             </div>
           </div>
 
@@ -1720,12 +1733,15 @@ function SignalCard({
 
   return (
     <div
-      className="revo-card group relative flex flex-col overflow-hidden p-0"
-      style={{ borderColor: `${accent}40` }}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border-2 bg-[#141827] transition hover:-translate-y-1"
+      style={{
+        borderColor: `${accent}60`,
+        boxShadow: `0 4px 24px -8px ${accent}40, inset 0 1px 0 rgba(255,255,255,0.04)`,
+      }}
     >
       {/* index badge */}
       <span
-        className="absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full text-[10px] font-black text-white"
+        className="absolute right-2 top-2 z-20 grid h-7 w-7 place-items-center rounded-lg text-[11px] font-black text-white shadow-lg"
         style={{ background: accent }}
       >
         {index + 1}
@@ -1733,52 +1749,52 @@ function SignalCard({
 
       {/* confidence label badge */}
       <span
-        className="absolute left-2 top-2 z-10 rounded-full px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide"
-        style={{ background: `${confColor}25`, color: confColor }}
+        className="absolute left-2 top-2 z-20 rounded-md px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide"
+        style={{ background: `${confColor}30`, color: confColor, backdropFilter: "blur(4px)" }}
       >
         {confLabel}
       </span>
 
-      <div className="relative overflow-hidden bg-[#0d1020]">
+      {/* HD image — no blur, sharp rendering */}
+      <div className="relative overflow-hidden bg-gradient-to-b from-[#0d1020] to-[#141827]">
         <img
           src={GAME_IMAGES[pred.game.imageKey]}
           alt={pred.game.name}
-          className="h-32 w-full object-contain transition group-hover:scale-105 sm:h-36"
+          className="h-36 w-full object-contain p-2 transition duration-300 group-hover:scale-110 sm:h-40"
+          style={{ imageRendering: "crisp-edges" }}
+          loading="eager"
         />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0d1020] via-[#0d1020]/70 to-transparent p-2.5 text-center">
-          <div className="text-base font-black text-white sm:text-lg">
+        {/* Gradient overlay for text readability — no blur on the image itself */}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#141827] via-[#141827]/80 to-transparent p-3 text-center">
+          <div className="text-lg font-black tracking-tight text-white sm:text-xl">
             {pred.game.name}
           </div>
           {pred.game.isBonus && (
-            <span className="mt-0.5 inline-block rounded-full bg-[#FFD700]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
-              ★ Bonus
+            <span className="mt-1 inline-block rounded-full bg-[#FFD700]/20 px-2 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+              ★ Bonus Round
             </span>
           )}
         </div>
       </div>
 
-      {/* confidence bar */}
-      <div className="p-3">
-        <div className="mb-1 flex items-center justify-between text-[10px]">
-          <span className="font-bold text-[#8899cc]">
-            <i className="fas fa-chart-line mr-0.5" style={{ color: accent }} />
+      {/* confidence bar — HD style */}
+      <div className="border-t border-[#1e2240] p-3">
+        <div className="mb-1.5 flex items-center justify-between text-[11px]">
+          <span className="flex items-center gap-1 font-bold text-[#8899cc]">
+            <i className="fas fa-chart-line" style={{ color: accent }} />
             Confidence
           </span>
-          <span className="font-black" style={{ color: accent }}>
+          <span className="font-black text-base" style={{ color: accent }}>
             {pred.confidence}%
           </span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-[#1e2240]">
+        <div className="h-2 overflow-hidden rounded-full bg-[#1e2240]">
           <div
-            className="h-full rounded-full transition-all duration-700"
+            className="h-full rounded-full transition-all duration-500"
             style={{
               width: `${pred.confidence}%`,
-              background:
-                pred.confidence >= 80
-                  ? "linear-gradient(90deg,#2ed573,#448AFF)"
-                  : pred.confidence >= 65
-                    ? "linear-gradient(90deg,#448AFF,#00d4ff)"
-                    : "linear-gradient(90deg,#ffa502,#FFD700)",
+              background: `linear-gradient(90deg, ${accent}, ${accent}cc)`,
+              boxShadow: `0 0 8px ${accent}80`,
             }}
           />
         </div>
