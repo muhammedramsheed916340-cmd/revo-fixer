@@ -11,68 +11,58 @@ const HEADERS: Record<string, string> = {
   Accept: "application/json",
 };
 
-// Server-side cache — very short TTL.
+// In-memory cache — long TTL to prevent excessive external fetches.
 let recentCache: { data: unknown; at: number } | null = null;
 let statsCache: { data: unknown; at: number } | null = null;
-const RECENT_CACHE_TTL = 4000; // 4 seconds
-const STATS_CACHE_TTL = 10000; // 10 seconds
+let recentFetching = false;
+let statsFetching = false;
+const RECENT_TTL = 8000; // 8 seconds
+const STATS_TTL = 30000; // 30 seconds
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type") ?? "recent";
-  const page = searchParams.get("page") ?? "0";
   const size = searchParams.get("size") ?? "30";
   const duration = searchParams.get("duration") ?? "24";
 
-  try {
-    let url: string;
-    let cache: { data: unknown; at: number } | null;
-    let ttl: number;
-
-    if (type === "stats") {
-      url = `${API_BASE}/stats?duration=${duration}&sortField=count`;
-      cache = statsCache;
-      ttl = STATS_CACHE_TTL;
-    } else {
-      url = `${API_BASE}?page=${page}&size=${size}&sort=data.settledAt,desc&duration=${duration}&wheelResults=Pachinko,CashHunt,CrazyBonus,CoinFlip,1,2,5,10&isTopSlotMatched=true,false`;
-      cache = recentCache;
-      ttl = RECENT_CACHE_TTL;
+  if (type === "stats") {
+    // Return cached if fresh
+    if (statsCache && Date.now() - statsCache.at < STATS_TTL) {
+      return NextResponse.json(statsCache.data, { headers: { "Cache-Control": "no-store" } });
     }
-
-    if (cache && Date.now() - cache.at < ttl) {
-      return NextResponse.json(cache.data, {
-        headers: { "Cache-Control": "no-store" },
-      });
+    // Return stale while fetching
+    if (statsFetching && statsCache) {
+      return NextResponse.json(statsCache.data, { headers: { "Cache-Control": "no-store" } });
     }
-
-    const res = await fetch(url, { headers: HEADERS, cache: "no-store" });
-    if (!res.ok) {
-      if (cache) {
-        return NextResponse.json(cache.data, {
-          headers: { "Cache-Control": "no-store" },
-        });
+    statsFetching = true;
+    try {
+      const res = await fetch(`${API_BASE}/stats?duration=${duration}&sortField=count`, { headers: HEADERS, cache: "no-store" });
+      if (res.ok) {
+        statsCache = { data: await res.json(), at: Date.now() };
       }
-      return NextResponse.json({ error: `Upstream ${res.status}` }, { status: 502 });
-    }
-
-    const data = await res.json();
-
-    if (type === "stats") {
-      statsCache = { data, at: Date.now() };
-    } else {
-      recentCache = { data, at: Date.now() };
-    }
-
-    return NextResponse.json(data, {
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch {
-    const cache = type === "stats" ? statsCache : recentCache;
-    if (cache) {
-      return NextResponse.json(cache.data, {
-        headers: { "Cache-Control": "no-store" },
-      });
-    }
-    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
+    } catch { /* keep stale */ }
+    statsFetching = false;
+    return NextResponse.json(statsCache?.data ?? {}, { headers: { "Cache-Control": "no-store" } });
   }
+
+  // Recent results
+  if (recentCache && Date.now() - recentCache.at < RECENT_TTL) {
+    return NextResponse.json(recentCache.data, { headers: { "Cache-Control": "no-store" } });
+  }
+  // Return stale while fetching
+  if (recentFetching && recentCache) {
+    return NextResponse.json(recentCache.data, { headers: { "Cache-Control": "no-store" } });
+  }
+  recentFetching = true;
+  try {
+    const res = await fetch(
+      `${API_BASE}?page=0&size=${size}&sort=data.settledAt,desc&duration=${duration}&wheelResults=Pachinko,CashHunt,CrazyBonus,CoinFlip,1,2,5,10&isTopSlotMatched=true,false`,
+      { headers: HEADERS, cache: "no-store" }
+    );
+    if (res.ok) {
+      recentCache = { data: await res.json(), at: Date.now() };
+    }
+  } catch { /* keep stale */ }
+  recentFetching = false;
+  return NextResponse.json(recentCache?.data ?? [], { headers: { "Cache-Control": "no-store" } });
 }

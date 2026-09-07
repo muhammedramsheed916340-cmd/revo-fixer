@@ -81,9 +81,10 @@ export function RevoLiveResults() {
 
   useEffect(() => {
     loadData();
-    // Poll every 5 seconds for fast live updates.
-    // Server-side cache (4s TTL) means only ONE external API call per cycle.
-    const t = setInterval(loadData, 5000);
+    // Poll every 4 seconds. The 8s server cache means only ONE external API
+    // call happens per 8 seconds regardless of how many clients poll.
+    // Stale-while-reFetching returns cached data instantly during fetches.
+    const t = setInterval(loadData, 4000);
     return () => clearInterval(t);
   }, []);
 
@@ -283,7 +284,7 @@ export function RevoLiveResults() {
             </span>
             <span className="flex items-center gap-1.5 rounded-full bg-[#ff4757]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ff4757]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff4757]" />
-              LIVE · 5s
+              LIVE · auto
             </span>
           </div>
 

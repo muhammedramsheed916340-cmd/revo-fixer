@@ -70,17 +70,27 @@ export function RevoApp() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  // live data polling (all real data, no login required)
+  // Load critical data first (settings, packages, stats), then defer heavy calls.
   useEffect(() => {
     let active = true;
-    async function loadAll() {
-      const [s, p, m, st, a, n] = await Promise.all([
+    async function loadCritical() {
+      const [s, p, st] = await Promise.all([
         fetch("/api/app-settings").then((r) => r.json() as Promise<AppSettings>),
         fetch("/api/packages").then((r) => r.json() as Promise<Package[]>),
+        fetch("/api/stats").then((r) => r.json() as Promise<Stats>),
+      ]);
+      if (!active) return;
+      setSettings(s);
+      setPackages(p);
+      setStats(st);
+    }
+    async function loadDeferred() {
+      // Wait 1.5s before loading heavy data to reduce memory pressure.
+      await new Promise((r) => setTimeout(r, 1500));
+      const [m, a, n] = await Promise.all([
         fetch("/api/payment-methods")
           .then((r) => r.json() as Promise<PaymentMethods>)
           .finally(() => active && setLoadingPayments(false)),
-        fetch("/api/stats").then((r) => r.json() as Promise<Stats>),
         fetch("/api/activity")
           .then((r) => r.json() as Promise<ActivityData>)
           .finally(() => active && setLoadingActivity(false)),
@@ -89,15 +99,13 @@ export function RevoApp() {
         ),
       ]);
       if (!active) return;
-      setSettings(s);
-      setPackages(p);
       setMethods(m);
-      setStats(st);
       setActivity(a);
       setNotifications(n);
     }
-    loadAll();
-    const t = setInterval(loadAll, 60000); // reduced from 25s to 60s to save memory
+    loadCritical();
+    loadDeferred();
+    const t = setInterval(loadCritical, 60000);
     return () => {
       active = false;
       clearInterval(t);
