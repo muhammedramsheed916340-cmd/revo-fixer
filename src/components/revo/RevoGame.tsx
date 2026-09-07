@@ -36,18 +36,46 @@ const GAMES: Game[] = [
 // Weighted selection thresholds (from the original app's algorithm)
 const WEIGHTS: number[] = [0.22, 0.42, 0.6, 0.75, 0.85, 0.92, 0.97, 1.0];
 
+/** Number of simultaneous signal cards. */
+const SIGNAL_COUNT = 4;
+
 interface Prediction {
   game: Game;
   confidence: number;
   time: number;
 }
 
-function pickGame(): Game {
-  const rand = Math.random();
-  for (let i = 0; i < WEIGHTS.length; i++) {
-    if (rand < WEIGHTS[i]) return GAMES[i];
+/**
+ * Pick a game using the original weighted algorithm, while excluding any games
+ * already chosen so every signal box shows a DIFFERENT outcome.
+ */
+function pickUniqueGames(count: number): Game[] {
+  const pool = [...GAMES];
+  const chosen: Game[] = [];
+  for (let i = 0; i < count && pool.length > 0; i++) {
+    const rand = Math.random();
+    let pickIdx = 0;
+    // Re-scale weights across the remaining pool so probabilities stay
+    // proportional to the original weighting.
+    const totalW = pool.reduce((s, _g, idx) => {
+      // Use WEIGHTS deltas as relative weights within the remaining pool.
+      const prev = idx === 0 ? 0 : WEIGHTS[GAMES.indexOf(pool[idx - 1])];
+      const cur = WEIGHTS[GAMES.indexOf(pool[idx])];
+      return s + (cur - prev);
+    }, 0);
+    let acc = 0;
+    for (let j = 0; j < pool.length; j++) {
+      const prev = j === 0 ? 0 : WEIGHTS[GAMES.indexOf(pool[j - 1])];
+      const cur = WEIGHTS[GAMES.indexOf(pool[j])];
+      acc += (cur - prev) / totalW;
+      if (rand <= acc) {
+        pickIdx = j;
+        break;
+      }
+    }
+    chosen.push(pool.splice(pickIdx, 1)[0]);
   }
-  return GAMES[0];
+  return chosen;
 }
 
 function confidenceFor(game: Game): number {
@@ -55,28 +83,48 @@ function confidenceFor(game: Game): number {
   return Math.floor(Math.random() * (hi - lo + 1)) + lo;
 }
 
+/** Build N unique predictions (no two boxes show the same game). */
+function buildPredictions(): Prediction[] {
+  const games = pickUniqueGames(SIGNAL_COUNT);
+  const now = Date.now();
+  return games.map((game) => ({
+    game,
+    confidence: confidenceFor(game),
+    time: now,
+  }));
+}
+
 const BONUS_NAMES = ["PACHINKO", "COIN FLIP", "CASH HUNT", "CRAZY TIME"];
 
-// Read a saved signal from localStorage once (lazy init, SSR-safe).
-function readSavedSignal(): Prediction | null {
+// Read saved signals from localStorage once (lazy init, SSR-safe).
+function readSavedSignals(): Prediction[] | null {
   if (typeof window === "undefined") return null;
   try {
-    const saved = localStorage.getItem("revo_lastSignal");
+    const saved = localStorage.getItem("revo_lastSignals");
     if (!saved) return null;
-    const data = JSON.parse(saved) as Prediction;
-    if (Date.now() - data.time < 5 * 60 * 1000) return data;
-    localStorage.removeItem("revo_lastSignal");
-    return null;
+    const data = JSON.parse(saved) as Prediction[];
+    if (!Array.isArray(data) || data.length === 0) {
+      localStorage.removeItem("revo_lastSignals");
+      return null;
+    }
+    // Valid only if all signals are from the same recent batch (< 5 min).
+    if (Date.now() - data[0].time > 5 * 60 * 1000) {
+      localStorage.removeItem("revo_lastSignals");
+      return null;
+    }
+    return data;
   } catch {
     return null;
   }
 }
 
 export function RevoGame() {
-  const [prediction, setPrediction] = useState<Prediction | null>(readSavedSignal);
+  const [predictions, setPredictions] = useState<Prediction[] | null>(
+    readSavedSignals,
+  );
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(60);
-  const [running, setRunning] = useState(() => prediction !== null);
+  const [running, setRunning] = useState(() => predictions !== null);
   const [stats, setStats] = useState({
     total: 1249,
     accuracy: 94,
@@ -102,24 +150,24 @@ export function RevoGame() {
 
   const generatePrediction = useCallback(() => {
     setLoading(true);
-    setPrediction(null);
+    setPredictions(null);
     setTimeout(() => {
-      const game = pickGame();
-      const confidence = confidenceFor(game);
-      const pred: Prediction = { game, confidence, time: Date.now() };
-      setPrediction(pred);
+      const preds = buildPredictions();
+      setPredictions(preds);
       setLoading(false);
       setRunning(true);
       setCountdown(60); // reset countdown when a new signal session starts
       try {
-        localStorage.setItem("revo_lastSignal", JSON.stringify(pred));
+        localStorage.setItem("revo_lastSignals", JSON.stringify(preds));
       } catch {
         /* ignore */
       }
-      // Update stats (same logic as original app)
+      // Update stats (counts every signal box generated)
       setStats((s) => {
-        const total = s.total + 1;
-        const bonusHits = s.bonusHits + (BONUS_NAMES.includes(game.name) ? 1 : 0);
+        const total = s.total + preds.length;
+        const bonusHits =
+          s.bonusHits +
+          preds.filter((p) => BONUS_NAMES.includes(p.game.name)).length;
         const accuracyChange = Math.random() > 0.7 ? -1 : 1;
         const accuracy = Math.max(85, Math.min(98, s.accuracy + accuracyChange));
         return { ...s, total, bonusHits, accuracy };
@@ -128,11 +176,11 @@ export function RevoGame() {
   }, []);
 
   const refreshPrediction = useCallback(() => {
-    setPrediction(null);
+    setPredictions(null);
     setRunning(false);
     if (timerRef.current) clearInterval(timerRef.current);
     try {
-      localStorage.removeItem("revo_lastSignal");
+      localStorage.removeItem("revo_lastSignals");
     } catch {
       /* ignore */
     }
@@ -191,7 +239,7 @@ export function RevoGame() {
 
   return (
     <section id="game" className="scroll-mt-20 px-4 py-12 sm:px-6">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-5xl">
         <div className="mb-6 text-center">
           <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#448AFF]">
             <span className="revo-pulse text-[#2ed573]">●</span> Live Game
@@ -200,8 +248,8 @@ export function RevoGame() {
             <span className="revo-gradient-animate">CRAZY TIME</span> LIVE
           </h2>
           <p className="mx-auto mt-1 max-w-lg text-sm text-[#8899cc]">
-            ⚡ Live Predictions • High Accuracy ⚡ — the same Crazy Time Revo
-            Signal engine from the original app, now free to use.
+            ⚡ {SIGNAL_COUNT} Live Predictions • High Accuracy ⚡ — each box shows
+            a different outcome, never the same.
           </p>
         </div>
 
@@ -213,19 +261,19 @@ export function RevoGame() {
           </div>
         )}
 
-        {/* Signal card */}
+        {/* Signal grid */}
         <div className="revo-card revo-card-glow overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#448AFF]/10 to-transparent px-4 py-3">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-bolt text-[#FFD700]" /> Current Prediction
+              <i className="fas fa-bolt text-[#FFD700]" /> Current Predictions
             </span>
             {clock && (
               <span className="text-[11px] text-[#5a6a99]">• {clock}</span>
             )}
           </div>
 
-          <div className="p-5 sm:p-6">
-            {!prediction && !loading && (
+          <div className="p-4 sm:p-6">
+            {!predictions && !loading && (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <span className="mb-3 grid h-16 w-16 place-items-center rounded-full bg-[#448AFF]/10 text-2xl text-[#448AFF] ring-2 ring-[#448AFF]/20">
                   <i className="fas fa-hand-pointer" />
@@ -233,7 +281,9 @@ export function RevoGame() {
                 <div className="text-sm font-bold text-white">
                   Click Get Signal To Start Live Session
                 </div>
-                <div className="text-xs text-[#5a6a99]">Get instant predictions</div>
+                <div className="text-xs text-[#5a6a99]">
+                  Get {SIGNAL_COUNT} instant predictions
+                </div>
               </div>
             )}
 
@@ -245,51 +295,11 @@ export function RevoGame() {
               </div>
             )}
 
-            {prediction && !loading && (
-              <div className="flex flex-col items-center">
-                <div className="relative overflow-hidden rounded-2xl border border-[#1e2240] bg-[#0d1020]">
-                  <img
-                    src={GAME_IMAGES[prediction.game.imageKey]}
-                    alt={prediction.game.name}
-                    className="h-36 w-full max-w-[260px] object-contain sm:h-44"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0d1020] via-[#0d1020]/80 to-transparent p-3 text-center">
-                    <div className="text-lg font-black text-white sm:text-2xl">
-                      {prediction.game.name}
-                    </div>
-                    {prediction.game.isBonus && (
-                      <span className="mt-0.5 inline-block rounded-full bg-[#FFD700]/20 px-2 py-0.5 text-[10px] font-bold uppercase text-[#FFD700]">
-                        ★ Bonus Round
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Confidence bar */}
-                <div className="mt-4 w-full max-w-md">
-                  <div className="mb-1.5 flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-1.5 font-bold text-[#8899cc]">
-                      <i className="fas fa-chart-line text-[#448AFF]" /> AI Confidence
-                    </span>
-                    <span className="font-black text-[#2ed573]">
-                      {prediction.confidence}%
-                    </span>
-                  </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-[#1e2240]">
-                    <div
-                      className="h-full rounded-full transition-all duration-700"
-                      style={{
-                        width: `${prediction.confidence}%`,
-                        background:
-                          prediction.confidence >= 80
-                            ? "linear-gradient(90deg,#2ed573,#448AFF)"
-                            : prediction.confidence >= 65
-                              ? "linear-gradient(90deg,#448AFF,#00d4ff)"
-                              : "linear-gradient(90deg,#ffa502,#FFD700)",
-                      }}
-                    />
-                  </div>
-                </div>
+            {predictions && !loading && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {predictions.map((pred, i) => (
+                  <SignalCard key={`${pred.game.name}-${pred.time}-${i}`} pred={pred} index={i} />
+                ))}
               </div>
             )}
           </div>
@@ -347,11 +357,76 @@ export function RevoGame() {
 
         <p className="mt-4 text-center text-[11px] text-[#5a6a99]">
           <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
-          Predictions are generated by the Revo Fixer signal engine for
-          entertainment. Play responsibly.
+          Each signal box shows a different game. Predictions are generated by
+          the Revo Fixer signal engine for entertainment. Play responsibly.
         </p>
       </div>
     </section>
+  );
+}
+
+function SignalCard({ pred, index }: { pred: Prediction; index: number }) {
+  const colors = ["#448AFF", "#FFD700", "#2ed573", "#00d4ff"];
+  const accent = colors[index % colors.length];
+
+  return (
+    <div
+      className="revo-card group relative flex flex-col overflow-hidden p-0"
+      style={{ borderColor: `${accent}40` }}
+    >
+      {/* index badge */}
+      <span
+        className="absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full text-[10px] font-black text-white"
+        style={{ background: accent }}
+      >
+        {index + 1}
+      </span>
+
+      <div className="relative overflow-hidden bg-[#0d1020]">
+        <img
+          src={GAME_IMAGES[pred.game.imageKey]}
+          alt={pred.game.name}
+          className="h-32 w-full object-contain transition group-hover:scale-105 sm:h-36"
+        />
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0d1020] via-[#0d1020]/70 to-transparent p-2.5 text-center">
+          <div className="text-base font-black text-white sm:text-lg">
+            {pred.game.name}
+          </div>
+          {pred.game.isBonus && (
+            <span className="mt-0.5 inline-block rounded-full bg-[#FFD700]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+              ★ Bonus
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* confidence bar */}
+      <div className="p-3">
+        <div className="mb-1 flex items-center justify-between text-[10px]">
+          <span className="font-bold text-[#8899cc]">
+            <i className="fas fa-chart-line mr-0.5" style={{ color: accent }} />
+            Confidence
+          </span>
+          <span className="font-black" style={{ color: accent }}>
+            {pred.confidence}%
+          </span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-[#1e2240]">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{
+              width: `${pred.confidence}%`,
+              background:
+                pred.confidence >= 80
+                  ? "linear-gradient(90deg,#2ed573,#448AFF)"
+                  : pred.confidence >= 65
+                    ? "linear-gradient(90deg,#448AFF,#00d4ff)"
+                    : "linear-gradient(90deg,#ffa502,#FFD700)",
+            }}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
