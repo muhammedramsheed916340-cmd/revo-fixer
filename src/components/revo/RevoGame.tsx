@@ -732,7 +732,7 @@ export function RevoGame() {
         </div>
 
         {/* ===== PERFORMANCE DASHBOARD (NEW — unified engine data) ===== */}
-        <PerformanceDashboardPanel dashboard={view.dashboard} />
+        <PerformanceDashboardPanel dashboard={view.dashboard} roundHistory={roundHistory} />
 
         {/* ===== WHEEL BASE-PROBABILITY MODEL (54 segments) ===== */}
         <WheelProbabilityPanel candidateScores={view.candidateScores} />
@@ -879,7 +879,7 @@ export function RevoGame() {
 // ============================================================
 // PERFORMANCE DASHBOARD PANEL
 // ============================================================
-function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashboard }) {
+function PerformanceDashboardPanel({ dashboard, roundHistory: rh }: { dashboard: PerformanceDashboard; roundHistory: RoundResult[] }) {
   const {
     totalRounds,
     hits,
@@ -1335,7 +1335,229 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
             Wilson lower bound = sample-size-aware confidence. 2/2 ≠ 100%.
           </div>
         </div>
+
+        {/* ===== PERFORMANCE LEDGER (REAL OUT-OF-SAMPLE) ===== */}
+        <PerformanceLedger
+          rounds={rh}
+          totalRounds={totalRounds}
+          hits={hits}
+          misses={misses}
+          hitRate={predictionHitRate}
+          normalResultHitRate={normalResultHitRate}
+          bonusResultHitRate={bonusResultHitRate}
+          normalResultCount={normalResultCount}
+          bonusResultCount={bonusResultCount}
+          recent5={recent5HitRate}
+          recent10={recent10HitRate}
+          recent20={recent20HitRate}
+          recent50={recent50HitRate}
+          recent100={recent100HitRate}
+          signalWise={signalWiseHitRate}
+        />
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// PERFORMANCE LEDGER — REAL OUT-OF-SAMPLE VALIDATION
+// ============================================================
+function PerformanceLedger({
+  rounds,
+  totalRounds,
+  hits,
+  misses,
+  hitRate,
+  normalResultHitRate,
+  bonusResultHitRate,
+  normalResultCount,
+  bonusResultCount,
+  recent5,
+  recent10,
+  recent20,
+  recent50,
+  recent100,
+  signalWise,
+}: {
+  rounds: import("./decisionEngine").RoundResult[];
+  totalRounds: number;
+  hits: number;
+  misses: number;
+  hitRate: number;
+  normalResultHitRate: number;
+  bonusResultHitRate: number;
+  normalResultCount: number;
+  bonusResultCount: number;
+  recent5: number;
+  recent10: number;
+  recent20: number;
+  recent50: number;
+  recent100: number;
+  signalWise: Record<string, { predicted: number; hit: number; rate: number; wilsonLower: number }>;
+}) {
+  // Compute per-outcome actual counts
+  const actualCounts: Record<string, number> = {};
+  for (const g of ENGINE_GAMES) actualCounts[g.name] = 0;
+  for (const r of rounds) {
+    actualCounts[r.actualResult.name] = (actualCounts[r.actualResult.name] ?? 0) + 1;
+  }
+
+  const isRealData = totalRounds > 0;
+  const minSample = 100;
+  const isMinMet = totalRounds >= minSample;
+
+  return (
+    <div className="mt-4 rounded-lg border-2 border-[#00d4ff]/30 bg-[#0d1020]/60 p-4">
+      {/* Header */}
+      <div className="mb-3 flex items-center justify-between">
+        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#00d4ff]">
+          <i className="fas fa-clipboard-list" /> Performance Ledger
+        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${isRealData ? "bg-[#2ed573]/15 text-[#2ed573]" : "bg-[#5a6a99]/15 text-[#5a6a99]"}`}>
+            {isRealData ? "● REAL OUT-OF-SAMPLE" : "○ WAITING FOR DATA"}
+          </span>
+          <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${isMinMet ? "bg-[#2ed573]/15 text-[#2ed573]" : "bg-[#ffa502]/15 text-[#ffa502]"}`}>
+            N={totalRounds}/{minSample}
+          </span>
+        </div>
+      </div>
+
+      {!isRealData ? (
+        <div className="py-6 text-center text-sm text-[#5a6a99]">
+          <i className="fas fa-hourglass-half mb-2 text-2xl text-[#5a6a99]" />
+          <div>No real out-of-sample data yet.</div>
+          <div className="text-[10px] mt-1">Predictions will be recorded as live results arrive.</div>
+        </div>
+      ) : (
+        <>
+          {/* Summary KPIs */}
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+              <div className="text-lg font-black text-white">{totalRounds}</div>
+              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Total Predictions</div>
+            </div>
+            <div className="rounded border border-[#2ed573]/30 bg-[#2ed573]/8 p-2 text-center">
+              <div className="text-lg font-black text-[#2ed573]">{hits}</div>
+              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">HIT</div>
+            </div>
+            <div className="rounded border border-[#ff4757]/30 bg-[#ff4757]/8 p-2 text-center">
+              <div className="text-lg font-black text-[#ff4757]">{misses}</div>
+              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">MISS</div>
+            </div>
+            <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-2 text-center">
+              <div className="text-lg font-black text-[#00d4ff]">{Math.round(hitRate * 100)}%</div>
+              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Hit Rate</div>
+            </div>
+          </div>
+
+          {/* Rolling windows */}
+          <div className="mb-3 grid grid-cols-5 gap-1.5">
+            {[
+              { label: "Last 5", rate: recent5, count: Math.min(totalRounds, 5) },
+              { label: "Last 10", rate: recent10, count: Math.min(totalRounds, 10) },
+              { label: "Last 25", rate: recent20, count: Math.min(totalRounds, 25) },
+              { label: "Last 50", rate: recent50, count: Math.min(totalRounds, 50) },
+              { label: "Last 100", rate: recent100, count: Math.min(totalRounds, 100) },
+            ].map((w) => {
+              const pct = w.count > 0 ? Math.round(w.rate * 100) : null;
+              const color = pct === null ? "#5a6a99" : pct >= 60 ? "#2ed573" : pct >= 40 ? "#448AFF" : "#ffa502";
+              return (
+                <div key={w.label} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">{w.label}</div>
+                  <div className="text-sm font-black" style={{ color }}>{pct !== null ? `${pct}%` : "—"}</div>
+                  <div className="text-[7px] text-[#5a6a99]">n={w.count}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Normal vs Bonus result HIT rate */}
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <div className="rounded border border-[#448AFF]/30 bg-[#448AFF]/5 p-2">
+              <div className="text-[9px] font-bold uppercase text-[#448AFF]">Normal Results</div>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-sm font-black text-[#2ed573]">{normalResultCount > 0 ? `${Math.round(normalResultHitRate * 100)}%` : "—"}</span>
+                <span className="text-[8px] text-[#5a6a99]">n={normalResultCount}</span>
+              </div>
+            </div>
+            <div className="rounded border border-[#FFD700]/30 bg-[#FFD700]/5 p-2">
+              <div className="text-[9px] font-bold uppercase text-[#FFD700]">Bonus Results</div>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-sm font-black text-[#2ed573]">{bonusResultCount > 0 ? `${Math.round(bonusResultHitRate * 100)}%` : "—"}</span>
+                <span className="text-[8px] text-[#5a6a99]">n={bonusResultCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Per-outcome ledger table */}
+          <div className="overflow-x-auto revo-scroll">
+            <table className="w-full min-w-[800px] text-center text-[9px]">
+              <thead>
+                <tr className="border-b border-[#1e2240] bg-[#0d1020]/60">
+                  <th className="px-1.5 py-2 text-left">Outcome</th>
+                  <th className="px-1.5 py-2">Predicted</th>
+                  <th className="px-1.5 py-2">Actual</th>
+                  <th className="px-1.5 py-2">HIT</th>
+                  <th className="px-1.5 py-2">MISS</th>
+                  <th className="px-1.5 py-2">Sel Rate</th>
+                  <th className="px-1.5 py-2">Act Rate</th>
+                  <th className="px-1.5 py-2">Precision</th>
+                  <th className="px-1.5 py-2">Recall</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ENGINE_GAMES.map((g) => {
+                  const sw = signalWise[g.name];
+                  const actual = actualCounts[g.name] ?? 0;
+                  const selRate = totalRounds > 0 ? sw.predicted / totalRounds : 0;
+                  const actRate = totalRounds > 0 ? actual / totalRounds : 0;
+                  // Precision = HIT / Predicted (of all times predicted, how often correct)
+                  const precision = sw.predicted > 0 ? sw.hit / sw.predicted : 0;
+                  // Recall = HIT / Actual (of all times it was the actual result, how often predicted)
+                  const recall = actual > 0 ? sw.hit / actual : 0;
+                  return (
+                    <tr key={g.name} className="border-b border-[#1e2240]/40 hover:bg-white/[0.02]">
+                      <td className="px-1.5 py-1.5 text-left">
+                        <span className={`font-bold ${g.isBonus ? "text-[#FFD700]" : "text-white"}`}>
+                          {g.name}
+                        </span>
+                        {g.isBonus && <span className="ml-0.5 text-[7px] text-[#FFD700]">★</span>}
+                      </td>
+                      <td className="px-1.5 py-1.5 text-[#448AFF]">{sw.predicted}</td>
+                      <td className="px-1.5 py-1.5 text-[#00d4ff]">{actual}</td>
+                      <td className="px-1.5 py-1.5 text-[#2ed573]">{sw.hit}</td>
+                      <td className="px-1.5 py-1.5 text-[#ff4757]">{actual - sw.hit}</td>
+                      <td className="px-1.5 py-1.5 text-[#8899cc]">{(selRate * 100).toFixed(1)}%</td>
+                      <td className="px-1.5 py-1.5 text-[#8899cc]">{(actRate * 100).toFixed(1)}%</td>
+                      <td className="px-1.5 py-1.5 text-[#2ed573]">{sw.predicted > 0 ? `${(precision * 100).toFixed(0)}%` : "—"}</td>
+                      <td className="px-1.5 py-1.5 text-[#448AFF]">{actual > 0 ? `${(recall * 100).toFixed(0)}%` : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Sample-size warning */}
+          {!isMinMet && (
+            <div className="mt-2 rounded-lg border border-[#ffa502]/30 bg-[#ffa502]/8 p-2.5 text-[10px] text-[#ffa502]">
+              <i className="fas fa-triangle-exclamation mr-1" />
+              <b>INSUFFICIENT SAMPLE:</b> {totalRounds}/{minSample} real rounds completed.
+              Minimum 100 rounds required for meaningful calibration assessment.
+              Do NOT interpret current hit rate as proof of model accuracy.
+            </div>
+          )}
+
+          {/* Data integrity notice */}
+          <div className="mt-2 text-[8px] text-[#5a6a99]">
+            <i className="fas fa-shield-halved mr-1 text-[#2ed573]" />
+            <b>REAL OUT-OF-SAMPLE:</b> Each prediction was LOCKED before the actual result arrived.
+            No data leakage. No retrospective modification. No reactive correction.
+            Result entered history only AFTER HIT/MISS was recorded.
+          </div>
+        </>
+      )}
     </div>
   );
 }

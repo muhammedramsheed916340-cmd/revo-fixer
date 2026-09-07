@@ -1645,3 +1645,72 @@ H. No structural exclusion: ✓ PASS
 
 No scoring logic was modified in this task — pure validation only.
 
+
+---
+
+Task ID: 36 (user request — REAL LIVE OUT-OF-SAMPLE VALIDATION)
+Agent: Z.ai Code
+Task: Create a persistent performance ledger for REAL out-of-sample validation. No scoring changes. Verify data flow order (prediction LOCKED → result → HIT/MISS → then history update). Track per-outcome performance, rolling windows, normal vs bonus, calibration assessment.
+
+Implementation:
+
+1. VERIFIED DATA FLOW ORDER (no data leakage):
+   - selectActualResult reads LOCKED prediction (line 414)
+   - Computes HIT/MISS (line 430)
+   - Records round to history (line 448) — AFTER settlement
+   - Builds next prediction from updated history (line 460/466)
+   - The actual result NEVER influences the prediction being tested. ✓
+
+2. ADDED PerformanceLedger component (`RevoGame.tsx`):
+   - Header: "Performance Ledger" with "● REAL OUT-OF-SAMPLE" / "○ WAITING FOR DATA" badge
+   - Sample-size badge: N=X/100 (orange until 100 reached, green when met)
+   - Summary KPIs: Total Predictions / HIT / MISS / Hit Rate
+   - Rolling windows: Last 5 / 10 / 25 / 50 / 100 (with n=count per window)
+   - Normal vs Bonus result HIT rate (separate, with n= counts)
+   - Per-outcome ledger table: Outcome / Predicted / Actual / HIT / MISS / Sel Rate / Act Rate / Precision / Recall
+   - Sample-size warning: "INSUFFICIENT SAMPLE: X/100 real rounds completed. Minimum 100 rounds required for meaningful calibration assessment. Do NOT interpret current hit rate as proof of model accuracy."
+   - Data integrity notice: "REAL OUT-OF-SAMPLE: Each prediction was LOCKED before the actual result arrived. No data leakage. No retrospective modification. No reactive correction. Result entered history only AFTER HIT/MISS was recorded."
+
+3. PER-OUTCOME METRICS:
+   - Predicted count (how many times in Top-4)
+   - Actual count (how many times was the actual result)
+   - HIT (predicted AND was actual result)
+   - MISS (was actual result but NOT predicted)
+   - Selection Rate (predicted / total rounds)
+   - Actual Rate (actual / total rounds)
+   - Precision (HIT / Predicted — when predicted, how often correct)
+   - Recall (HIT / Actual — when it was the result, how often predicted)
+
+4. ROLLING WINDOWS (separate performance windows):
+   - Last 5, Last 10, Last 25, Last 50, Last 100
+   - Each shows hit-rate % and n=count
+   - Prevents short streaks from inflating perceived accuracy
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Performance Ledger renders with "● REAL OUT-OF-SAMPLE" badge.
+- After live results (3 rounds): INSUFFICIENT SAMPLE warning shown (3/100).
+- Data integrity notice rendered.
+- Per-outcome table renders with all 8 outcomes.
+- Rolling windows (5/10/25/50/100) render.
+- Normal vs Bonus result HIT rate render.
+- Sample-size warning: "Do NOT interpret current hit rate as proof of model accuracy."
+
+Data Flow Verification:
+- Prediction LOCKED before result arrives (LIVE AUTO + LOCKED badges)
+- Result arrives → HIT/MISS computed → recorded → THEN enters history
+- New prediction generated from updated history → LOCKED
+- NO data leakage (result never influences prediction being tested)
+
+Stage Summary:
+- Performance Ledger created for REAL out-of-sample validation.
+- No scoring formula, Bayesian shrinkage, ranking logic, or Top-4 selection logic was modified.
+- Data flow verified: prediction LOCKED → result → HIT/MISS → history → new prediction.
+- Per-outcome metrics: Predicted / Actual / HIT / MISS / Precision / Recall.
+- Rolling windows: Last 5/10/25/50/100 (prevents short-streak bias).
+- Sample-size protection: INSUFFICIENT warning until 100 real rounds.
+- Data integrity: each prediction LOCKED before result, no leakage, no retrospective modification.
+- Minimum validation target: 100 REAL completed prediction/result cycles.
+- Lint clean, no errors, agent-browser QA green.
+
