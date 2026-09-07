@@ -897,35 +897,33 @@ export function RevoGame() {
   const generatePrediction = useCallback(() => {
     setLoading(true);
     setPredictions(null);
-    setTimeout(() => {
-      const allRounds = readRoundHistory();
-      const vRounds = allRounds.length;
-      const vHits = allRounds.filter((r) => r.hit).length;
-      const vHitRate = vRounds > 0 ? vHits / vRounds : 0;
-      const hist = allRounds.map((r) => r.actualResult);
-      const preds =
-        hist.length > 0
-          ? buildHistoryInformedPredictions(hist, vRounds, vHitRate)
-          : buildPredictions(vRounds, vHitRate);
-      setPredictions(preds);
-      setLoading(false);
-      setRunning(true);
-      setCountdown(60);
-      try {
-        localStorage.setItem(SIGNALS_KEY, JSON.stringify(preds));
-        cachedRaw = "";
-        signalsListeners.forEach((l) => l());
-      } catch {
-        /* ignore */
-      }
-      setStats((s) => {
-        const total = s.total + preds.length;
-        const bonusHits =
-          s.bonusHits +
-          preds.filter((p) => BONUS_NAMES.includes(p.game.name)).length;
-        return { ...s, total, bonusHits, accuracy: s.accuracy };
-      });
-    }, 2000);
+    // Generate immediately — no artificial delay.
+    const allRounds = readRoundHistory();
+    const vRounds = allRounds.length;
+    const vHits = allRounds.filter((r) => r.hit).length;
+    const vHitRate = vRounds > 0 ? vHits / vRounds : 0;
+    const hist = allRounds.map((r) => r.actualResult);
+    const preds =
+      hist.length > 0
+        ? buildHistoryInformedPredictions(hist, vRounds, vHitRate)
+        : buildPredictions(vRounds, vHitRate);
+    setPredictions(preds);
+    setLoading(false);
+    setRunning(true);
+    try {
+      localStorage.setItem(SIGNALS_KEY, JSON.stringify(preds));
+      cachedRaw = "";
+      signalsListeners.forEach((l) => l());
+    } catch {
+      /* ignore */
+    }
+    setStats((s) => {
+      const total = s.total + preds.length;
+      const bonusHits =
+        s.bonusHits +
+        preds.filter((p) => BONUS_NAMES.includes(p.game.name)).length;
+      return { ...s, total, bonusHits, accuracy: s.accuracy };
+    });
   }, []);
 
   const refreshPrediction = useCallback(() => {
@@ -939,7 +937,7 @@ export function RevoGame() {
     } catch {
       /* ignore */
     }
-    setTimeout(() => generatePrediction(), 300);
+    setTimeout(() => generatePrediction(), 50); // near-instant
   }, [generatePrediction]);
 
   // ===== AUTO-GENERATE PREDICTIONS ON MOUNT =====

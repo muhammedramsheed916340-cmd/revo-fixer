@@ -11,17 +11,17 @@ const HEADERS: Record<string, string> = {
   Accept: "application/json",
 };
 
-// Server-side in-memory cache — very short TTL for near real-time updates.
+// Server-side cache — very short TTL.
 let recentCache: { data: unknown; at: number } | null = null;
 let statsCache: { data: unknown; at: number } | null = null;
-const RECENT_CACHE_TTL = 5000; // 5 seconds
-const STATS_CACHE_TTL = 15000; // 15 seconds (stats don't change as fast)
+const RECENT_CACHE_TTL = 4000; // 4 seconds
+const STATS_CACHE_TTL = 10000; // 10 seconds
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type") ?? "recent";
   const page = searchParams.get("page") ?? "0";
-  const size = searchParams.get("size") ?? "20";
+  const size = searchParams.get("size") ?? "30";
   const duration = searchParams.get("duration") ?? "24";
 
   try {
@@ -39,7 +39,6 @@ export async function GET(req: Request) {
       ttl = RECENT_CACHE_TTL;
     }
 
-    // Return cached data if fresh enough.
     if (cache && Date.now() - cache.at < ttl) {
       return NextResponse.json(cache.data, {
         headers: { "Cache-Control": "no-store" },
@@ -48,7 +47,6 @@ export async function GET(req: Request) {
 
     const res = await fetch(url, { headers: HEADERS, cache: "no-store" });
     if (!res.ok) {
-      // Return stale cache if available on error.
       if (cache) {
         return NextResponse.json(cache.data, {
           headers: { "Cache-Control": "no-store" },
@@ -59,7 +57,6 @@ export async function GET(req: Request) {
 
     const data = await res.json();
 
-    // Update cache.
     if (type === "stats") {
       statsCache = { data, at: Date.now() };
     } else {
@@ -70,7 +67,6 @@ export async function GET(req: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch {
-    // Return stale cache on exception.
     const cache = type === "stats" ? statsCache : recentCache;
     if (cache) {
       return NextResponse.json(cache.data, {
