@@ -237,6 +237,18 @@ export interface PerformanceDashboard {
   // ===== NEW: Model-bias warning =====
   modelBiasWarning: boolean;         // true if bonuses repeatedly appear in actuals while excluded from predictions
   modelBiasNote: string;
+  // ===== NEW: Per-bonus selection bias detection =====
+  // Tracks each bonus's prediction inclusion rate vs its base probability.
+  // If a bonus is selected far more than its evidence supports, flag it.
+  perBonusSelectionBias: Record<string, {
+    inclusionRate: number;          // how often this bonus is in the prediction (0..1)
+    baseProbability: number;        // 54-segment base prior (0..1)
+    observedRate: number;           // actual observed frequency (0..1)
+    overSelected: boolean;          // inclusionRate > baseProbability * 2 (with 10+ sample)
+    underSelected: boolean;         // inclusionRate < observedRate * 0.3 (with 10+ sample)
+  }>;
+  selectionBiasWarning: boolean;    // true if any bonus is over-selected
+  selectionBiasNote: string;
 }
 
 // ============================================================
@@ -734,6 +746,40 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
     ? `MODEL BIAS WARNING: ${biasBonuses.length} bonuses (${biasBonuses.join(", ")}) are repeatedly appearing in actual results while being excluded from predictions. Recalibration needed — do NOT keep selecting [1,2,5,10].`
     : "No model bias detected.";
 
+  // ===== NEW: Per-bonus selection bias detection =====
+  // For each bonus: inclusion rate vs base probability vs observed rate.
+  // If a bonus is selected far more than its evidence supports → over-selected.
+  const perBonusSelectionBias: Record<string, {
+    inclusionRate: number;
+    baseProbability: number;
+    observedRate: number;
+    overSelected: boolean;
+    underSelected: boolean;
+  }> = {};
+  const overSelectedBonuses: string[] = [];
+  for (const bonusName of BONUS_NAMES) {
+    const p = perBonusPerformance[bonusName];
+    const baseProb = THEORETICAL[bonusName] ?? 0.05;
+    const inclusionRate = totalRounds > 0 ? p.predictedCount / totalRounds : 0;
+    const observedRate = totalRounds > 0 ? p.actualCount / totalRounds : 0;
+    // Over-selected: inclusion > 2× base probability (with 10+ sample)
+    const overSelected = totalRounds >= 10 && inclusionRate > baseProb * 2;
+    // Under-selected: inclusion < 30% of observed (with 10+ sample)
+    const underSelected = totalRounds >= 10 && observedRate > 0 && inclusionRate < observedRate * 0.3;
+    perBonusSelectionBias[bonusName] = {
+      inclusionRate,
+      baseProbability: baseProb,
+      observedRate,
+      overSelected,
+      underSelected,
+    };
+    if (overSelected) overSelectedBonuses.push(bonusName);
+  }
+  const selectionBiasWarning = overSelectedBonuses.length > 0;
+  const selectionBiasNote = selectionBiasWarning
+    ? `SELECTION BIAS: ${overSelectedBonuses.map((b) => `${b} (inclusion ${Math.round(perBonusSelectionBias[b].inclusionRate * 100)}% vs base ${Math.round(perBonusSelectionBias[b].baseProbability * 100)}%)`).join(", ")} — being selected far more than evidence supports. Recalibrating.`
+    : "No selection bias detected.";
+
   return {
     totalRounds,
     hits,
@@ -794,6 +840,10 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
     bonusUnderrepresentationNote,
     modelBiasWarning,
     modelBiasNote,
+    // NEW selection bias detection:
+    perBonusSelectionBias,
+    selectionBiasWarning,
+    selectionBiasNote,
   };
 }
 
@@ -1094,49 +1144,41 @@ function scoreCandidates(
       // If repeat rate is near baseline → NO boost, NO penalty. Fresh ranking.
     }
 
-    // ===== FACTOR 7: BONUS-AWARE SCORING (no bonus blind spot, no forced bonus) =====
-    // Bonus outcomes are scored EQUALLY with number outcomes. Bonus evidence
-    // must be STATISTICALLY MEANINGFUL before affecting the score — a single
-    // small burst does NOT aggressively change the prediction.
+    // ===== FACTOR 7: PER-OUTCOME BONUS EVIDENCE (no group boost) =====
+    // CRITICAL: NO group bonus boost. Each bonus is scored INDIVIDUALLY.
+    // A COIN FLIP cluster affects ONLY COIN FLIP — never transfers to
+    // CASH HUNT / PACHINKO / CRAZY TIME. This prevents COIN FLIP from
+    // being over-selected due to generic bonus group boosts.
     //
     // Per user spec:
-    //   - 2 bonus in 3 rounds = mild signal (requires 15+ combined sample)
-    //   - 3 bonus in 5 rounds = stronger signal (requires 20+ combined sample)
-    //   - Recent bonus rate vs long-term rate = trend signal
-    //   - A small burst must NOT aggressively change prediction
-    //
-    // This eliminates the [1,2,5,10] blind spot: when bonus evidence is
-    // strong enough, a bonus outcome CAN enter the Top-4. But it's NEVER
-    // forced — bonus must out-compete numbers on complete evidence.
+    //   - NO generic bonus-elevated boost (was applying to ALL bonuses)
+    //   - NO generic bonus-clustering boost (was applying to ALL bonuses)
+    //   - Per-outcome recent occurrence = individual evidence
+    //   - Per-outcome cluster = individual evidence
+    //   - Each bonus competes on the SAME scoring framework as numbers
     if (isBonusGame(g.name)) {
-      // Boost only with statistically meaningful sample (15+ combined spins)
-      if (combinedSeq.length >= 15 && recentBonusRate > combinedBonusRate * 1.3) {
-        const elevation = (recentBonusRate - combinedBonusRate) / Math.max(combinedBonusRate, 0.01);
-        score *= 1 + Math.min(0.15, elevation * 0.25); // capped +15% (was +20%)
-        signals.push(`bonus-elevated (${Math.round(recentBonusRate * 100)}%)`);
-      }
-      // Boost if this specific bonus appeared recently (last 10) — requires 20+ sample
+      // Per-outcome recent occurrence (last 10) — INDIVIDUAL, not group
       const thisBonusRecent = bonusRecentFreq[g.name] ?? 0;
       if (combinedSeq.length >= 20 && thisBonusRecent > 0 && recentCombined.length > 0) {
         const thisBonusRate = thisBonusRecent / recentCombined.length;
         const thisBonusTheo = theo;
+        // Boost only if THIS specific bonus is appearing more than 1.5× its base
         if (thisBonusRate > thisBonusTheo * 1.5) {
-          score *= 1.08; // capped +8% (was +10%)
-          signals.push("bonus-recent-active");
+          score *= 1.08; // capped +8%
+          signals.push(`${g.name.toLowerCase()}-recent-active`);
         }
       }
-      // Mild boost if bonus clustering detected — requires 2+ bursts AND 20+ sample
-      if (combinedSeq.length >= 20 && bonusBursts >= 2 && bonusActive) {
-        score *= 1.04; // capped +4% (was +5%)
-        signals.push("bonus-clustering");
+      // Per-outcome cluster detection — THIS bonus's own cluster (2+ in last 5)
+      const last5ForThisBonus = combinedSeq.slice(-5);
+      const thisBonusInLast5 = last5ForThisBonus.filter((n) => n === g.name).length;
+      if (combinedSeq.length >= 20 && thisBonusInLast5 >= 2) {
+        // This specific bonus has its own cluster — mild boost
+        score *= 1.05; // capped +5%
+        signals.push(`${g.name.toLowerCase()}-cluster-${thisBonusInLast5}in5`);
       }
-      // Stronger boost if 3+ bonuses in last 5 rounds (meaningful cluster)
-      const last5Combined = combinedSeq.slice(-5);
-      const bonusInLast5 = last5Combined.filter(isBonusGame).length;
-      if (combinedSeq.length >= 20 && bonusInLast5 >= 3) {
-        score *= 1.10; // capped +10%
-        signals.push("bonus-cluster-3in5");
-      }
+      // NO group bonus-elevated boost
+      // NO group bonus-clustering boost
+      // NO group bonus-cluster-3in5 boost
     } else {
       // For NUMBER outcomes: if bonus risk is high, numbers are slightly
       // less reliable (the wheel is in a "bonus phase"). Mild dampening.

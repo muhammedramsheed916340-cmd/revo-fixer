@@ -939,6 +939,10 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
     bonusUnderrepresentationNote,
     modelBiasWarning,
     modelBiasNote,
+    // NEW selection bias detection:
+    perBonusSelectionBias,
+    selectionBiasWarning,
+    selectionBiasNote,
   } = dashboard;
 
   return (
@@ -1204,6 +1208,52 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
               <div className="text-[10px] text-[#bcc6e0]">{bonusUnderrepresentationNote}</div>
             </div>
           )}
+
+          {/* ===== Selection Bias Detection (per-bonus) ===== */}
+          <div className="mt-2 rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-2">
+            <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+              Selection Bias Detection (inclusion vs base prob vs observed)
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {["COIN FLIP", "CASH HUNT", "PACHINKO", "CRAZY TIME"].map((bonusName) => {
+                const sb = perBonusSelectionBias[bonusName];
+                if (!sb) return null;
+                return (
+                  <div
+                    key={bonusName}
+                    className={`rounded border p-1.5 ${
+                      sb.overSelected
+                        ? "border-[#ff4757]/40 bg-[#ff4757]/8"
+                        : sb.underSelected
+                          ? "border-[#ffa502]/40 bg-[#ffa502]/8"
+                          : "border-[#1e2240] bg-[#0d1020]/60"
+                    }`}
+                  >
+                    <div className="text-[8px] font-bold uppercase text-[#FFD700]">{bonusName}</div>
+                    <div className="mt-0.5 text-[8px] text-[#5a6a99]">
+                      Incl: <span className="font-bold text-white">{Math.round(sb.inclusionRate * 100)}%</span>
+                    </div>
+                    <div className="text-[8px] text-[#5a6a99]">
+                      Base: <span className="text-[#448AFF]">{Math.round(sb.baseProbability * 100)}%</span>
+                      {" "}Obs: <span className="text-[#00d4ff]">{Math.round(sb.observedRate * 100)}%</span>
+                    </div>
+                    {sb.overSelected && (
+                      <div className="mt-0.5 text-[7px] font-bold uppercase text-[#ff4757]">⚠ Over-selected</div>
+                    )}
+                    {sb.underSelected && (
+                      <div className="mt-0.5 text-[7px] font-bold uppercase text-[#ffa502]">⚠ Under-selected</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {selectionBiasWarning && (
+              <div className="mt-1.5 rounded border border-[#ff4757]/30 bg-[#ff4757]/8 px-2 py-1 text-[9px] text-[#ff4757]">
+                <i className="fas fa-triangle-exclamation mr-1" />
+                {selectionBiasNote}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Pattern shift + anomaly alerts */}

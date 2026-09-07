@@ -1262,3 +1262,62 @@ Stage Summary:
 - No last-hit carryover, no HOT/OVERDUE chasing, no gambler's fallacy.
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 30 (user request — COIN FLIP OVER-TARGETING FIX)
+Agent: Z.ai Code
+Task: User reported COIN FLIP now appearing too frequently in Top-4 due to group bonus boosts. Fix: remove all GROUP bonus boosts, score each bonus INDIVIDUALLY, add per-bonus selection bias detection.
+
+Root Cause Found:
+- FACTOR 7 had GROUP bonus boosts that applied to ALL bonus outcomes when bonus activity was elevated:
+  - `bonus-elevated` (group boost, +15%) — applied to ALL bonuses
+  - `bonus-clustering` (group boost, +4%) — applied to ALL bonuses
+  - `bonus-cluster-3in5` (group boost, +10%) — applied to ALL bonuses
+- Since COIN FLIP has the highest base probability (7.41% vs PACHINKO 3.70% vs CRAZY TIME 1.85%), it disproportionately benefited from these group boosts → over-selected.
+
+Fixes Applied:
+
+1. **`decisionEngine.ts` — Removed ALL group bonus boosts** (FACTOR 7):
+   - REMOVED: `bonus-elevated` (was applying to ALL bonuses)
+   - REMOVED: `bonus-clustering` (was applying to ALL bonuses)
+   - REMOVED: `bonus-cluster-3in5` (was applying to ALL bonuses)
+   - KEPT: per-outcome `bonus-recent-active` (already individual, capped +8%)
+   - ADDED: per-outcome cluster detection — THIS bonus's own cluster (2+ in last 5, +5%)
+   - Each bonus is now scored INDIVIDUALLY. A COIN FLIP cluster affects ONLY COIN FLIP — never transfers to CASH HUNT / PACHINKO / CRAZY TIME.
+
+2. **`decisionEngine.ts` — Added per-bonus selection bias detection** (`PerformanceDashboard`):
+   - `perBonusSelectionBias` record: for each bonus:
+     - `inclusionRate` — how often this bonus is in the prediction (0..1)
+     - `baseProbability` — 54-segment base prior (7.41% / 3.70% / 3.70% / 1.85%)
+     - `observedRate` — actual observed frequency
+     - `overSelected` — inclusionRate > baseProbability × 2 (with 10+ sample)
+     - `underSelected` — inclusionRate < observedRate × 0.3 (with 10+ sample)
+   - `selectionBiasWarning` — true if any bonus is over-selected
+   - `selectionBiasNote` — lists over-selected bonuses with inclusion/base rates
+
+3. **`RevoGame.tsx` — Added Selection Bias Detection UI panel**:
+   - 4-column grid: COIN FLIP / CASH HUNT / PACHINKO / CRAZY TIME
+   - Each shows: Incl (inclusion rate) / Base (base probability) / Obs (observed rate)
+   - Over-selected bonuses: red border + "⚠ Over-selected" badge
+   - Under-selected bonuses: orange border + "⚠ Under-selected" badge
+   - Selection bias warning message when triggered
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Initial prediction: [1, 2, 5, 10] — NO COIN FLIP (group boost removed).
+- Selection Bias Detection panel renders per-bonus: COIN FLIP (Base 7%), CASH HUNT (Base 4%), PACHINKO (Base 4%), CRAZY TIME (Base 2%) — each scored INDIVIDUALLY.
+- After live results (3 rounds): COIN FLIP in predictions = 0/3 (0%), CASH HUNT = 0/3, PACHINKO = 0/3, CRAZY TIME = 0/3.
+- Current prediction: [1, 2, COIN FLIP, 5] — COIN FLIP entered based on its OWN individual evidence (not a group boost).
+
+Stage Summary:
+- COIN FLIP over-targeting FIXED: all group bonus boosts removed.
+- Each bonus scored INDIVIDUALLY — per-outcome recent occurrence + per-outcome cluster.
+- A COIN FLIP cluster affects ONLY COIN FLIP — never transfers to other bonuses.
+- Per-bonus selection bias detection: tracks inclusion rate vs base probability vs observed rate.
+- "Over-selected" badge triggers when inclusion > 2× base probability.
+- No fixed COIN FLIP, no group bonus boost, no artificial balancing.
+- All 8 outcomes compete on the SAME scoring framework.
+- Lint clean, no errors, agent-browser QA green.
+
