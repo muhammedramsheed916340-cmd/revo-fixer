@@ -3,9 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { broadcastLiveResult } from "./liveResultsBus";
 
-const STREAM_URL =
-  "https://live101.egprom.com/app/43/amlst:dc3_ct_auto/playlist.m3u8";
-
 const GAME_CARD_IMAGES: Record<string, string> = {
   "1": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539269/one-card_r0ffuy.png",
   "2": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539364/two-card_ayl9lu.png",
@@ -63,48 +60,11 @@ interface StatItem {
 }
 
 export function RevoLiveResults() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [streamStatus, setStreamStatus] = useState<"idle" | "loading" | "playing" | "error">("idle");
   const [results, setResults] = useState<SpinResult[]>([]);
   const [stats, setStats] = useState<StatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const lastResultTime = useRef<string>("");
-
-  // Load HLS video stream
-  useEffect(() => {
-    let hls: { destroy: () => void } | null = null;
-    async function initStream() {
-      const video = videoRef.current;
-      if (!video) return;
-      setStreamStatus("loading");
-      try {
-        const Hls = (await import("hls.js")).default;
-        if (Hls.isSupported()) {
-          hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-          hls.loadSource(STREAM_URL);
-          hls.attachMedia(video);
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            video.play().then(() => setStreamStatus("playing")).catch(() => setStreamStatus("error"));
-          });
-          hls.on(Hls.Events.ERROR, (_e: unknown, data: { fatal: boolean }) => {
-            if (data.fatal) setStreamStatus("error");
-          });
-        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-          video.src = STREAM_URL;
-          video.addEventListener("loadedmetadata", () => {
-            video.play().then(() => setStreamStatus("playing")).catch(() => setStreamStatus("error"));
-          });
-        } else {
-          setStreamStatus("error");
-        }
-      } catch {
-        setStreamStatus("error");
-      }
-    }
-    initStream();
-    return () => { if (hls) hls.destroy(); };
-  }, []);
 
   // Load live results + stats, and broadcast NEW results to the prediction system
   async function loadData() {
@@ -165,67 +125,13 @@ export function RevoLiveResults() {
             Crazy Time <span className="revo-gradient-text">Live Results</span>
           </h2>
           <p className="mx-auto mt-1 max-w-lg text-sm text-[#8899cc]">
-            Watch the live stream &amp; see real-time results. New results
+            Real-time Crazy Time results &amp; statistics. New results
             auto-update predictions with AI recalibration.
           </p>
         </div>
 
-        {/* Live Stream Video Player */}
-        <div className="revo-card revo-card-glow overflow-hidden p-0">
-          <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#ff4757]/10 to-transparent px-4 py-3">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-video text-[#ff4757]" /> Live Stream
-            </span>
-            <div className="flex items-center gap-2">
-              {streamStatus === "playing" && (
-                <span className="flex items-center gap-1 rounded-full bg-[#ff4757]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ff4757]">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff4757]" /> LIVE
-                </span>
-              )}
-              {streamStatus === "loading" && (
-                <span className="flex items-center gap-1 rounded-full bg-[#448AFF]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#448AFF]">
-                  <i className="fas fa-spinner fa-spin" /> Connecting
-                </span>
-              )}
-              {streamStatus === "error" && (
-                <span className="flex items-center gap-1 rounded-full bg-[#ffa502]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ffa502]">
-                  <i className="fas fa-triangle-exclamation" /> Offline
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="relative bg-black">
-            <video
-              ref={videoRef}
-              className="aspect-video w-full bg-black"
-              controls
-              autoPlay
-              muted
-              playsInline
-            />
-            {streamStatus === "loading" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-                <div className="mb-3 h-12 w-12 animate-spin rounded-full border-4 border-[#ff4757]/20 border-t-[#ff4757]" />
-                <div className="text-sm font-bold text-white">Connecting to live stream…</div>
-              </div>
-            )}
-            {streamStatus === "error" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 p-6 text-center">
-                <span className="mb-3 grid h-14 w-14 place-items-center rounded-full bg-[#ffa502]/15 text-2xl text-[#ffa502]">
-                  <i className="fas fa-video-slash" />
-                </span>
-                <div className="text-sm font-bold text-white">Stream temporarily unavailable</div>
-                <div className="mt-1 text-xs text-[#5a6a99]">
-                  The live stream may be geo-restricted. Results below still update in real-time.
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Latest Results */}
-        <div className="revo-card mt-4 overflow-hidden">
+        <div className="revo-card revo-card-glow overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#2ed573]/10 to-transparent px-4 py-3">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
               <i className="fas fa-bolt text-[#2ed573]" /> Latest Results
