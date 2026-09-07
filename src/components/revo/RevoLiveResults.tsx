@@ -34,10 +34,17 @@ export function RevoLiveResults() {
 
   async function loadData() {
     try {
-      // Fetch 100 recent results for deep statistical analysis
+      // Fetch recent results for live analysis (reduced size for speed)
       const res = await fetch("/api/crazy-time?type=recent&size=30&duration=24");
       const rData = await res.json();
       const newResults = Array.isArray(rData) ? rData : [];
+
+      // Only update + re-analyze if results actually changed (detect new spin)
+      const latestTime = newResults[0]?.data?.settledAt ?? "";
+      if (latestTime === lastResultTime.current && results.length > 0) {
+        return; // No new data — skip expensive re-render + re-analysis
+      }
+
       setResults(newResults);
 
       // Parse + run AI statistical analysis
@@ -74,7 +81,9 @@ export function RevoLiveResults() {
 
   useEffect(() => {
     loadData();
-    const t = setInterval(loadData, 60000); // refresh every 60s (reduced to save memory)
+    // Poll every 3 seconds for near real-time updates.
+    // The server-side cache (3s TTL) prevents excessive external API calls.
+    const t = setInterval(loadData, 3000);
     return () => clearInterval(t);
   }, []);
 
@@ -274,7 +283,7 @@ export function RevoLiveResults() {
             </span>
             <span className="flex items-center gap-1.5 rounded-full bg-[#ff4757]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ff4757]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff4757]" />
-              LIVE · 20s
+              LIVE · 3s
             </span>
           </div>
 

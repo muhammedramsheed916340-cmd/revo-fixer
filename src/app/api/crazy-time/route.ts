@@ -11,10 +11,11 @@ const HEADERS: Record<string, string> = {
   Accept: "application/json",
 };
 
-// Server-side in-memory cache to prevent OOM from repeated external fetches.
+// Server-side in-memory cache — very short TTL for near real-time updates.
 let recentCache: { data: unknown; at: number } | null = null;
 let statsCache: { data: unknown; at: number } | null = null;
-const CACHE_TTL = 30000; // 30 seconds
+const RECENT_CACHE_TTL = 3000; // 3 seconds (near real-time)
+const STATS_CACHE_TTL = 15000; // 15 seconds (stats don't change as fast)
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -26,17 +27,20 @@ export async function GET(req: Request) {
   try {
     let url: string;
     let cache: { data: unknown; at: number } | null;
+    let ttl: number;
 
     if (type === "stats") {
       url = `${API_BASE}/stats?duration=${duration}&sortField=count`;
       cache = statsCache;
+      ttl = STATS_CACHE_TTL;
     } else {
       url = `${API_BASE}?page=${page}&size=${size}&sort=data.settledAt,desc&duration=${duration}&wheelResults=Pachinko,CashHunt,CrazyBonus,CoinFlip,1,2,5,10&isTopSlotMatched=true,false`;
       cache = recentCache;
+      ttl = RECENT_CACHE_TTL;
     }
 
     // Return cached data if fresh enough.
-    if (cache && Date.now() - cache.at < CACHE_TTL) {
+    if (cache && Date.now() - cache.at < ttl) {
       return NextResponse.json(cache.data, {
         headers: { "Cache-Control": "no-store" },
       });
