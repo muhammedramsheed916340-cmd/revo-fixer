@@ -278,6 +278,9 @@ export function RevoGame() {
   const [clock, setClock] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const liveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Mirror of countdown state for use inside interval callbacks (avoids
+  // setState-during-render when the interval triggers generatePrediction).
+  const countdownRef = useRef(60);
 
   const displayPredictions = predictions ?? savedSignals;
   const isRunning = running || (predictions === null && savedSignals !== null && !loading);
@@ -415,6 +418,7 @@ export function RevoGame() {
       setLastRecalibration(nextRecal);
       setRunning(true);
       setCountdown(60);
+      countdownRef.current = 60;
       saveSignals(nextPreds);
     },
     [predictions, savedSignals, lastRecalibration],
@@ -429,13 +433,14 @@ export function RevoGame() {
   useEffect(() => {
     if (!isRunning) return;
     timerRef.current = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          generatePrediction();
-          return 60;
-        }
-        return c - 1;
-      });
+      const next = countdownRef.current - 1;
+      if (next <= 0) {
+        generatePrediction();
+        countdownRef.current = 60;
+      } else {
+        countdownRef.current = next;
+      }
+      setCountdown(countdownRef.current);
     }, 1000);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -461,13 +466,14 @@ export function RevoGame() {
       if (document.hidden && timerRef.current) clearInterval(timerRef.current);
       else if (!document.hidden && isRunning && !timerRef.current) {
         timerRef.current = setInterval(() => {
-          setCountdown((c) => {
-            if (c <= 1) {
-              generatePrediction();
-              return 60;
-            }
-            return c - 1;
-          });
+          const next = countdownRef.current - 1;
+          if (next <= 0) {
+            generatePrediction();
+            countdownRef.current = 60;
+          } else {
+            countdownRef.current = next;
+          }
+          setCountdown(countdownRef.current);
         }, 1000);
       }
     };

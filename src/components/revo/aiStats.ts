@@ -248,7 +248,8 @@ export function analyzeSpins(spins: SpinData[]): AnalysisResult {
     let confidence: number;
     let confidenceLabel: string;
     if (n < 20) {
-      confidence = 20 + Math.floor(Math.random() * 10);
+      // Deterministic (no Math.random) to avoid SSR hydration mismatch.
+      confidence = 24;
       confidenceLabel = "INSUFFICIENT DATA";
     } else if (n < 50) {
       confidence = Math.min(50, Math.round(Math.abs(zScore) * 15 + 20));

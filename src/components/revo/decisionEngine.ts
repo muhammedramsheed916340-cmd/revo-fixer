@@ -681,7 +681,8 @@ function honestConfidence(dashboard: PerformanceDashboard, triggered: boolean): 
   const n = dashboard.sampleSize;
   if (n < 3) {
     // Insufficient data — honestly low confidence.
-    return 20 + Math.floor(Math.random() * 10); // 20-29%
+    // Deterministic value (NO Math.random) to avoid SSR hydration mismatch.
+    return 24;
   }
   // Use Wilson lower bound of long-term hit-rate as the honest base.
   // This naturally penalizes small samples.
