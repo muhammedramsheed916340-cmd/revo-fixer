@@ -260,3 +260,36 @@ Stage Summary:
 - All real Firebase data preserved (packages, stats, payments, activity, revenue, testimonials, notifications, online-users, admin gate, terms, FAQ).
 - Bonus: wired the Command-K quick-nav palette (⌘K / Ctrl+K) with a navbar hint button.
 - Lint clean, dev log clean, all 12 APIs healthy (200), agent-browser QA green across desktop + mobile.
+
+---
+
+Task ID: 9 (user request — game page)
+Agent: Z.ai Code
+Task: User said "Game page are missed" — add back the Crazy Time game/signal page (the original app's `live-game.html`), now public (no activation code, since login was removed in task 8).
+
+Work Log:
+- Investigated the original app: the dashboard had a "Signal" action → `activation.html` (code-input gate) → on success redirected to `live-game.html` (the actual Crazy Time Revo Signal game page).
+- Fetched & analyzed `live-game.html` (28KB): it's the Crazy Time Live signal predictor with 8 real game outcomes (1, 2, 5, 10, PACHINKO, COIN FLIP, CASH HUNT, CRAZY TIME) each with a real Cloudinary card image, a weighted-random prediction algorithm, AI confidence bar, auto-refresh 60s timer, and 4 live stats (total/accuracy/bonus/live users).
+- Built `RevoGame.tsx` faithfully replicating the original:
+  - 8 real Cloudinary game card images (same URLs as the original app).
+  - Same weighted selection (1:22%, 2:20%, 5:18%, 10:15%, PACHINKO:10%, COIN FLIP:7%, CASH HUNT:5%, CRAZY TIME:3%).
+  - Same per-game confidence ranges + random confidence generation.
+  - "GET SIGNAL" button → 2s "Analyzing Patterns…" loading → prediction card with image + name + bonus badge + confidence bar (color-coded by confidence level).
+  - "REFRESH" button → clears + regenerates.
+  - Auto-refresh 60s countdown timer (auto-regenerates on 0).
+  - Live stats (total starts 1249, accuracy 94%, bonus 128, live 1.2k) that increment/fluctuate exactly like the original (total+1 per signal, accuracy 85-98 fluctuation, bonus+1 on bonus rounds, live users ±10 every 8s).
+  - localStorage persistence (lastSignal, 5-min expiry, like the original).
+  - Pause on tab-hidden (like the original).
+  - Possible-outcomes chip reference (8 chips, bonus games gold).
+  - Responsible-play disclaimer.
+- Wired `RevoGame` into RevoApp right after the Ticker (prominent position — it's the main game feature).
+- Added "Live Game" to navbar (fa-gamepad icon, 2nd item) + footer nav + command palette.
+- Fixed lint: lazy `readSavedSignal()` initializer (no setState-in-effect for localStorage restore), moved `generatePrediction`/`refreshPrediction` useCallbacks before effects that reference them, moved `setCountdown(60)` into the callback (not the effect body).
+- `bun run lint` → **0 errors**.
+- agent-browser QA: 15 sections render, game section present, no console/runtime errors. GET SIGNAL flow: initial stats (1,249/94%/128/1.2k) → click → "Analyzing Patterns…" spinner → prediction (e.g. "2" card from Cloudinary, 82% confidence) → countdown ticking (59s→47s) → confidence bar width matches → stats increment (total 1249→1250, accuracy fluctuated, live 1.2k→1.3k). REFRESH button clears + regenerates new prediction (87%). 8 outcome chips labels correct. Mobile (375×812): 15 sections, game present, responsive.
+
+Stage Summary:
+- Added the missing Crazy Time Live game/signal page as a public section — no login/activation required.
+- Faithfully replicates the original `live-game.html`: same 8 real Cloudinary game cards, same weighted prediction algorithm, same confidence ranges, same auto-refresh timer, same live stats behavior, same localStorage persistence.
+- 1 new component (`RevoGame.tsx`, ~370 lines), navbar 14→15 items (Live Game added 2nd), footer nav + command palette updated.
+- Lint clean, dev log clean, agent-browser QA green across desktop + mobile.

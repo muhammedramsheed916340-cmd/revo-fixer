@@ -7,6 +7,7 @@ import { RevoOnlineBadge } from "./RevoOnlineBadge";
 
 const NAV = [
   { id: "home", label: "Home", icon: "fa-house" },
+  { id: "game", label: "Live Game", icon: "fa-gamepad" },
   { id: "packages", label: "Packages", icon: "fa-crown" },
   { id: "recommender", label: "Picker", icon: "fa-wand-magic-sparkles" },
   { id: "compare", label: "Compare", icon: "fa-table-columns" },

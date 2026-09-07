@@ -24,6 +24,7 @@ import { RevoTicker } from "./RevoTicker";
 import { RevoReveal } from "./RevoReveal";
 import { RevoTestimonials } from "./RevoTestimonials";
 import { RevoCommandPalette } from "./RevoCommandPalette";
+import { RevoGame } from "./RevoGame";
 
 import type {
   AppSettings,
@@ -177,6 +178,10 @@ export function RevoApp() {
           />
 
           <RevoTicker />
+
+          <RevoReveal>
+            <RevoGame />
+          </RevoReveal>
 
           <RevoReveal>
             <RevoPackages

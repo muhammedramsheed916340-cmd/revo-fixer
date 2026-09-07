@@ -11,7 +11,8 @@ interface CommandItem {
 }
 
 const COMMANDS: CommandItem[] = [
-  { id: "home", label: "Home / License Login", icon: "fa-house", hint: "Activate key", group: "Navigate" },
+  { id: "home", label: "Home", icon: "fa-house", hint: "Landing", group: "Navigate" },
+  { id: "game", label: "Crazy Time Live Game", icon: "fa-gamepad", hint: "Live signal predictor", group: "Navigate" },
   { id: "packages", label: "Packages", icon: "fa-crown", hint: "5 real plans", group: "Navigate" },
   { id: "recommender", label: "Smart Picker", icon: "fa-wand-magic-sparkles", hint: "Find best plan", group: "Navigate" },
   { id: "compare", label: "Compare Plans", icon: "fa-table-columns", hint: "Feature matrix", group: "Navigate" },

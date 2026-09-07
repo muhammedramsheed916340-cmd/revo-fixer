@@ -78,6 +78,7 @@ export function RevoFooter({
             <ul className="space-y-2 text-sm">
               {[
                 { id: "home", label: "Home" },
+                { id: "game", label: "Live Game" },
                 { id: "packages", label: "Packages" },
                 { id: "recommender", label: "Picker" },
                 { id: "compare", label: "Compare" },
