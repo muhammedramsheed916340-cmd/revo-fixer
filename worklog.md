@@ -1855,3 +1855,49 @@ Stage Summary:
 - 1 result = exactly 1 settlement + 1 history update + 1 new prediction.
 - No scoring logic modified.
 
+
+---
+
+Task ID: 39 (user request — REMOVE STALE CACHE FROM LIVE RESULT PATH + PUSH)
+Agent: Z.ai Code
+Task: Remove stale live-result cache. Every poll fetches fresh from API. Add baseline exclusion for initial stale result. Track stale/duplicate/dropped events. Push to GitHub.
+
+Changes:
+
+1. **`src/app/api/crazy-time/route.ts` — COMPLETELY REWROTE**:
+   - REMOVED `recentCache` + `RECENT_TTL` (was 3s cache) — every poll now fetches FRESH from the CasinoScores API.
+   - Added `recentFetchPromise` dedup guard — prevents concurrent duplicate API calls (if a fetch is in progress, subsequent requests wait for it).
+   - Added `_bust=Date.now()` cache-busting query param to prevent CDN/proxy caching.
+   - Kept `statsCache` with 15s TTL (stats don't change frequently).
+   - All responses include `Cache-Control: no-store`.
+
+2. **`src/components/revo/RevoLiveResults.tsx` — Added baseline tracking**:
+   - `baselineSettledAt` ref: establishes the latest known settledAt on first page load.
+   - `isBaselineEstablished` flag: prevents the initial stale result from being broadcasted as a live event.
+   - The first historical result is NOT counted as a live latency sample — measurement starts from the NEXT newer result.
+   - Added `_t=Date.now()` cache-busting param to client-side fetch.
+   - Added `pollStartedAt` / `responseAt` timing tracking.
+
+3. **`src/components/revo/RevoGame.tsx` — Enhanced Performance Debug Panel**:
+   - Added `eventStats` state: stale count, duplicate count, dropped count, total events.
+   - Added P95 (95th percentile) calculation for Source→App latency.
+   - Added aggregated stats section showing: Avg/Min/Max/P95 for Source→App, Avg/Min/Max for App→UI and App→Prediction.
+   - "Aggregated Live Statistics (genuine NEW events only, n=X)" header.
+   - Only genuine NEW live events are counted (initial stale excluded).
+
+4. **Pushed to GitHub**: `muhammedramsheed916340-cmd/revo-fixer` (private repo, main branch).
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- Performance Debug panel renders with all metrics.
+- Initial stale result excluded from stats (baseline established).
+- 3 genuine new events recorded: Source→App avg 47.8s (includes early high values), P95 87.2s, min 7.8s.
+- App→UI: avg 0ms, min 0ms, max 0ms — INSTANT.
+- App→Prediction: avg 2ms, min 1ms — INSTANT.
+- stale:0, dup:0 — no stale or duplicate events.
+- No stale live-result cache — every poll fetches fresh.
+- Polling remains 2s.
+- Consecutive identical results preserved (dedup by timestamp, NOT by name).
+- No scoring/Bayesian/ranking/bonus/HIT-MISS/calibration/locking logic modified.
+
