@@ -1439,17 +1439,27 @@ function selectTopByEvidence(candidates: CandidateScore[], count: number): Candi
 
   // If we have exactly 8 candidates and need 4, evaluate all 70 combinations
   if (candidates.length === 8 && count === 4) {
+    // Sort calibrated by rawScore descending for "top-4 by individual score" comparison
+    const byScore = [...calibrated].sort((a, b) => b.rawScore - a.rawScore);
+    const top4ByScore = byScore.slice(0, 4);
+    const top4ByScoreNames = top4ByScore.map((c) => c.game.name);
+    const top4ByScoreCoverage = top4ByScore.reduce((s, c) => s + c.calibratedProbability, 0);
+
+    // Evaluate ALL 70 combinations
+    const allCombos: { names: string[]; coverage: number }[] = [];
     let bestCombination: typeof calibrated = [];
     let bestCoverage = -1;
 
-    // Generate all C(8,4) = 70 combinations
     for (let a = 0; a < 5; a++) {
       for (let b = a + 1; b < 6; b++) {
         for (let c = b + 1; c < 7; c++) {
           for (let d = c + 1; d < 8; d++) {
             const combo = [calibrated[a], calibrated[b], calibrated[c], calibrated[d]];
-            // Expected coverage = sum of calibrated probabilities (mutually exclusive)
             const coverage = combo.reduce((s, x) => s + x.calibratedProbability, 0);
+            allCombos.push({
+              names: combo.map((x) => x.game.name),
+              coverage,
+            });
             if (coverage > bestCoverage) {
               bestCoverage = coverage;
               bestCombination = combo;
@@ -1459,8 +1469,29 @@ function selectTopByEvidence(candidates: CandidateScore[], count: number): Candi
       }
     }
 
+    // Sort all 70 combinations by coverage descending
+    allCombos.sort((a, b) => b.coverage - a.coverage);
+
     // Sort the best combination by calibrated probability descending
     bestCombination.sort((a, b) => b.calibratedProbability - a.calibratedProbability);
+
+    // ===== DEBUG OUTPUT =====
+    const bestNames = bestCombination.map((c) => c.game.name);
+    const match = JSON.stringify(top4ByScoreNames.sort()) === JSON.stringify(bestNames.sort());
+    console.log("===== 70-COMBINATION OPTIMIZER DEBUG =====");
+    console.log("All 8 calibrated probabilities:");
+    for (const c of calibrated) {
+      console.log(`  ${c.game.name.padEnd(12)}: calProb=${(c.calibratedProbability * 100).toFixed(2)}%  score=${c.rawScore.toFixed(4)}`);
+    }
+    console.log(`Top-4 by individual score: [${top4ByScoreNames.join(", ")}] coverage=${(top4ByScoreCoverage * 100).toFixed(2)}%`);
+    console.log(`70-combination optimizer result: [${bestNames.join(", ")}] coverage=${(bestCoverage * 100).toFixed(2)}%`);
+    console.log(`Top 3 combinations:`);
+    for (let i = 0; i < Math.min(3, allCombos.length); i++) {
+      console.log(`  #${i + 1}: [${allCombos[i].names.join(", ")}] coverage=${(allCombos[i].coverage * 100).toFixed(2)}%`);
+    }
+    console.log(`Optimizer matches top-4-by-score: ${match ? "YES (same set)" : "NO (different set — optimizer wins)"}`);
+    console.log("===== END OPTIMIZER DEBUG =====");
+
     return bestCombination;
   }
 
