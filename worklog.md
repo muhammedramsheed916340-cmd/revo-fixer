@@ -1946,3 +1946,104 @@ Pipeline Audit Result:
 ✓ Every prediction evaluated against NEXT live result
 ✓ No scoring/Bayesian/ranking/bonus logic modified
 
+
+---
+
+Task ID: 41 (user request — FINAL OBJECTIVE: BUILD PROPER 8→TOP-4 EVIDENCE SELECTION ENGINE)
+Agent: Z.ai Code
+Task: Verify the engine meets ALL 15 success criteria for a proper 8→Top-4 evidence-ranked prediction engine. No code changes — pure verification.
+
+Verification Result: ALL 15 CRITERIA PASS — NO CODE CHANGES NEEDED.
+
+The engine was already built to this spec across Tasks 1-40. Here is the complete audit:
+
+1. ALL 8 COMPETE EQUALLY: ✓
+   - `scoreCandidates()` loops through all 8 GAMES, scoring each independently.
+   - Each gets: prior, N, observed, smoothed, relative deviation, evidence score, final score, rank.
+
+2. NO FIXED OUTCOMES: ✓
+   - No `alwaysInclude`, `fixedTop`, `guaranteedBonus`, `minNormal`, `minBonus` found in codebase.
+   - Selection is pure `selectTopByEvidence()` = top 4 by sorted score.
+
+3. NO ROTATION: ✓
+   - No rotation/swap logic between predefined combinations.
+   - Prediction is deterministic given the same evidence (no random variation).
+
+4. NO FORCED BONUS: ✓
+   - Bonus outcomes (COIN FLIP, CASH HUNT, PACHINKO, CRAZY TIME) compete individually.
+   - No group bonus boost (removed in Task 30).
+   - 0-4 bonuses in Top-4 is valid based on ranking.
+
+5. NO LAST-RESULT CHASING: ✓
+   - `prev-miss-dampen` removed (Task 22).
+   - `prev-hit-confirm` removed (Task 22).
+   - Repeat-pattern analysis is data-based (not blind carryover).
+   - Last result is one historical data point, not a prediction command.
+
+6. BAYESIAN STABILIZATION: ✓
+   - `SHRINKAGE_K = 20` active.
+   - `smoothedFreq = (count + k * prior) / (N + k)`.
+   - Small samples → conservative; large samples → more weight.
+   - Raw +885% → stabilized +45% (verified in live data).
+
+7. SEPARATE PRIOR FROM EVIDENCE: ✓
+   - `score = evidenceScore * 0.85 + theo * 0.15`.
+   - Primary (85%): relative deviation (how strong is evidence vs own baseline).
+   - Secondary (15%): mild prior weight (regression to mean).
+
+8. PREDICTION LOCKING: ✓
+   - LIVE AUTO + LOCKED badges in UI.
+   - No countdown, no auto-refresh, no timer dependency.
+   - Prediction only changes via `selectActualResult` on new live result.
+
+9. REAL PERFORMANCE MEASUREMENT: ✓
+   - Performance Ledger: Total/HIT/MISS/Hit Rate.
+   - Rolling windows: Last 5/10/25/50/100.
+   - Normal vs Bonus result HIT rates.
+   - "REAL OUT-OF-SAMPLE" label.
+   - "INSUFFICIENT SAMPLE" warning until 100 rounds.
+
+10. TOP-4 COVERAGE RATE: ✓
+    - `predictionHitRate` = hits / totalRounds.
+    - Displayed in Performance Ledger as "Hit Rate".
+
+11. PER-OUTCOME CALIBRATION: ✓
+    - `perBonusSelectionBias`: inclusion rate, base probability, observed rate.
+    - `perBonusPerformance`: predicted, actual, HIT, MISS, precision, recall.
+    - Over-selected / under-selected flags (n>=50 only).
+
+12. DIVERSITY NOT GOAL: ✓
+    - No artificial diversity logic.
+    - Same evidence → same Top-4 (deterministic).
+    - Evidence over appearance.
+
+13. DEBUG OUTPUT: ✓
+    - Debug table shows ALL 8 outcomes with:
+      Outcome | Base Prior | N | Observed | Smoothed | Raw Dev. | Stabilized | Evidence | Final | Rank | Sel | Reason.
+    - Selection reason is specific per outcome.
+
+14. NO REACTIVE MODEL CHANGES: ✓
+    - "NO reactive correction — diagnostic only" displayed in UI.
+    - Bias detection is diagnostic, never adjusts scores.
+    - "Do NOT interpret current hit rate as proof of model accuracy."
+
+15. ALL SUCCESS CRITERIA: ✓
+    - All 8 independently evaluated: YES
+    - All 8 scored: YES
+    - All 8 ranked (1-8): YES
+    - Top-4 = ranks 1-4: YES
+    - No fixed outcome: YES
+    - No fixed combination: YES
+    - No rotation: YES
+    - No forced bonus: YES
+    - No forced normal: YES
+    - No last-result chasing: YES
+    - Bayesian stabilization active: YES (k=20)
+    - Prediction locked before result: YES
+    - Actual result cannot influence prediction being tested: YES
+    - Every prediction tested against NEXT live result: YES
+    - Real Top-4 coverage recorded: YES
+    - Per-outcome calibration recorded: YES
+
+Conclusion: The engine is a mathematically honest, evidence-ranked 8→Top-4 prediction engine. No guaranteed wins, no artificial HIT rate increase, no reactive model changes. The goal is achieved.
+
