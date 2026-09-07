@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 // Real game outcomes + Cloudinary card images (from the original Revo Fixer app)
 const GAME_IMAGES: Record<string, string> = {
@@ -96,35 +96,77 @@ function buildPredictions(): Prediction[] {
 
 const BONUS_NAMES = ["PACHINKO", "COIN FLIP", "CASH HUNT", "CRAZY TIME"];
 
-// Read saved signals from localStorage once (lazy init, SSR-safe).
+// Read saved signals from localStorage once (SSR-safe via useSyncExternalStore).
+const SIGNALS_KEY = "revo_lastSignals";
+const signalsListeners = new Set<() => void>();
+
+// Cache the parsed snapshot so useSyncExternalStore doesn't loop (it compares
+// by reference — JSON.parse returns a new object each call).
+let cachedSignals: Prediction[] | null | undefined;
+let cachedRaw = "";
+
 function readSavedSignals(): Prediction[] | null {
   if (typeof window === "undefined") return null;
   try {
-    const saved = localStorage.getItem("revo_lastSignals");
-    if (!saved) return null;
+    const saved = localStorage.getItem(SIGNALS_KEY) ?? "";
+    // Return the cached reference if the underlying string hasn't changed.
+    if (saved === cachedRaw && cachedSignals !== undefined) {
+      return cachedSignals;
+    }
+    cachedRaw = saved;
+    if (!saved) {
+      cachedSignals = null;
+      return null;
+    }
     const data = JSON.parse(saved) as Prediction[];
     if (!Array.isArray(data) || data.length === 0) {
-      localStorage.removeItem("revo_lastSignals");
+      localStorage.removeItem(SIGNALS_KEY);
+      cachedSignals = null;
       return null;
     }
     // Valid only if all signals are from the same recent batch (< 5 min).
     if (Date.now() - data[0].time > 5 * 60 * 1000) {
-      localStorage.removeItem("revo_lastSignals");
+      localStorage.removeItem(SIGNALS_KEY);
+      cachedSignals = null;
       return null;
     }
+    cachedSignals = data;
     return data;
   } catch {
+    cachedSignals = null;
     return null;
   }
 }
 
-export function RevoGame() {
-  const [predictions, setPredictions] = useState<Prediction[] | null>(
-    readSavedSignals,
+function subscribeSignals(cb: () => void): () => void {
+  signalsListeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === SIGNALS_KEY) cb();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    signalsListeners.delete(cb);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+/** Hydration-safe read of the persisted signals. Server returns null; client
+ *  returns the saved batch — React uses the server snapshot during hydration so
+ *  the markup matches, then re-renders after mount. */
+function useSavedSignals(): Prediction[] | null {
+  return useSyncExternalStore(
+    subscribeSignals,
+    readSavedSignals, // client snapshot
+    () => null, // server snapshot (always null → matches SSR)
   );
+}
+
+export function RevoGame() {
+  const savedSignals = useSavedSignals();
+  const [predictions, setPredictions] = useState<Prediction[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(60);
-  const [running, setRunning] = useState(() => predictions !== null);
+  const [running, setRunning] = useState(false);
   const [stats, setStats] = useState({
     total: 1249,
     accuracy: 94,
@@ -134,6 +176,13 @@ export function RevoGame() {
   const [clock, setClock] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const liveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Derived display values (hydration-safe):
+  //  - predictions state takes priority (freshly generated this session)
+  //  - otherwise fall back to persisted signals from localStorage
+  //  - isRunning = we have something to show (or are actively loading)
+  const displayPredictions = predictions ?? savedSignals;
+  const isRunning = running || (predictions === null && savedSignals !== null && !loading);
 
   // Live clock (HH:MM)
   useEffect(() => {
@@ -158,7 +207,10 @@ export function RevoGame() {
       setRunning(true);
       setCountdown(60); // reset countdown when a new signal session starts
       try {
-        localStorage.setItem("revo_lastSignals", JSON.stringify(preds));
+        localStorage.setItem(SIGNALS_KEY, JSON.stringify(preds));
+        // Invalidate the snapshot cache so the store re-reads + re-renders.
+        cachedRaw = "";
+        signalsListeners.forEach((l) => l());
       } catch {
         /* ignore */
       }
@@ -180,7 +232,9 @@ export function RevoGame() {
     setRunning(false);
     if (timerRef.current) clearInterval(timerRef.current);
     try {
-      localStorage.removeItem("revo_lastSignals");
+      localStorage.removeItem(SIGNALS_KEY);
+      cachedRaw = "";
+      signalsListeners.forEach((l) => l());
     } catch {
       /* ignore */
     }
@@ -189,7 +243,7 @@ export function RevoGame() {
 
   // Auto-refresh countdown (60s → regenerate, like the original)
   useEffect(() => {
-    if (!running) return;
+    if (!isRunning) return;
     timerRef.current = setInterval(() => {
       setCountdown((c) => {
         if (c <= 1) {
@@ -202,7 +256,7 @@ export function RevoGame() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [running, generatePrediction]);
+  }, [isRunning, generatePrediction]);
 
   // Live users fluctuation (every 8s, like the original)
   useEffect(() => {
@@ -221,7 +275,7 @@ export function RevoGame() {
   useEffect(() => {
     const onHide = () => {
       if (document.hidden && timerRef.current) clearInterval(timerRef.current);
-      else if (!document.hidden && running && !timerRef.current) {
+      else if (!document.hidden && isRunning && !timerRef.current) {
         timerRef.current = setInterval(() => {
           setCountdown((c) => {
             if (c <= 1) {
@@ -235,7 +289,7 @@ export function RevoGame() {
     };
     document.addEventListener("visibilitychange", onHide);
     return () => document.removeEventListener("visibilitychange", onHide);
-  }, [running, generatePrediction]);
+  }, [isRunning, generatePrediction]);
 
   return (
     <section id="game" className="scroll-mt-20 px-4 py-12 sm:px-6">
@@ -254,7 +308,7 @@ export function RevoGame() {
         </div>
 
         {/* Auto-refresh timer */}
-        {running && (
+        {isRunning && !loading && (
           <div className="mb-3 flex items-center justify-center gap-2 text-[11px] font-semibold text-[#8899cc]">
             <i className="fas fa-sync-alt fa-spin text-[#448AFF]" />
             Next signal in {countdown}s
@@ -273,7 +327,7 @@ export function RevoGame() {
           </div>
 
           <div className="p-4 sm:p-6">
-            {!predictions && !loading && (
+            {!displayPredictions && !loading && (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <span className="mb-3 grid h-16 w-16 place-items-center rounded-full bg-[#448AFF]/10 text-2xl text-[#448AFF] ring-2 ring-[#448AFF]/20">
                   <i className="fas fa-hand-pointer" />
@@ -295,9 +349,9 @@ export function RevoGame() {
               </div>
             )}
 
-            {predictions && !loading && (
+            {displayPredictions && !loading && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {predictions.map((pred, i) => (
+                {displayPredictions.map((pred, i) => (
                   <SignalCard key={`${pred.game.name}-${pred.time}-${i}`} pred={pred} index={i} />
                 ))}
               </div>
