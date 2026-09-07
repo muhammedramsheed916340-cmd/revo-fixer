@@ -452,3 +452,47 @@ body {
 .revo-card:hover {
   border-color: rgba(68, 138, 255, 0.35);
 }
+
+/* Animated gradient text (shimmering brand text) */
+.revo-gradient-animate {
+  background: linear-gradient(
+    90deg,
+    #448aff 0%,
+    #00d4ff 25%,
+    #ffd700 50%,
+    #00d4ff 75%,
+    #448aff 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: revoGradientText 4s linear infinite;
+}
+@keyframes revoGradientText {
+  0% {
+    background-position: 0% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Gradient border (uses padding-box + border-image trick) */
+.revo-gradient-border {
+  position: relative;
+  background-clip: padding-box;
+  border: 1px solid transparent;
+}
+.revo-gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(68, 138, 255, 0.5), rgba(255, 215, 0, 0.3), rgba(0, 212, 255, 0.4));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}

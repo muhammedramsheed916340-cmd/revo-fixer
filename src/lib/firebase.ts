@@ -631,3 +631,32 @@ export function getTestimonials(limit = 8): Promise<Testimonial[]> {
   });
 }
 
+/**
+ * Real "online users" estimate — counts securityCodes with activity (usedAt
+ * or lastLogin) within the last `windowMs`. Since the platform doesn't expose
+ * true presence, we derive a live-activity proxy from recent key usage.
+ */
+export function getOnlineUsers(windowMs = 15 * 60 * 1000): Promise<{
+  count: number;
+  windowLabel: string;
+  totalKeys: number;
+}> {
+  return cached("onlineUsers", 20000, async () => {
+    const map = await fbGet<Record<string, SecurityCode>>("securityCodes");
+    if (!map) return { count: 0, windowLabel: "15m", totalKeys: 0 };
+    const cutoff = Date.now() - windowMs;
+    let count = 0;
+    for (const v of Object.values(map)) {
+      if (!v) continue;
+      const ts = v.lastLogin ?? v.usedAt ?? 0;
+      if (ts && ts >= cutoff) count++;
+    }
+    return {
+      count,
+      windowLabel: `${Math.round(windowMs / 60000)}m`,
+      totalKeys: Object.keys(map).length,
+    };
+  });
+}
+
+

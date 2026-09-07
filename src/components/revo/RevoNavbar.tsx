@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { RevoNotificationsBell } from "./RevoNotificationsBell";
 import { RevoThemeToggle } from "./RevoThemeToggle";
+import { RevoOnlineBadge } from "./RevoOnlineBadge";
 
 const NAV = [
   { id: "home", label: "Home", icon: "fa-house" },
@@ -90,6 +91,7 @@ export function RevoNavbar({
         </nav>
 
         <div className="flex items-center gap-2">
+          <RevoOnlineBadge />
           {maintenanceMode && (
             <span className="hidden items-center gap-1.5 rounded-full border border-[#ffa502]/40 bg-[#ffa502]/10 px-2.5 py-1 text-[11px] font-semibold text-[#ffa502] sm:flex">
               <i className="fas fa-triangle-exclamation" /> Maintenance

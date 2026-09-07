@@ -7,6 +7,8 @@ import {
   Bar,
   BarChart,
   Cell,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -342,6 +344,122 @@ export function RevoRevenue() {
               </span>
             </div>
             <DeepDive data={data.byPackageMethod} />
+          </div>
+        )}
+
+        {/* Package popularity donut */}
+        {!loading && data?.byPackage && data.byPackage.length > 0 && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.4fr]">
+            <div className="revo-card p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fas fa-chart-pie text-[#00d4ff]" />
+                <span className="text-sm font-bold text-white">
+                  Package popularity
+                </span>
+              </div>
+              <div className="relative h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={data.byPackage.map((p) => ({
+                        name: p.package,
+                        value: p.count,
+                        revenue: p.revenue,
+                      }))}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={3}
+                      stroke="none"
+                    >
+                      {data.byPackage.map((_, i) => (
+                        <Cell key={i} fill={PKG_COLORS[i % PKG_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const p = payload[0].payload as {
+                          name: string;
+                          value: number;
+                          revenue: number;
+                        };
+                        return (
+                          <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/95 px-3 py-2 text-xs shadow-xl backdrop-blur-md">
+                            <div className="font-bold text-white">{p.name}</div>
+                            <div className="text-[#bcc6e0]">
+                              {p.value} payment{p.value !== 1 ? "s" : ""}
+                            </div>
+                            <div className="text-[#2ed573]">{formatINR(p.revenue)}</div>
+                          </div>
+                        );
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* center label */}
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="text-2xl font-black text-white">
+                    {data.byPackage.reduce((s, p) => s + p.count, 0)}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#5a6a99]">
+                    payments
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="revo-card p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <i className="fas fa-list-ul text-[#448AFF]" />
+                <span className="text-sm font-bold text-white">
+                  Revenue share
+                </span>
+              </div>
+              <div className="space-y-2">
+                {data.byPackage.map((p, i) => {
+                  const total = data.byPackage.reduce((s, x) => s + x.revenue, 0);
+                  const sharePct = total > 0 ? (p.revenue / total) * 100 : 0;
+                  return (
+                    <div
+                      key={p.package}
+                      className="flex items-center gap-3 rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5"
+                    >
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ background: PKG_COLORS[i % PKG_COLORS.length] }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-xs font-bold text-white">
+                            {p.package}
+                          </span>
+                          <span className="shrink-0 text-xs font-black text-[#FFD700]">
+                            {formatINR(p.revenue)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center gap-2">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#1e2240]">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${sharePct}%`,
+                                background: PKG_COLORS[i % PKG_COLORS.length],
+                              }}
+                            />
+                          </div>
+                          <span className="shrink-0 text-[10px] text-[#5a6a99]">
+                            {p.count} · {sharePct.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>

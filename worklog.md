@@ -206,3 +206,36 @@ Stage Summary:
 - All data remains 100% real from live Firebase — zero mock.
 - Lint clean, dev log clean, all 11 APIs healthy (200), agent-browser QA green across desktop + mobile + both themes.
 - Next phase candidates: admin write operations (Firebase service-account), live notifications WebSocket, package revenue deep-dive PDF, real-time user count badge, search/filter for activity feed.
+
+---
+
+Task ID: 7 (cron round 7)
+Agent: Z.ai Code (webDevReview)
+Task: Round-7 review — QA current state, fix bugs, then add Activity search/filter, Live Online-Users badge, Package Popularity donut chart + styling polish. All real data only.
+
+Work Log:
+- Read worklog; confirmed rounds 1-6 stable (11 APIs, 14 sections, lint clean).
+- agent-browser QA: 14 sections render, no runtime errors, license verify (banned + used) passes, dashboard loads 70 real entries, theme toggle works, mobile responsive. No bugs found.
+- Added Activity Feed search/filter to `RevoActivity.tsx`: search input (magnifying-glass icon, clear button) + 4 filter chips (All/Payments/Transfers/Alerts) with live counts. Items now carry a `search` field (lowercased package/method/amount/status). `useMemo` filtering. Empty-state message adapts to active search/filter. Verified: 27 default items → "usdt" filter → 2 items → clear → 27 restored; Transfers chip → 10 items.
+- Built Live Online-Users badge:
+  - Added `getOnlineUsers()` to firebase.ts — counts securityCodes with `lastLogin` or `usedAt` within last 15 min. Cached 20s. Returns {count, windowLabel, totalKeys}.
+  - Built `/api/online-users` route.
+  - Built `RevoOnlineBadge.tsx` — navbar badge with double-pulse green dot + "N online" label, polls every 20s. Auto-hides when count=0 (real data shows 0 since the live DB's recent activity window is empty). Title tooltip shows window + total keys.
+- Added Package Popularity donut chart to `RevoRevenue.tsx`:
+  - Imported `Pie, PieChart` from recharts.
+  - Added donut (innerRadius 55, outerRadius 80, paddingAngle 3) using real `byPackage` data with PKG_COLORS. Center label shows total payments count.
+  - Side panel "Revenue share" with colored progress bars + per-package count + % share.
+  - Verified: 3 pie slices (1 Day / 1 Hour / 1 Hour Package), center "23", 6 share rows.
+- Styling polish:
+  - Added `.revo-gradient-animate` CSS — animated multi-stop gradient text (blue→cyan→gold→cyan→blue, 4s linear loop, 200% background-size). Applied to hero "REVO" wordmark (was static gradient).
+  - Added `.revo-gradient-border` CSS — gradient border via mask-composite trick (blue→gold→cyan).
+- `bun run lint` → **0 errors**.
+- agent-browser QA: 14 sections render. Activity search: 27→2 (usdt)→27 (clear), filter chips work (Transfers→10). Donut chart: 3 slices + center "23" + 6 share rows. Hero animated gradient: background-clip:text + linear-gradient confirmed. Online badge: present, hides when count=0. License verify (banned) passes. Dashboard regression: 81 real entries. Mobile (375×812): 13 sections + search + donut. Only benign next-themes hydration warning. All 12 APIs healthy (200).
+
+Stage Summary:
+- 3 new real-data features shipped: Activity search/filter, Live Online-Users badge, Package Popularity donut chart.
+- 1 new API route (`/api/online-users`), 1 new firebase.ts function (`getOnlineUsers`), 1 new component (`RevoOnlineBadge`), search/filter added to `RevoActivity`, donut chart added to `RevoRevenue`.
+- Styling polish: animated gradient hero text, gradient-border CSS utility.
+- All data remains 100% real from live Firebase — zero mock.
+- Lint clean, dev log clean, all 12 APIs healthy (200), agent-browser QA green across desktop + mobile.
+- Next phase candidates: admin write operations (Firebase service-account), live notifications WebSocket, package revenue deep-dive PDF, command-K quick-nav, real-time stats WebSocket.

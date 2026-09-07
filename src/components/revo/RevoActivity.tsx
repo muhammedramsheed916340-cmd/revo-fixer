@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatINR, timeAgo } from "./lib";
 import type {
   NotificationItem,
@@ -18,6 +19,8 @@ const METHOD_COLOR: Record<string, string> = {
   usdt: "#2ed573",
 };
 
+type FilterKind = "all" | "payment" | "transfer" | "notification";
+
 export function RevoActivity({
   data,
   notifications,
@@ -27,47 +30,79 @@ export function RevoActivity({
   notifications: NotificationItem[];
   loading: boolean;
 }) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<FilterKind>("all");
+
   const payments = data?.payments ?? [];
   const transfers = data?.transfers ?? [];
 
-  // Merge into a single timeline of {ts, kind, icon, text, color}
+  // Merge into a single timeline of {ts, kind, icon, text, color, searchable}
   type Item = {
     ts: number;
+    kind: "payment" | "transfer" | "notification";
     icon: string;
     color: string;
     title: string;
     sub: string;
+    search: string;
   };
-  const items: Item[] = [];
-  for (const p of payments) {
-    items.push({
-      ts: p.createdAt,
-      icon: "fa-credit-card",
-      color: METHOD_COLOR[p.method] ?? "#448AFF",
-      title: `${p.packageName} · ${formatINR(p.amount)}`,
-      sub: `Package purchase · ${p.method.toUpperCase()}${p.discountPercent ? ` · -${p.discountPercent}%` : ""}`,
+  const items: Item[] = useMemo(() => {
+    const list: Item[] = [];
+    for (const p of payments) {
+      const method = (p.method ?? "").toLowerCase();
+      list.push({
+        ts: p.createdAt,
+        kind: "payment",
+        icon: "fa-credit-card",
+        color: METHOD_COLOR[method] ?? "#448AFF",
+        title: `${p.packageName} · ${formatINR(p.amount)}`,
+        sub: `Package purchase · ${p.method.toUpperCase()}${p.discountPercent ? ` · -${p.discountPercent}%` : ""}`,
+        search: `${p.packageName ?? ""} ${p.method ?? ""} ${p.amount ?? ""} package purchase`.toLowerCase(),
+      });
+    }
+    for (const t of transfers) {
+      list.push({
+        ts: t.createdAt,
+        kind: "transfer",
+        icon: "fa-right-left",
+        color: "#ffa502",
+        title: `Transfer · ${formatINR(t.amount)}`,
+        sub: `Wallet transfer · ${t.status ?? "pending"}`,
+        search: `transfer wallet ${t.amount ?? ""} ${t.status ?? ""} ${t.username ?? ""}`.toLowerCase(),
+      });
+    }
+    for (const n of notifications) {
+      list.push({
+        ts: n.timestamp,
+        kind: "notification",
+        icon: "fa-bell",
+        color: "#00d4ff",
+        title: n.title,
+        sub: n.message ?? "",
+        search: `${n.title ?? ""} ${n.message ?? ""} ${n.type ?? ""}`.toLowerCase(),
+      });
+    }
+    list.sort((a, b) => b.ts - a.ts);
+    return list;
+  }, [payments, transfers, notifications]);
+
+  // Apply filter + search
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((it) => {
+      if (filter !== "all" && it.kind !== filter) return false;
+      if (q && !it.search.includes(q)) return false;
+      return true;
     });
-  }
-  for (const t of transfers) {
-    items.push({
-      ts: t.createdAt,
-      icon: "fa-right-left",
-      color: "#ffa502",
-      title: `Transfer · ${formatINR(t.amount)}`,
-      sub: `Wallet transfer · ${t.status ?? "pending"}`,
-    });
-  }
-  for (const n of notifications) {
-    items.push({
-      ts: n.timestamp,
-      icon: "fa-bell",
-      color: "#00d4ff",
-      title: n.title,
-      sub: n.message ?? "",
-    });
-  }
-  items.sort((a, b) => b.ts - a.ts);
-  const feed = items.slice(0, 16);
+  }, [items, filter, query]);
+
+  const feed = filtered.slice(0, 30);
+  const counts = {
+    all: items.length,
+    payment: items.filter((i) => i.kind === "payment").length,
+    transfer: items.filter((i) => i.kind === "transfer").length,
+    notification: items.filter((i) => i.kind === "notification").length,
+  };
 
   const totalRevenue = payments.reduce((s, p) => s + (p.amount ?? 0), 0);
   const avgTicket = payments.length
@@ -125,6 +160,55 @@ export function RevoActivity({
           </div>
         </div>
 
+        {/* Search + filter bar */}
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <i className="fas fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-[#5a6a99]" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search transactions, methods, amounts…"
+              className="w-full rounded-xl border border-[#1e2240] bg-[#0d1020] py-2.5 pl-9 pr-9 text-sm text-white outline-none transition placeholder:text-[#5a6a99] focus:border-[#448AFF] focus:ring-2 focus:ring-[#448AFF]/30"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5a6a99] transition hover:text-white"
+                aria-label="Clear search"
+              >
+                <i className="fas fa-xmark" />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-1 overflow-x-auto revo-scroll rounded-xl border border-[#1e2240] bg-[#0d1020] p-1">
+            {(
+              [
+                ["all", "All", "fa-layer-group"],
+                ["payment", "Payments", "fa-credit-card"],
+                ["transfer", "Transfers", "fa-right-left"],
+                ["notification", "Alerts", "fa-bell"],
+              ] as const
+            ).map(([k, label, icon]) => (
+              <button
+                key={k}
+                onClick={() => setFilter(k)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  filter === k
+                    ? "bg-[#448AFF] text-white shadow"
+                    : "text-[#8899cc] hover:text-white"
+                }`}
+              >
+                <i className={`fas ${icon} text-[10px]`} />
+                {label}
+                <span className="rounded-full bg-black/20 px-1.5 py-0.5 text-[9px]">
+                  {counts[k]}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="revo-card overflow-hidden">
           <div className="max-h-[28rem] overflow-y-auto revo-scroll">
             {loading ? (
@@ -135,7 +219,9 @@ export function RevoActivity({
               </div>
             ) : feed.length === 0 ? (
               <div className="p-10 text-center text-sm text-[#5a6a99]">
-                No recent activity.
+                {query || filter !== "all"
+                  ? "No matching transactions. Try a different search or filter."
+                  : "No recent activity."}
               </div>
             ) : (
               <ul className="relative">

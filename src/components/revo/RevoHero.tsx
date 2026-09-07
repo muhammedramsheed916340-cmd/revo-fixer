@@ -101,7 +101,7 @@ export function RevoHero({
         </div>
 
         <h1 className="text-4xl font-black tracking-tight sm:text-6xl">
-          <span className="revo-gradient-text">REVO</span>{" "}
+          <span className="revo-gradient-animate">REVO</span>{" "}
           <span className="text-white">FIXER</span>
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm font-semibold uppercase tracking-[0.25em] text-[#448AFF] sm:text-base">
