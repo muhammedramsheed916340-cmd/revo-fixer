@@ -79,12 +79,15 @@ export function RevoFooter({
               {[
                 { id: "home", label: "Home" },
                 { id: "packages", label: "Packages" },
+                { id: "compare", label: "Compare" },
                 { id: "revenue", label: "Revenue" },
                 { id: "converter", label: "Converter" },
+                { id: "deposit", label: "Deposit" },
                 { id: "payments", label: "Payments" },
                 { id: "stats", label: "Live Stats" },
                 { id: "activity", label: "Activity" },
                 { id: "faq", label: "FAQ" },
+                { id: "admin", label: "Admin" },
               ].map((l) => (
                 <li key={l.id}>
                   <button

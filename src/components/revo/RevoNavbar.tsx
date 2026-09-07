@@ -5,12 +5,15 @@ import { useEffect, useState } from "react";
 const NAV = [
   { id: "home", label: "Home", icon: "fa-house" },
   { id: "packages", label: "Packages", icon: "fa-crown" },
+  { id: "compare", label: "Compare", icon: "fa-table-columns" },
   { id: "revenue", label: "Revenue", icon: "fa-chart-line" },
   { id: "converter", label: "Converter", icon: "fa-right-left" },
+  { id: "deposit", label: "Deposit", icon: "fa-money-bill-transfer" },
   { id: "payments", label: "Payments", icon: "fa-wallet" },
   { id: "stats", label: "Live Stats", icon: "fa-signal" },
   { id: "activity", label: "Activity", icon: "fa-bolt" },
   { id: "faq", label: "FAQ", icon: "fa-circle-question" },
+  { id: "admin", label: "Admin", icon: "fa-user-shield" },
 ];
 
 export function RevoNavbar({
@@ -67,15 +70,16 @@ export function RevoNavbar({
           </span>
         </button>
 
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="hidden items-center gap-0.5 overflow-x-auto revo-scroll xl:flex">
           {NAV.map((n) => (
             <button
               key={n.id}
               onClick={() => onGo(n.id)}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-[#bcc6e0] transition hover:bg-white/5 hover:text-white"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-[#bcc6e0] transition hover:bg-white/5 hover:text-white"
+              title={n.label}
             >
-              <i className={`fas ${n.icon} mr-1.5 text-[12px] text-[#448AFF]`} />
-              {n.label}
+              <i className={`fas ${n.icon} text-[11px] text-[#448AFF]`} />
+              <span className="whitespace-nowrap">{n.label}</span>
             </button>
           ))}
         </nav>
@@ -101,7 +105,7 @@ export function RevoNavbar({
           </button>
           <button
             onClick={() => setOpen((v) => !v)}
-            className="grid h-10 w-10 place-items-center rounded-lg border border-[#1e2240] bg-[#141827]/60 text-[#bcc6e0] lg:hidden"
+            className="grid h-10 w-10 place-items-center rounded-lg border border-[#1e2240] bg-[#141827]/60 text-[#bcc6e0] xl:hidden"
             aria-label="Toggle menu"
           >
             <i className={`fas ${open ? "fa-xmark" : "fa-bars"} text-lg`} />
@@ -110,8 +114,8 @@ export function RevoNavbar({
       </div>
 
       {open && (
-        <div className="border-t border-[#1e2240] bg-[#0a0b14]/95 px-4 py-3 backdrop-blur-xl lg:hidden">
-          <div className="grid grid-cols-2 gap-2">
+        <div className="border-t border-[#1e2240] bg-[#0a0b14]/95 px-4 py-3 backdrop-blur-xl xl:hidden">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {NAV.map((n) => (
               <button
                 key={n.id}

@@ -81,3 +81,35 @@ Stage Summary:
 - All data remains 100% real from live Firebase — zero mock.
 - Lint clean, dev log clean, all 7 APIs healthy (200), agent-browser QA green.
 - Next phase candidates: admin panel (adminKeys login), deposit/transfer request submission, package comparison table, T&C.
+
+---
+
+Task ID: 3 (cron round 3)
+Agent: Z.ai Code (webDevReview)
+Task: Round-3 review — QA current state, fix bugs, then add Admin Gate, Package Comparison Table, Deposit/Transfer Request UI, and styling polish. All real data only.
+
+Work Log:
+- Read worklog; confirmed rounds 1-2 stable (8 APIs, 8 sections, lint clean).
+- agent-browser QA: 8 sections render, no console/runtime errors, license verify (banned + used) passes, dashboard loads 42 real entries, mobile responsive. No bugs found.
+- Verified real admin data available: 12 adminKeys (with loginCount/maxLogins/label), 2 activation_codes, 51 securityCodes (44 banned/4 active/1 reset/2 used).
+- Added `verifyAdminKey()` to firebase.ts — read-only admin-key verification (normalizes dash/underscore forms, returns sanitized data). Caches adminKeys + activationCodes 30s.
+- Added `getSecurityCodesOverview()` — real status breakdown (total + byStatus counts + 12 most-recent sanitized keys). Cached 30s.
+- Added `getPaymentRequestsOverview()` — real payment requests (screenshots stripped). Cached 30s.
+- Added 2 API routes: `/api/verify-admin` (POST), `/api/admin-data` (GET — parallel Promise.allSettled of adminKeys/activationCodes/security/paymentRequests).
+- Built `RevoAdminGate.tsx`: purple-themed admin console. Locked state = "Admin Access" CTA button. Unlock → AdminLogin form (key verify via /api/verify-admin). Verified → Panel with 4 tabs: License Keys / Admin Keys / Signal Codes / Pay Requests. Session persisted via useSyncExternalStore (SSR-safe). Read-only badges, login-usage progress bars, status badges, summary strip (total/active/used/banned).
+- Built `RevoComparison.tsx`: full feature comparison table — 14 standardized feature rows × 5 real packages side-by-side. Sticky feature column + sticky header. Hover-to-highlight columns. Popular plan highlighted. Check/minus icons. Buy buttons per column. Horizontal scroll on mobile.
+- Built `RevoDeposit.tsx`: deposit & wallet-transfer request builder. Deposit/Transfer toggle (transfer disabled if walletTransfer.enabled=false). Method picker (UPI/Bkash/USDT). Package selector auto-fills amount. Min-amount validation (₹7,000). USDT↔INR live conversion display. Builds a copyable request summary (Type/Package/Amount/Method/Destination) + "Send to @RevoAgent" button. Explicit read-only disclaimer (no payment processed).
+- Built `RevoScrollTop.tsx`: scroll-to-top FAB with conic-gradient scroll-progress ring (appears after 400px scroll). Also exported `RevoDivider` decorative section separator.
+- Styling polish: navbar expanded to 11 items (Compare, Deposit, Admin added), made compact (xs text, icon+label, overflow-x-auto with hidden scrollbar at xl breakpoint), mobile menu breakpoint moved to xl with 3-col grid. Footer nav expanded to 11 items. Section divider before admin console.
+- Wired 4 new sections into RevoApp main layout (Packages → Compare → Revenue → Converter → Stats → Deposit → Payments → Activity → FAQ → Divider → Admin → Footer + ScrollTop).
+- `bun run lint` → **0 errors**.
+- agent-browser QA: 11 sections render, no console/runtime errors. Admin login: real key `56K9-ODNU-BMS2-ETC5` (Master Admin) verified → panel shows 4 tabs (License Keys 51 / Admin Keys 12 / Signal Codes 2 / Pay Requests 20) + summary (51 total / 4 active / 2 used / 44 banned). Tab switching works (Signal Codes shows real codes `7AO1-EJUZ-9OMT`). Compare table: 15 rows × 6 cols, 16 checkmarks, 5 buy buttons, horizontal scroll on mobile. Deposit: selecting package auto-fills amount (₹2,000), below-min blocked, ₹7,500 above min → summary renders (6 rows + Copy summary + Send to @RevoAgent buttons). Scroll-top FAB appears after scroll. License verify (banned + used) still passes. Dashboard still loads 42 entries. Mobile (375×812) 11 sections responsive. All 9 APIs healthy.
+
+Stage Summary:
+- 4 new real-data features shipped: Admin Gate (read-only console), Package Comparison Table, Deposit/Transfer Request UI, Scroll-to-top FAB.
+- 2 new API routes (`/api/verify-admin`, `/api/admin-data`), 3 new firebase.ts functions (`verifyAdminKey`, `getSecurityCodesOverview`, `getPaymentRequestsOverview`).
+- 4 new components (`RevoAdminGate`, `RevoComparison`, `RevoDeposit`, `RevoScrollTop`), ~900 lines.
+- Navbar expanded 8→11 items, footer nav 8→11 items.
+- All data remains 100% real from live Firebase — zero mock.
+- Lint clean, dev log clean, all APIs healthy (verify-admin 405 on GET is correct = POST-only), agent-browser QA green across desktop + mobile.
+- Next phase candidates: T&C section, per-package revenue deep-dive modal, admin write operations (needs Firebase service-account), live notifications bell, dark/light theme toggle.

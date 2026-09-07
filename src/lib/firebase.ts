@@ -281,17 +281,131 @@ export function getRevenueSummary(): Promise<RevenueSummary> {
 }
 
 /** Real activation codes (Crazy Time Revo Signal) — usage stats only. */
-export async function getActivationCodes(): Promise<ActivationCode[]> {
-  const map = await fbGet<Record<string, ActivationCode>>("activation_codes");
-  if (!map) return [];
-  return Object.values(map);
+export function getActivationCodes(): Promise<ActivationCode[]> {
+  return cached("activationCodes", 30000, async () => {
+    const map = await fbGet<Record<string, ActivationCode>>("activation_codes");
+    if (!map) return [];
+    return Object.values(map);
+  });
 }
 
 /** Real admin keys (login counters only — no secrets). */
-export async function getAdminKeys(): Promise<AdminKey[]> {
-  const map = await fbGet<Record<string, AdminKey>>("adminKeys");
-  if (!map) return [];
-  return Object.values(map);
+export function getAdminKeys(): Promise<AdminKey[]> {
+  return cached("adminKeys", 30000, async () => {
+    const map = await fbGet<Record<string, AdminKey>>("adminKeys");
+    if (!map) return [];
+    return Object.values(map);
+  });
+}
+
+/**
+ * Real admin-key verification (read-only). Confirms a key exists in
+ * `adminKeys` and is active, without leaking other admins' data.
+ */
+export async function verifyAdminKey(
+  rawKey: string,
+): Promise<{ ok: boolean; key?: string; data?: Partial<AdminKey> }> {
+  // Admin keys are stored with underscores in the DB key but displayed with
+  // dashes. Normalize both forms.
+  const dashed = rawKey.trim().toUpperCase().replace(/_/g, "-");
+  const underscored = dashed.replace(/-/g, "_");
+  if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(dashed)) {
+    return { ok: false };
+  }
+  const data = await fbGet<AdminKey>(`adminKeys/${underscored}`);
+  if (!data) return { ok: false };
+  return {
+    ok: true,
+    key: dashed,
+    data: {
+      originalKey: data.originalKey,
+      status: data.status,
+      loginCount: data.loginCount,
+      maxLogins: data.maxLogins,
+      label: data.label,
+      createdAt: data.createdAt,
+      lastLogin: data.lastLogin,
+    },
+  };
+}
+
+/**
+ * Real security-code status breakdown (read-only, for admin panel).
+ * Returns counts by status + recent keys (sanitized).
+ */
+export function getSecurityCodesOverview(): Promise<{
+  total: number;
+  byStatus: Record<string, number>;
+  recent: {
+    key: string;
+    status: string;
+    name?: string;
+    hours?: number;
+    finalPrice?: number;
+    usedAt?: number;
+    createdAt?: number;
+    totalDevices?: number;
+  }[];
+}> {
+  return cached("securityOverview", 30000, async () => {
+    const map = await fbGet<Record<string, SecurityCode>>("securityCodes");
+    if (!map)
+      return { total: 0, byStatus: {}, recent: [] };
+    const byStatus: Record<string, number> = {};
+    const entries = Object.entries(map).map(([key, v]) => {
+      const st = v?.status ?? "unknown";
+      byStatus[st] = (byStatus[st] ?? 0) + 1;
+      return {
+        key,
+        status: st,
+        name: v?.name,
+        hours: v?.hours,
+        finalPrice: v?.finalPrice,
+        usedAt: v?.usedAt,
+        createdAt: v?.createdAt,
+        totalDevices: v?.totalDevices,
+      };
+    });
+    entries.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    return {
+      total: entries.length,
+      byStatus,
+      recent: entries.slice(0, 12),
+    };
+  });
+}
+
+/**
+ * Real payment-request overview (for admin panel). Strips screenshots.
+ */
+export function getPaymentRequestsOverview(
+  limit = 20,
+): Promise<
+  {
+    id: string;
+    amount: number;
+    method: string;
+    currency?: string;
+    status?: string;
+    createdAt: number;
+    approvedAt?: number;
+  }[]
+> {
+  return cached(`payReqsOverview:${limit}`, 30000, async () => {
+    const map = await fbGet<
+      Record<string, PaymentRequest & { screenshot?: string; status?: string }>
+    >("paymentRequests", {
+      orderBy: '"$key"',
+      limitToLast: String(limit),
+    });
+    if (!map) return [];
+    return Object.entries(map)
+      .map(([id, v]) => {
+        const { screenshot: _s, ...rest } = v;
+        return { id, ...rest };
+      })
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  });
 }
 
 /** Real recent notifications (titles/messages/timestamps only). */

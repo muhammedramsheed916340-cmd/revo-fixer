@@ -15,6 +15,10 @@ import { RevoFooter } from "./RevoFooter";
 import { RevoRevenue } from "./RevoRevenue";
 import { RevoConverter } from "./RevoConverter";
 import { RevoFaq } from "./RevoFaq";
+import { RevoAdminGate } from "./RevoAdminGate";
+import { RevoComparison } from "./RevoComparison";
+import { RevoDeposit } from "./RevoDeposit";
+import { RevoScrollTop, RevoDivider } from "./RevoScrollTop";
 
 import type {
   AppSettings,
@@ -196,6 +200,17 @@ export function RevoApp() {
     [scrollTo],
   );
 
+  // Compare table / deposit "view package" → scroll to packages section.
+  const handlePickPackage = useCallback(
+    (pkg: Package) => {
+      toast.info(`${pkg.name} · ${formatINR(pkg.price)}`, {
+        description: `${pkg.hours}h access — see packages above.`,
+      });
+      scrollTo("packages");
+    },
+    [scrollTo],
+  );
+
   const handleSupport = useCallback(() => {
     if (settings?.telegramLink) {
       window.open(settings.telegramLink, "_blank", "noopener");
@@ -257,11 +272,20 @@ export function RevoApp() {
             onBuy={handleBuy}
           />
 
+          <RevoComparison packages={packages} onBuy={handlePickPackage} />
+
           <RevoRevenue />
 
           <RevoConverter settings={settings} />
 
           <RevoStats stats={stats} settings={settings} />
+
+          <RevoDeposit
+            settings={settings}
+            packages={packages}
+            methods={methods}
+            onPickPackage={handlePickPackage}
+          />
 
           <RevoPayments methods={methods} loading={loadingPayments} />
 
@@ -272,9 +296,14 @@ export function RevoApp() {
           />
 
           <RevoFaq settings={settings} />
+
+          <RevoDivider icon="fa-user-shield" color="#a78bfa" />
+
+          <RevoAdminGate />
         </main>
 
         <RevoFooter settings={settings} onGo={scrollTo} />
+        <RevoScrollTop />
       </div>
   </div>
   );
