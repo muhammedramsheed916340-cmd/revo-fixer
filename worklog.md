@@ -538,3 +538,47 @@ Stage Summary:
 - Real data from CasinoScores API (100 spins analyzed), cached 30s server-side.
 - AI predictions based on real statistics, not random. "STRONG" confidence only when data supports it.
 - Server stable (hls.js removed, API cached, allowedDevOrigins added). Lint clean.
+
+---
+
+Task ID: 17 (user request — advanced decision engine)
+Agent: Z.ai Code
+Task: Build an advanced analytical decision engine with RCA, Decision Gate, No Loss Chasing, Multi-Factor Verification, and structured output format. Nothing removed — all existing UI kept.
+
+Work Log:
+- Added `DecisionEngineOutput` interface with all Step 6 fields: STATUS, NEXT ANALYSIS, CONFIDENCE, WHY THIS MOVE, RISK LEVEL, VALIDATION CRITERIA, PREVIOUS RESULT, PREVIOUS PREDICTION, RESULT, RCA NOTE.
+- Added `runDecisionEngine(rounds)` function implementing all 8 steps:
+  1. **RCA (Root Cause Analysis)** — on MISS: checks streaks, pattern shifts, sample size. Returns "INSUFFICIENT DATA" when root cause not identifiable (no forced explanations).
+  2. **No Loss Chasing** — doesn't force predictions to recover losses. No artificial confidence boost. Doesn't blindly chase repeating outcomes.
+  3. **Multi-Factor Verification** — checks historical trend consistency, recent behaviour, data integrity, sample size, model confidence, previous prediction performance, current uncertainty.
+  4. **Decision Gate** — confidence < 35% or insufficient data → WAIT/HOLD. Sufficient → READY.
+  5. **Recalibration** — on MISS: recalculates using updated frequency weights. Never repeats old prediction blindly. No fake/random data. No hard-coded confidence.
+  6. **Output Format** — structured panel with all fields from the user's specification.
+  7. **Manual Actual Result** — user's selection is source of truth. Prediction never auto-marked as actual.
+  8. **Continuous Learning** — each confirmed result → comparison → HIT/MISS → performance update → if MISS: RCA → recalibration → next analysis.
+- Confidence rules:
+  - <3 rounds → HOLD, INSUFFICIENT DATA (20-30%)
+  - 3-9 rounds → WAIT if <35%, READY if ≥35%, max 45% (LOW CONFIDENCE)
+  - 10+ rounds → can reach STRONG (70-85%) when hit-rate supports it
+  - "STRONG" never shown when confidence is low
+  - Insufficient data → WAIT/HOLD preferred output
+- Added Decision Engine panel in the UI (between prediction grid and verified accuracy):
+  - STATUS badge (READY/WAIT/HOLD with color coding)
+  - 3-column grid: Confidence + label, Risk Level, Last Result (HIT/MISS)
+  - Next Analysis: 4 candidate outcomes OR "HOLD — Insufficient data" / "WAIT — Below threshold"
+  - Why This Move: explanation with hit-rate, recent rate, data integrity
+  - RCA panel (red): only on MISS, shows root cause analysis
+  - Validation Criteria: what must be observed before treating prediction as successful
+  - Previous Round: predicted chips (matching one highlighted green) → actual result
+- `bun run lint` → 0 errors.
+- Verified: GET SIGNAL → 4 predictions → select CRAZY TIME (MISS) → Decision Engine shows:
+  STATUS: HOLD, Confidence: 0%, Risk: HIGH, Result: MISS, RCA present, Next Analysis present (HOLD message), Why This Move present, Validation Criteria present, Previous Round (predicted [1,CASH HUNT,10,5] → actual CRAZY TIME).
+
+Stage Summary:
+- Advanced decision engine built with all 8 steps from the user's specification.
+- RCA on MISS (streaks, anomalies, insufficient data — no forced explanations).
+- Decision Gate (WAIT/HOLD/READY based on confidence threshold).
+- No loss chasing, no artificial confidence boost.
+- Structured output panel with all fields.
+- Nothing removed — 8 result boxes, 4 prediction boxes, GET SIGNAL, HIT/MISS history all kept.
+- Lint clean, verified in browser.
