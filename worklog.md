@@ -1901,3 +1901,48 @@ Verification (agent-browser QA):
 - Consecutive identical results preserved (dedup by timestamp, NOT by name).
 - No scoring/Bayesian/ranking/bonus/HIT-MISS/calibration/locking logic modified.
 
+
+---
+
+Task ID: 40 (user request — PIPELINE AUDIT: LAST RESULT / NEXT PREDICTION)
+Agent: Z.ai Code
+Task: Audit the exact relationship between LAST RESULT, LOCKED PREDICTION, HIT/MISS, UPDATED HISTORY, NEXT PREDICTION. Add Event Debug Log proving the pipeline order. No scoring changes.
+
+Audit Findings:
+- Pipeline order is CORRECT: OLD prediction read → HIT/MISS computed → history updated (N→N+1) → new prediction from updated history → LOCKED.
+- No stale React state: `readRoundHistory()` reads from localStorage (with cache invalidation on persist), not stale React state.
+- `persistRounds` clears `cachedRoundsRaw = ""` → forces re-read from localStorage.
+- `recalibrate(updated, ...)` / `buildInitial(updated, ...)` uses `updated` array (not stale state).
+- No timer dependency — prediction only changes on new live result.
+- Dedup by `sector-timestamp` (NOT by result name) — consecutive identical results preserved.
+- Initial stale result excluded from latency stats (baseline tracking).
+
+Changes:
+1. Added Event Debug Log (`setEventLog` state + UI table) that logs for each live result:
+   - Event ID, Actual result, Old LOCKED prediction, HIT/MISS, History N Before, History N After, New prediction, Prediction ID, Locked status.
+   - Proves: old prediction settled BEFORE history update, N+1 correct, new prediction from updated history.
+2. Added explicit STEP comments in `selectActualResult` (STEP 1-5) for audit clarity.
+3. Committed + pushed to GitHub.
+
+Verification (agent-browser QA, 16 live events):
+- Event #16: Actual=1, Old Pred=[5,10,1,PACHINKO], HIT, N Before=15, N After=16, New Pred=[5,10,1,PACHINKO], Pred#=17, Lock=✓.
+- Every event: N After = N Before + 1 (exactly one history append).
+- Every event: exactly one settlement + one history update + one new prediction.
+- Old prediction tested against actual result (NOT new prediction).
+- New prediction generated from updated history.
+- Pipeline proof: "Old prediction settled BEFORE history update. New prediction uses updated history (N+1). Prediction Y tested against result X+1, NEVER against result X."
+
+Pipeline Audit Result:
+✓ LAST RESULT = actual latest live result
+✓ OLD prediction settled before history update
+✓ New result added exactly once (N → N+1)
+✓ NEXT prediction uses updated history (not stale state)
+✓ NEXT prediction locked
+✓ Prediction does not change without new live result
+✓ No stale React state
+✓ No off-by-one result/prediction matching
+✓ No retrospective prediction
+✓ No direct last-result chasing
+✓ Every prediction evaluated against NEXT live result
+✓ No scoring/Bayesian/ranking/bonus logic modified
+
