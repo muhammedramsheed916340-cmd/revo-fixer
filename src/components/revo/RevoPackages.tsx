@@ -31,10 +31,15 @@ function PackageCard({
 
   return (
     <div
-      className={`revo-card relative flex flex-col p-5 transition hover:-translate-y-1 ${
+      className={`revo-card group relative flex flex-col overflow-hidden p-5 transition hover:-translate-y-1.5 hover:ring-1 hover:ring-[#448AFF]/40 ${
         pkg.popular ? "revo-card-glow ring-1 ring-[#448AFF]/40" : ""
       }`}
     >
+      {/* top gradient strip on hover */}
+      <span
+        className="absolute inset-x-0 top-0 h-[3px] origin-left scale-x-0 bg-gradient-to-r from-[#448AFF] via-[#00d4ff] to-[#FFD700] transition-transform duration-500 group-hover:scale-x-100"
+        aria-hidden
+      />
       {pkg.popular && (
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#448AFF] to-[#2962FF] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-lg">
           ★ Most Popular

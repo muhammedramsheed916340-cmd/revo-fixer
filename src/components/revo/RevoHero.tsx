@@ -203,16 +203,29 @@ export function RevoHero({
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-[#5a6a99]">
-          <span>
-            <i className="fas fa-shield-halved text-[#2ed573]" /> Secure activation
-          </span>
-          <span>
-            <i className="fas fa-bolt text-[#ffa502]" /> Instant access
-          </span>
-          <span>
-            <i className="fas fa-headset text-[#448AFF]" /> 24/7 support
-          </span>
+        <div className="mt-7 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            { icon: "fa-shield-halved", color: "#2ed573", label: "Secure", sub: "Verified keys" },
+            { icon: "fa-bolt", color: "#ffa502", label: "Instant", sub: "Auto-activation" },
+            { icon: "fa-headset", color: "#448AFF", label: "24/7", sub: "Live support" },
+            { icon: "fa-globe", color: "#00d4ff", label: "UPI · USDT", sub: "Bkash crypto" },
+          ].map((b) => (
+            <div
+              key={b.label}
+              className="revo-card flex items-center gap-2.5 px-3 py-2.5"
+            >
+              <span
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm"
+                style={{ background: `${b.color}1f`, color: b.color }}
+              >
+                <i className={`fas ${b.icon}`} />
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-xs font-bold text-white">{b.label}</div>
+                <div className="truncate text-[10px] text-[#5a6a99]">{b.sub}</div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>

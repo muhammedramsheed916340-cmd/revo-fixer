@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 const NAV = [
   { id: "home", label: "Home", icon: "fa-house" },
   { id: "packages", label: "Packages", icon: "fa-crown" },
+  { id: "revenue", label: "Revenue", icon: "fa-chart-line" },
+  { id: "converter", label: "Converter", icon: "fa-right-left" },
   { id: "payments", label: "Payments", icon: "fa-wallet" },
-  { id: "stats", label: "Live Stats", icon: "fa-chart-line" },
+  { id: "stats", label: "Live Stats", icon: "fa-signal" },
   { id: "activity", label: "Activity", icon: "fa-bolt" },
-  { id: "support", label: "Support", icon: "fa-headset" },
+  { id: "faq", label: "FAQ", icon: "fa-circle-question" },
 ];
 
 export function RevoNavbar({

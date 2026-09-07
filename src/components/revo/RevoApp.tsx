@@ -12,6 +12,9 @@ import { RevoPayments } from "./RevoPayments";
 import { RevoActivity } from "./RevoActivity";
 import { RevoDashboard } from "./RevoDashboard";
 import { RevoFooter } from "./RevoFooter";
+import { RevoRevenue } from "./RevoRevenue";
+import { RevoConverter } from "./RevoConverter";
+import { RevoFaq } from "./RevoFaq";
 
 import type {
   AppSettings,
@@ -254,6 +257,10 @@ export function RevoApp() {
             onBuy={handleBuy}
           />
 
+          <RevoRevenue />
+
+          <RevoConverter settings={settings} />
+
           <RevoStats stats={stats} settings={settings} />
 
           <RevoPayments methods={methods} loading={loadingPayments} />
@@ -263,6 +270,8 @@ export function RevoApp() {
             notifications={notifications}
             loading={loadingActivity}
           />
+
+          <RevoFaq settings={settings} />
         </main>
 
         <RevoFooter settings={settings} onGo={scrollTo} />

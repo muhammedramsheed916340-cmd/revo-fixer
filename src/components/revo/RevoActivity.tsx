@@ -122,17 +122,28 @@ export function RevoActivity({
                 No recent activity.
               </div>
             ) : (
-              <ul className="divide-y divide-[#1e2240]">
+              <ul className="relative">
+                {/* timeline vertical connector */}
+                <span
+                  className="pointer-events-none absolute left-[2.05rem] top-3 bottom-3 w-px bg-gradient-to-b from-[#448AFF]/40 via-[#448AFF]/15 to-transparent"
+                  aria-hidden
+                />
                 {feed.map((it, i) => (
                   <li
                     key={i}
-                    className="flex items-center gap-3 px-4 py-3 transition hover:bg-white/[0.02]"
+                    className="group relative flex items-center gap-3 px-4 py-3 transition hover:bg-white/[0.03]"
                   >
                     <span
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-base"
+                      className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl text-base ring-2 ring-[#0a0b14]"
                       style={{ background: `${it.color}1a`, color: it.color }}
                     >
                       <i className={`fas ${it.icon}`} />
+                      {i === 0 && (
+                        <span
+                          className="absolute inset-0 rounded-xl"
+                          style={{ boxShadow: `0 0 0 2px ${it.color}40` }}
+                        />
+                      )}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-bold text-white">
@@ -142,7 +153,7 @@ export function RevoActivity({
                         {it.sub}
                       </div>
                     </div>
-                    <span className="shrink-0 text-[11px] font-medium text-[#5a6a99]">
+                    <span className="shrink-0 rounded-full border border-[#1e2240] bg-[#0d1020]/60 px-2 py-0.5 text-[10px] font-medium text-[#5a6a99]">
                       {timeAgo(it.ts)}
                     </span>
                   </li>

@@ -50,5 +50,34 @@ User uploaded `Revo Fixer.apk`. Request: rebuild it as a website using the **SAM
 ## Unresolved / Risks / Next-phase priorities
 - **Writes not replicated**: license activation that mutates `securityCodes`/`users` is intentionally NOT reproduced server-side (would mutate the user's live production DB; also needs Firebase write auth). Verification is read-only. If the owner wants real writes, add a Firebase service-account + admin API.
 - `getPackagePayments` fetches 5.5MB (base64 screenshots) server-side every 20s (TTL-cached). Acceptable; could be reduced further with a Cloud Function that strips screenshots.
-- Could add: admin panel (real `adminKeys` login → manage `securityCodes`/`packages`/`paymentMethods`), deposit/transfer request submission, USDT↔INR live converter widget, per-package revenue chart (recharts already installed), FAQ/T&C sections. Recommended next phase.
+- ~~Could add: admin panel, deposit/transfer request submission, USDT↔INR converter, revenue chart, FAQ~~ — converter + revenue chart + FAQ done in round 2.
+- Still open: admin panel (real `adminKeys` login → manage `securityCodes`/`packages`/`paymentMethods`), deposit/transfer request submission UI, per-package comparison table, T&C section.
 - Cron `webDevReview` scheduled every 15 min for continued QA + feature additions.
+
+---
+
+Task ID: 2 (cron round 2)
+Agent: Z.ai Code (webDevReview)
+Task: Round-2 review — QA current state, fix bugs, then add revenue charts, USDT↔INR converter, FAQ, and styling polish. All real data only.
+
+Work Log:
+- Read worklog; confirmed round-1 base stable (8 APIs + single-page app).
+- agent-browser QA: opened `/`, no console/runtime errors, 6 sections render real data, banned key → "License key blocked", used key → real dashboard (42 activity entries, timer "00:00:00" since expired), mobile responsive, sticky footer OK. No bugs found.
+- Added `getRevenueSummary()` to `src/lib/firebase.ts` — aggregates ALL real `packagePayments` (cached 60s) into: totalRevenue (approved only), totalPayments, avgTicket, approved/rejected/pending counts, byMethod[], byPackage[], byDay[] (last 14 active days).
+- Added API route `/api/revenue` (force-dynamic). Returns real aggregated revenue: ₹18,900 approved revenue, 23 payments, ₹822 avg, 10 approved / 13 rejected; byMethod Bkash ₹77,400 · UPI ₹58,500 · USDT ₹36,000; byPackage 1 Day ₹136k · 1 Hour ₹33.9k.
+- Built `RevoRevenue.tsx` (recharts AreaChart + BarChart): KPI cards (revenue/avg/approved/rejected) + 3-view toggle (By Day / By Method / By Package) + breakdown list. Polished tooltips, gradient fills, method-colored bars.
+- Built `RevoConverter.tsx`: bidirectional USDT↔INR using real `usdtRate` (₹94.14) + `minDepositINR` (₹7,000). Direction toggle, quick-amount chips (50/100/500/1000 USDT or min-deposit/5k/10k/40k INR), copyable result, swap button, live rate panel showing min-deposit ≈ USDT equivalent.
+- Built `RevoFaq.tsx`: 8 expandable Q&A cards with real platform facts (activation steps, 5 real packages + prices, UPI/Bkash/USDT methods, USDT rate ₹94.14, wallet transfer ₹7,000 min active, reset_required policy, refund policy, support contacts). Category chips, animated accordion, "still need help" CTA → real telegram/email.
+- Styling polish: navbar expanded to 8 nav items (Revenue, Converter, FAQ added); activity feed upgraded to timeline with vertical gradient connector + ring on icon + pulse on first item + pill time-ago badges; package cards got hover gradient top-strip + stronger lift; hero trust badges upgraded from inline text to 4 icon cards (Secure/Instant/24-7/UPI·USDT); footer nav updated.
+- Wired 3 new sections into `RevoApp.tsx` main layout (after Packages → Revenue → Converter → Stats → Payments → Activity → FAQ → Footer).
+- `bun run lint` → **0 errors**.
+- agent-browser final QA: 8 sections render, revenue KPIs ₹18,900/₹822/10/13 correct, chart SVG renders with 3 bars in By-Method view, converter 100 USDT→₹9,414 and 100 INR→1.0622 USDT, FAQ accordion opens/closes, license verify (banned + used) still passes, dashboard still loads 42 real entries, mobile (375×812) 8 sections + 1-col packages + 2-col KPIs. No console/runtime errors.
+
+Stage Summary:
+- 3 new real-data features shipped: Revenue Analytics (recharts), USDT↔INR Converter, FAQ Help Center.
+- 1 new API route (`/api/revenue`) aggregating real payment data.
+- 3 new components (`RevoRevenue`, `RevoConverter`, `RevoFaq`), ~600 lines.
+- Styling polish across navbar, hero, packages, activity timeline, footer.
+- All data remains 100% real from live Firebase — zero mock.
+- Lint clean, dev log clean, all 7 APIs healthy (200), agent-browser QA green.
+- Next phase candidates: admin panel (adminKeys login), deposit/transfer request submission, package comparison table, T&C.

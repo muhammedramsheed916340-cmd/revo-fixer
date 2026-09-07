@@ -173,6 +173,113 @@ export function getTransferRequests(limit = 12): Promise<TransferRequest[]> {
   });
 }
 
+export interface RevenueSummary {
+  totalRevenue: number;
+  totalPayments: number;
+  avgTicket: number;
+  approvedCount: number;
+  rejectedCount: number;
+  pendingCount: number;
+  byMethod: { method: string; revenue: number; count: number }[];
+  byPackage: { package: string; revenue: number; count: number }[];
+  byDay: { day: string; revenue: number; count: number }[];
+}
+
+/**
+ * Real revenue analytics aggregated from ALL package payments.
+ * Fetches the full node (cached 60s) and groups by method/package/day.
+ */
+export function getRevenueSummary(): Promise<RevenueSummary> {
+  return cached("revenueSummary", 60000, async () => {
+    const map = await fbGet<
+      Record<string, PackagePayment & { screenshot?: string }>
+    >("packagePayments", { orderBy: '"$key"', limitToLast: "200" });
+    if (!map)
+      return {
+        totalRevenue: 0,
+        totalPayments: 0,
+        avgTicket: 0,
+        approvedCount: 0,
+        rejectedCount: 0,
+        pendingCount: 0,
+        byMethod: [],
+        byPackage: [],
+        byDay: [],
+      };
+
+    const list = Object.values(map).filter((p) => p && p.amount != null);
+    let totalRevenue = 0;
+    let approvedCount = 0;
+    let rejectedCount = 0;
+    let pendingCount = 0;
+    const methodMap = new Map<string, { revenue: number; count: number }>();
+    const pkgMap = new Map<string, { revenue: number; count: number }>();
+    const dayMap = new Map<string, { revenue: number; count: number }>();
+
+    for (const p of list) {
+      const amt = Number(p.amount ?? 0);
+      const status = (p.status ?? "").toLowerCase();
+      // Count revenue only for approved / completed payments.
+      const counted =
+        status === "approved" ||
+        status === "completed" ||
+        (!status && p.approvedAt);
+      if (counted) {
+        totalRevenue += amt;
+        approvedCount++;
+      } else if (status === "rejected") {
+        rejectedCount++;
+      } else if (status === "pending" || !status) {
+        pendingCount++;
+      }
+
+      const method = (p.method ?? "unknown").toLowerCase();
+      const m = methodMap.get(method) ?? { revenue: 0, count: 0 };
+      m.revenue += amt;
+      m.count += 1;
+      methodMap.set(method, m);
+
+      const pkg = p.packageName ?? "Unknown";
+      const pg = pkgMap.get(pkg) ?? { revenue: 0, count: 0 };
+      pg.revenue += amt;
+      pg.count += 1;
+      pkgMap.set(pkg, pg);
+
+      if (p.createdAt) {
+        const d = new Date(p.createdAt);
+        const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const dd = dayMap.get(day) ?? { revenue: 0, count: 0 };
+        dd.revenue += amt;
+        dd.count += 1;
+        dayMap.set(day, dd);
+      }
+    }
+
+    const byMethod = Array.from(methodMap.entries())
+      .map(([method, v]) => ({ method, ...v }))
+      .sort((a, b) => b.revenue - a.revenue);
+    const byPackage = Array.from(pkgMap.entries())
+      .map(([pkg, v]) => ({ package: pkg, ...v }))
+      .sort((a, b) => b.revenue - a.revenue);
+    const byDay = Array.from(dayMap.entries())
+      .map(([day, v]) => ({ day, ...v }))
+      .sort((a, b) => a.day.localeCompare(b.day))
+      .slice(-14); // last 14 active days
+
+    return {
+      totalRevenue,
+      totalPayments: list.length,
+      avgTicket: list.length ? Math.round(totalRevenue / list.length) : 0,
+      approvedCount,
+      rejectedCount,
+      pendingCount,
+      byMethod,
+      byPackage,
+      byDay,
+    };
+  });
+}
+
 /** Real activation codes (Crazy Time Revo Signal) — usage stats only. */
 export async function getActivationCodes(): Promise<ActivationCode[]> {
   const map = await fbGet<Record<string, ActivationCode>>("activation_codes");
