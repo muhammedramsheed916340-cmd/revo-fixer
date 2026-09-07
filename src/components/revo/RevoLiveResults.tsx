@@ -2,32 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { broadcastLiveResult } from "./liveResultsBus";
-
-const GAME_CARD_IMAGES: Record<string, string> = {
-  "1": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539269/one-card_r0ffuy.png",
-  "2": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539364/two-card_ayl9lu.png",
-  "5": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539403/five-card_msp0cr.png",
-  "10": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539416/ten-card_cx3cvj.png",
-  Pachinko: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539441/pachiko-card_zxiw7r.png",
-  CoinFlip: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539429/coin-flip-card_kbbg7m.png",
-  CashHunt: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539519/cash-hunt-card_jp8hr3.png",
-  CrazyTime: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539531/crazy-time-card_dftfw3.png",
-};
-
-function sectorToDisplay(sector: string): { name: string; imgKey: string; isBonus: boolean } {
-  switch (sector) {
-    case "1": return { name: "1", imgKey: "1", isBonus: false };
-    case "2": return { name: "2", imgKey: "2", isBonus: false };
-    case "5": return { name: "5", imgKey: "5", isBonus: false };
-    case "10": return { name: "10", imgKey: "10", isBonus: false };
-    case "Pachinko": return { name: "PACHINKO", imgKey: "Pachinko", isBonus: true };
-    case "CoinFlip": return { name: "COIN FLIP", imgKey: "CoinFlip", isBonus: true };
-    case "CashHunt": return { name: "CASH HUNT", imgKey: "CashHunt", isBonus: true };
-    case "CrazyTime":
-    case "CrazyBonus": return { name: "CRAZY TIME", imgKey: "CrazyTime", isBonus: true };
-    default: return { name: sector, imgKey: "1", isBonus: false };
-  }
-}
+import { analyzeSpins, parseSpins, type AnalysisResult, SEGMENT_NAMES, GAME_CARD_IMAGES, DISPLAY_NAMES } from "./aiStats";
 
 function timeAgo(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime();
@@ -50,38 +25,28 @@ interface SpinResult {
   };
 }
 
-interface StatItem {
-  wheelResult: string;
-  count: number;
-  percentage: number;
-  lastOccurredAt: string;
-  lastSeenBefore: number;
-  hotFrequencyPercentage: number;
-}
-
 export function RevoLiveResults() {
   const [results, setResults] = useState<SpinResult[]>([]);
-  const [stats, setStats] = useState<StatItem[]>([]);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const lastResultTime = useRef<string>("");
 
-  // Load live results + stats, and broadcast NEW results to the prediction system
   async function loadData() {
     try {
-      const [resRes, statsRes] = await Promise.all([
-        fetch("/api/crazy-time?type=recent&size=15&duration=24"),
-        fetch("/api/crazy-time?type=stats&duration=24"),
-      ]);
-      const rData = await resRes.json();
-      const sData = await statsRes.json();
+      // Fetch 100 recent results for deep statistical analysis
+      const res = await fetch("/api/crazy-time?type=recent&size=100&duration=24");
+      const rData = await res.json();
       const newResults = Array.isArray(rData) ? rData : [];
       setResults(newResults);
-      setStats(sData?.aggStats ?? []);
-      setError("");
 
-      // Auto-detect NEW result → broadcast to prediction system
-      if (newResults.length > 0) {
+      // Parse + run AI statistical analysis
+      const spins = parseSpins(newResults);
+      if (spins.length > 0) {
+        const result = analyzeSpins(spins);
+        setAnalysis(result);
+
+        // Broadcast NEW result to prediction system
         const latest = newResults[0];
         const settledAt = latest?.data?.settledAt ?? "";
         if (settledAt && settledAt !== lastResultTime.current) {
@@ -99,8 +64,9 @@ export function RevoLiveResults() {
           }
         }
       }
+      setError("");
     } catch {
-      setError("Failed to load live results");
+      setError("Failed to load live data");
     } finally {
       setLoading(false);
     }
@@ -108,104 +74,242 @@ export function RevoLiveResults() {
 
   useEffect(() => {
     loadData();
-    const t = setInterval(loadData, 15000); // refresh every 15s
+    const t = setInterval(loadData, 20000);
     return () => clearInterval(t);
   }, []);
-
-  const totalCount = stats.reduce((s, st) => s + st.count, 0);
 
   return (
     <section id="live-results" className="scroll-mt-20 px-4 py-12 sm:px-6">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 text-center">
           <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#2ed573]">
-            <span className="revo-pulse text-[#2ed573]">●</span> Live Results
+            <span className="revo-pulse text-[#2ed573]">●</span> AI Statistical Analysis
           </div>
           <h2 className="mt-1 text-2xl font-black text-white sm:text-3xl">
-            Crazy Time <span className="revo-gradient-text">Live Results</span>
+            Crazy Time <span className="revo-gradient-text">Live AI Analysis</span>
           </h2>
           <p className="mx-auto mt-1 max-w-lg text-sm text-[#8899cc]">
-            Real-time Crazy Time results &amp; statistics. New results
-            auto-update predictions with AI recalibration.
+            Deep statistical analysis — Z-Score, Drought, Top Slot Correlation,
+            Moving Averages &amp; Bayesian Forecasting. Real data, real math, no fakes.
           </p>
         </div>
 
-        {/* Latest Results */}
-        <div className="revo-card revo-card-glow overflow-hidden">
+        {/* AI Analysis Summary */}
+        {analysis && (
+          <div className="revo-card revo-card-glow mb-4 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#448AFF]/10 to-transparent px-4 py-3">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-brain text-[#448AFF]" /> AI Analysis Summary
+              </span>
+              <span className="text-[10px] font-bold text-[#2ed573]">
+                {analysis.overallAnalysis}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* 1. Segment Analysis Table (Z-Score + Variance + Drought) */}
+        {analysis && (
+          <div className="revo-card mb-4 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[#1e2240] px-4 py-3">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-chart-column text-[#448AFF]" /> Variance &amp; Z-Score Analysis
+              </span>
+              <span className="text-[10px] text-[#5a6a99]">{analysis.totalSpins} spins</span>
+            </div>
+
+            <div className="overflow-x-auto revo-scroll">
+              <table className="w-full min-w-[640px] text-center text-xs">
+                <thead>
+                  <tr className="border-b border-[#1e2240] bg-[#0d1020]/60">
+                    <th className="px-2 py-2 text-left">Segment</th>
+                    <th className="px-2 py-2">Hits</th>
+                    <th className="px-2 py-2">Actual%</th>
+                    <th className="px-2 py-2">Theor.</th>
+                    <th className="px-2 py-2">Z-Score</th>
+                    <th className="px-2 py-2">Current Gap</th>
+                    <th className="px-2 py-2">Max Drought</th>
+                    <th className="px-2 py-2">Bayesian%</th>
+                    <th className="px-2 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analysis.segments.map((s) => (
+                    <tr key={s.segment} className="border-b border-[#1e2240]/40 hover:bg-white/[0.02]">
+                      <td className="px-2 py-2 text-left">
+                        <div className="flex items-center gap-2">
+                          <img src={GAME_CARD_IMAGES[s.imageKey]} alt={s.displayName} className="h-8 w-8 object-contain" />
+                          <span className="font-bold text-white">{s.displayName}</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 text-white">{s.count}</td>
+                      <td className="px-2 py-2 text-[#448AFF]">{(s.actualFreq * 100).toFixed(1)}%</td>
+                      <td className="px-2 py-2 text-[#5a6a99]">{(s.theoreticalProb * 100).toFixed(1)}%</td>
+                      <td className="px-2 py-2">
+                        <span className={s.zScore > 0 ? "text-[#ff4757]" : "text-[#00d4ff]"}>
+                          {s.zScore > 0 ? "+" : ""}{s.zScore.toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-white">
+                        {s.currentGap}
+                        {s.isOverdue && <span className="ml-1 text-[#ffa502]">⚠️</span>}
+                      </td>
+                      <td className="px-2 py-2 text-[#5a6a99]">{s.maxDrought}</td>
+                      <td className="px-2 py-2 text-[#2ed573]">{(s.bayesianProb * 100).toFixed(1)}%</td>
+                      <td className="px-2 py-2">
+                        {s.isHot && <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]">🔥 Hot</span>}
+                        {s.isCold && <span className="rounded-full bg-[#00d4ff]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#00d4ff]">❄️ Cold</span>}
+                        {s.isOverdue && <span className="rounded-full bg-[#ffa502]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ffa502]">⏰ Overdue</span>}
+                        {!s.isHot && !s.isCold && !s.isOverdue && <span className="text-[#5a6a99]">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 2. AI Prediction (Bayesian + Z-Score based) */}
+        {analysis && (
+          <div className="revo-card mb-4 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#2ed573]/10 to-transparent px-4 py-3">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-bullseye text-[#2ed573]" /> AI Prediction (Bayesian)
+              </span>
+              <span className="rounded-full bg-[#2ed573]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#2ed573]">
+                Confidence: {analysis.predictionConfidence}%
+              </span>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {analysis.prediction.map((seg, i) => {
+                  const stat = analysis.segments.find((s) => s.segment === seg);
+                  if (!stat) return null;
+                  return (
+                    <div
+                      key={seg}
+                      className="rounded-xl border p-3 text-center"
+                      style={{
+                        borderColor: `${stat.confidence >= 70 ? "#2ed573" : stat.confidence >= 45 ? "#448AFF" : "#ffa502"}40`,
+                        background: `${stat.confidence >= 70 ? "#2ed573" : stat.confidence >= 45 ? "#448AFF" : "#ffa502"}0a`,
+                      }}
+                    >
+                      <span className="mb-1 inline-block rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-black">
+                        #{i + 1}
+                      </span>
+                      <img src={GAME_CARD_IMAGES[stat.imageKey]} alt={stat.displayName} className="mx-auto h-12 w-12 object-contain" />
+                      <div className="mt-1 text-sm font-black text-white">{stat.displayName}</div>
+                      <div className="text-[10px] text-[#5a6a99]">
+                        Bayes: {(stat.bayesianProb * 100).toFixed(1)}%
+                      </div>
+                      <div className="text-[10px] font-bold" style={{ color: stat.confidence >= 70 ? "#2ed573" : stat.confidence >= 45 ? "#448AFF" : "#ffa502" }}>
+                        {stat.confidenceLabel}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Top Slot Correlation + Moving Averages */}
+        {analysis && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Top Slot Correlation */}
+            <div className="revo-card p-4">
+              <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-bolt text-[#FFD700]" /> Top Slot Correlation
+              </div>
+              <div className="mb-2 text-2xl font-black text-[#FFD700]">
+                {(analysis.topSlotMatchRate * 100).toFixed(1)}%
+              </div>
+              <div className="text-[10px] text-[#5a6a99]">Match rate (Top Slot → Wheel)</div>
+              <div className="mt-3 space-y-1">
+                {Object.entries(analysis.topSlotSegments)
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 4)
+                  .map(([seg, count]) => (
+                    <div key={seg} className="flex items-center justify-between text-[10px]">
+                      <span className="text-[#bcc6e0]">{DISPLAY_NAMES[seg] ?? seg}</span>
+                      <span className="font-bold text-white">{count} times</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Moving Averages */}
+            <div className="revo-card p-4">
+              <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-wave-square text-[#00d4ff]" /> Moving Averages
+              </div>
+              <div className="space-y-1">
+                {SEGMENT_NAMES.map((seg) => {
+                  const ma20 = analysis.movingAvg20[seg] ?? 0;
+                  const ma50 = analysis.movingAvg50[seg] ?? 0;
+                  const trend = ma20 > ma50 ? "↑" : ma20 < ma50 ? "↓" : "→";
+                  const trendColor = ma20 > ma50 ? "#2ed573" : ma20 < ma50 ? "#ff4757" : "#5a6a99";
+                  return (
+                    <div key={seg} className="flex items-center justify-between text-[10px]">
+                      <span className="text-[#bcc6e0]">{DISPLAY_NAMES[seg]}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-[#5a6a99]">MA20: {(ma20 * 100).toFixed(1)}%</span>
+                        <span className="text-[#5a6a99]">MA50: {(ma50 * 100).toFixed(1)}%</span>
+                        <span style={{ color: trendColor }} className="font-bold">{trend}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Latest Results Feed */}
+        <div className="revo-card mt-4 overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#2ed573]/10 to-transparent px-4 py-3">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-bolt text-[#2ed573]" /> Latest Results
+              <i className="fas fa-history text-[#2ed573]" /> Latest Results
             </span>
             <span className="flex items-center gap-1.5 rounded-full bg-[#ff4757]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ff4757]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff4757]" />
-              AUTO · 15s refresh
+              LIVE · 20s
             </span>
           </div>
 
           {loading ? (
             <div className="space-y-2 p-4">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-14 rounded-xl revo-shimmer" />
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-12 rounded-xl revo-shimmer" />
               ))}
             </div>
           ) : error ? (
-            <div className="p-8 text-center text-sm text-[#ff4757]">{error}</div>
+            <div className="p-6 text-center text-sm text-[#ff4757]">{error}</div>
           ) : results.length === 0 ? (
-            <div className="p-8 text-center text-sm text-[#5a6a99]">
-              No recent results available.
-            </div>
+            <div className="p-6 text-center text-sm text-[#5a6a99]">No results available.</div>
           ) : (
-            <div className="max-h-[24rem] overflow-y-auto revo-scroll">
-              <div className="grid grid-cols-1 gap-1.5 p-3 sm:grid-cols-2">
-                {results.map((r, i) => {
-                  const sector =
-                    r.data?.result?.outcome?.wheelResult?.wheelSector ??
-                    r.data?.result?.outcome?.topSlot?.wheelSector ??
-                    "—";
-                  const disp = sectorToDisplay(sector);
+            <div className="max-h-[20rem] overflow-y-auto revo-scroll p-2">
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {results.slice(0, 20).map((r, i) => {
+                  const sector = r.data?.result?.outcome?.wheelResult?.wheelSector ??
+                    r.data?.result?.outcome?.topSlot?.wheelSector ?? "—";
+                  const dispName = DISPLAY_NAMES[sector] ?? sector;
+                  const imgKey = sector in GAME_CARD_IMAGES ? sector : "1";
+                  const isBonus = ["CoinFlip", "Pachinko", "CashHunt", "CrazyTime", "CrazyBonus"].includes(sector);
                   const multiplier = r.data?.result?.outcome?.maxMultiplier;
-                  const topSlot = r.data?.result?.outcome?.topSlot?.wheelSector;
-                  const topSlotMatched = topSlot && topSlot !== sector;
-
                   return (
                     <div
                       key={i}
-                      className={`flex items-center gap-3 rounded-xl border p-2.5 transition ${
-                        i === 0
-                          ? "border-[#2ed573]/40 bg-[#2ed573]/5"
-                          : "border-[#1e2240] bg-[#0d1020]/60 hover:bg-white/[0.02]"
-                      }`}
+                      className={`flex items-center gap-2 rounded-lg border p-2 ${i === 0 ? "border-[#2ed573]/40 bg-[#2ed573]/5" : "border-[#1e2240] bg-[#0d1020]/60"}`}
                     >
-                      <img
-                        src={GAME_CARD_IMAGES[disp.imgKey]}
-                        alt={disp.name}
-                        className="h-12 w-12 shrink-0 rounded-lg object-contain"
-                      />
+                      <img src={GAME_CARD_IMAGES[imgKey] ?? GAME_CARD_IMAGES["1"]} alt={dispName} className="h-8 w-8 object-contain" />
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-black text-white">
-                            {disp.name}
-                          </span>
-                          {disp.isBonus && (
-                            <span className="rounded-full bg-[#FFD700]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
-                              ★ Bonus
-                            </span>
-                          )}
-                          {topSlotMatched && (
-                            <span className="rounded-full bg-[#448AFF]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#448AFF]">
-                              ⚡ Top Slot
-                            </span>
-                          )}
-                          {i === 0 && (
-                            <span className="rounded-full bg-[#2ed573]/20 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#2ed573]">
-                              NEW
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-[#5a6a99]">
-                          {r.data?.dealer?.name ? `Dealer: ${r.data.dealer.name}` : ""}
-                          {multiplier ? ` · ×${multiplier}` : ""}
-                          {" · "}
+                        <span className="text-xs font-bold text-white">{dispName}</span>
+                        {isBonus && <span className="ml-1 text-[8px] text-[#FFD700]">★</span>}
+                        {i === 0 && <span className="ml-1 rounded bg-[#2ed573]/20 px-1 text-[7px] font-bold uppercase text-[#2ed573]">NEW</span>}
+                        <div className="text-[9px] text-[#5a6a99]">
+                          {multiplier ? `×${multiplier} · ` : ""}
                           {timeAgo(r.data?.settledAt ?? new Date().toISOString())}
                         </div>
                       </div>
@@ -217,71 +321,11 @@ export function RevoLiveResults() {
           )}
         </div>
 
-        {/* Statistics */}
-        {!loading && !error && stats.length > 0 && (
-          <div className="revo-card mt-4 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#448AFF]/10 to-transparent px-4 py-3">
-              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-                <i className="fas fa-chart-column text-[#448AFF]" /> Statistics
-                <span className="text-[10px] font-normal text-[#5a6a99]">
-                  (last 24h · {totalCount.toLocaleString()} spins)
-                </span>
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
-              {stats.map((st) => {
-                const disp = sectorToDisplay(st.wheelResult);
-                const isHot = st.hotFrequencyPercentage > 5;
-                const isCold = st.hotFrequencyPercentage < -5;
-
-                return (
-                  <div
-                    key={st.wheelResult}
-                    className="rounded-xl border border-[#1e2240] bg-[#0d1020]/60 p-3 text-center"
-                  >
-                    <img
-                      src={GAME_CARD_IMAGES[disp.imgKey]}
-                      alt={disp.name}
-                      className="mx-auto h-10 w-10 object-contain"
-                    />
-                    <div className="mt-1 text-sm font-black text-white">
-                      {disp.name}
-                    </div>
-                    <div className="text-lg font-black text-[#448AFF]">
-                      {st.percentage.toFixed(1)}%
-                    </div>
-                    <div className="text-[10px] text-[#5a6a99]">
-                      {st.count} hits
-                    </div>
-                    <div className="mt-1 flex items-center justify-center gap-1">
-                      {isHot && (
-                        <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]">
-                          🔥 Hot
-                        </span>
-                      )}
-                      {isCold && (
-                        <span className="rounded-full bg-[#00d4ff]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#00d4ff]">
-                          ❄️ Cold
-                        </span>
-                      )}
-                      <span className="text-[9px] text-[#5a6a99]">
-                        {st.lastSeenBefore === 0 ? "just now" : `${st.lastSeenBefore} ago`}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         <p className="mt-4 text-center text-[11px] text-[#5a6a99]">
           <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
-          Real-time data from CasinoScores. When a new result arrives, the
-          prediction system auto-selects it, compares vs the previous
-          prediction (HIT/MISS), and recalibrates using AI pattern analysis.
-          For entertainment only — play responsibly.
+          AI analysis uses Z-Score, Bayesian updating, drought analysis &amp; moving
+          averages on real CasinoScores data. {analysis ? `${analysis.totalSpins} spins analyzed.` : ""}
+          Each spin is independent RNG — no prediction is guaranteed. For entertainment only.
         </p>
       </div>
     </section>
