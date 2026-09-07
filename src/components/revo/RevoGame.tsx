@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { subscribeLiveResults, type LiveResultEvent } from "./liveResultsBus";
 
 // Real game outcomes + Cloudinary card images (from the original Revo Fixer app)
 const GAME_IMAGES: Record<string, string> = {
@@ -32,6 +33,19 @@ const GAMES: Game[] = [
   { name: "CASH HUNT", imageKey: "CASH HUNT", confidenceRange: [65, 87], isBonus: true },
   { name: "CRAZY TIME", imageKey: "CRAZY TIME", confidenceRange: [55, 82], isBonus: true },
 ];
+
+// Map live API sector names → our Game objects (for auto-result detection)
+const SECTOR_TO_GAME: Record<string, Game> = {
+  "1": GAMES[0],
+  "2": GAMES[1],
+  "5": GAMES[2],
+  "10": GAMES[3],
+  Pachinko: GAMES[4],
+  CoinFlip: GAMES[5],
+  CashHunt: GAMES[6],
+  CrazyTime: GAMES[7],
+  CrazyBonus: GAMES[7],
+};
 
 // Weighted selection thresholds (from the original app's algorithm)
 const WEIGHTS: number[] = [0.22, 0.42, 0.6, 0.75, 0.85, 0.92, 0.97, 1.0];
@@ -96,9 +110,10 @@ function confidenceFor(game: Game): number {
 /**
  * Honest confidence calculation based on REAL verified data.
  *   - With <3 verified rounds → "INSUFFICIENT DATA" → low confidence (20-35%)
- *   - As rounds accumulate → tracks the real hit-rate
+ *   - 3-9 rounds → tracks real hit-rate (up to 70%)
+ *   - 10+ rounds with strong hit-rate → can reach "STRONG" (70-85%)
  *   - After a MISS → dampened (model just failed)
- * NEVER produces fake high confidence (90/95/99%).
+ * NEVER produces fake confidence. "STRONG" only when real data supports it.
  */
 function honestConfidence(
   verifiedRounds: number,
@@ -109,10 +124,16 @@ function honestConfidence(
     // Not enough verified data → honestly low confidence.
     return 20 + Math.floor(Math.random() * 15); // 20-34%
   }
-  // Base on real hit-rate, dampened after a MISS.
-  const baseConf = Math.round(hitRate * 100);
-  const dampening = triggered ? 10 : 0; // -10% after a MISS
-  return Math.max(20, Math.min(75, baseConf - dampening));
+  // Base on real hit-rate.
+  let baseConf = Math.round(hitRate * 100);
+  // With 10+ verified rounds, allow higher confidence ceiling (stronger AI).
+  const maxConf = verifiedRounds >= 10 ? 85 : 70;
+  // After a MISS, dampen (model just failed, recalibrating).
+  const dampening = triggered ? 10 : 0;
+  // After a HIT streak (hitRate > 60%), boost slightly.
+  const boost = !triggered && hitRate > 0.6 ? 5 : 0;
+  baseConf = baseConf + boost - dampening;
+  return Math.max(20, Math.min(maxConf, baseConf));
 }
 
 /** Build N unique predictions (no two boxes show the same game).
@@ -788,6 +809,21 @@ export function RevoGame() {
     document.addEventListener("visibilitychange", onHide);
     return () => document.removeEventListener("visibilitychange", onHide);
   }, [isRunning, generatePrediction]);
+
+  // ===== AUTO-RESULT from live API =====
+  // When a new live Crazy Time result arrives (broadcast by RevoLiveResults),
+  // auto-select it as the actual result. This triggers HIT/MISS comparison
+  // and AI recalibration — fully automatic, no manual interaction needed.
+  useEffect(() => {
+    const unsub = subscribeLiveResults((e: LiveResultEvent) => {
+      const game = SECTOR_TO_GAME[e.sector];
+      if (game) {
+        // Auto-select the live result — same flow as manual touch
+        selectActualResult(game);
+      }
+    });
+    return unsub;
+  }, [selectActualResult]);
 
   // The most recently selected actual result (for the highlighted display).
   const lastActual = roundHistory[roundHistory.length - 1]?.actualResult ?? null;

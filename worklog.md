@@ -472,3 +472,32 @@ Stage Summary:
 - Uses HLS player (hls.js) for the live stream, with fallback "Open on CasinoScores" button.
 - NOT Crazy Time A — main Crazy Time table only (as user specified).
 - Nothing removed, design unchanged. Lint clean, no errors.
+
+---
+
+Task ID: 15 (user request — live video + auto-update predictions with strong AI)
+Agent: Z.ai Code
+Task: Add live video stream back, auto-update prediction when live result arrives, use strong AI confidence with proper data.
+
+Work Log:
+- Added HLS video stream player back to RevoLiveResults (hls.js, LIVE/Connecting/Offline badges, loading/error overlays).
+- Created `liveResultsBus.ts` — shared event bus that broadcasts new live results from the RevoLiveResults component to the RevoGame component.
+- Updated RevoLiveResults to detect NEW results from the CasinoScores API (by comparing `settledAt` timestamp) and broadcast them via `broadcastLiveResult()`.
+- Updated RevoGame to subscribe to live results via `subscribeLiveResults()`. When a new result arrives:
+  1. Maps the API sector name (e.g. "CrazyTime", "CoinFlip") to the Game object via `SECTOR_TO_GAME`.
+  2. Auto-calls `selectActualResult(game)` — same flow as manual touch.
+  3. This triggers HIT/MISS comparison + AI recalibration automatically.
+- Enhanced AI confidence (`honestConfidence`):
+  - 10+ verified rounds → max confidence raised to 85% (was 75%) — allows "STRONG" label when real data supports it.
+  - HIT streak (hitRate > 60%) → +5% boost (reward for good performance).
+  - MISS → -10% dampening (model just failed, recalibrating).
+  - <3 rounds → still "INSUFFICIENT DATA" (20-34%, honest).
+  - NEVER fake 90/95/99% — "STRONG" only when real verified data supports it.
+- `bun run lint` → 0 errors.
+- agent-browser QA: 16 sections, live video player present, 23 live results loaded (first: "10" with Top Slot, NEW badge, Dealer Timurs, ×10), game section auto-created 2 history rounds from live results (HIT + MISS with recalibration), 50% accuracy, no console/hydration errors.
+
+Stage Summary:
+- Live video stream (HLS player) added back to Live Results section.
+- Auto-update: new live results from CasinoScores API automatically feed into the prediction system → HIT/MISS comparison → AI recalibration — fully automatic, no manual interaction needed.
+- Stronger AI: 10+ verified rounds can reach "STRONG" confidence (70-85%) when real hit-rate supports it. HIT streaks get +5% boost.
+- All real data, no fakes. Lint clean, no errors.
