@@ -688,3 +688,58 @@ Stage Summary:
 - Real casino prior (observed frequency) drives the long-term prior, blended with user-verified history + recent live spins.
 - All existing UI/design unchanged. Lint clean, no errors, agent-browser QA green across full GET-SIGNAL → live-result → HIT/MISS → recalibration → next-prediction flow.
 
+
+---
+
+Task ID: 20 (user request — powerful AI analysis + no fixed signals)
+Agent: Z.ai Code (webDevReview round)
+Task: User requested "Variance & Z-Score Analysis and live result powerful AI add and proper analysis and predict ai never fix any bonus and number signal only analysis after predict". Built a powerful 10-method statistical analysis engine. The AI NEVER predetermines any bonus round or number as a signal — every prediction emerges PURELY from statistical evidence via weighted probabilistic sampling.
+
+Work Log:
+- Reviewed existing `aiStats.ts` — had 5 analysis methods (Z-Score, Drought, Top Slot, Moving Avg, Bayesian) and deterministic `ranked.slice(0, 4)` prediction (always top-4 by bayesianProb → effectively "fixed" signals).
+- Rewrote `aiStats.ts` with **10 powerful statistical methods**:
+  1. **Variance & Z-Score** — actual vs theoretical frequency (existing, kept)
+  2. **Maximum Drought & Gap** — overdue detection (existing, kept)
+  3. **Top Slot Correlation** — multiplier matching (existing, kept)
+  4. **Moving Averages** — MA20 vs MA50 trend (existing, kept)
+  5. **Bayesian Forecasting** — Laplace-smoothed posterior (existing, kept)
+  6. **Shannon Entropy** — randomness/predictability measure (0..3 bits, ratio 0..1). Higher = more random wheel.
+  7. **Markov Chain** — order-1 transition matrix P(next|current). Shows what tends to follow what.
+  8. **Volatility Index** — 0..100, normalized average coefficient of variation of all segment gap histories.
+  9. **Chi-Square Goodness of Fit** — distribution fit vs theoretical (7 dof, Wilson-Hilferty p-value approximation). p>0.05 = normal.
+  10. **Streak Analysis** — longest consecutive-repeat streak.
+- Added `scoreEvidence()` — combines all 10 signals into a per-segment evidence score. NO fixed/preset signals — every segment scored purely by statistical evidence (frequency alignment, overdue, hot, cold, Markov transition, volatility penalty, streak potential).
+- Added `sampleWeighted()` — weighted probabilistic sampling without replacement. Weight = evidenceScore. High-evidence segments picked MORE often; rare segments (CRAZY TIME, PACHINKO) DO get picked based on probability. **No fixed signals.**
+- Added `wilsonLowerBound()` — sample-size-aware confidence (2/2 ≠ 100%).
+- Added `analysisPipeline` audit trail — 12-step pipeline shown in UI.
+- Prediction now uses `sampleWeighted(segments, 4)` instead of deterministic `slice(0, 4)`. Returns `[]` when <10 spins (INSUFFICIENT DATA — AI waits for real data, never guesses).
+- Added new fields to `AnalysisResult`: entropy, entropyRatio, chiSquare, chiSquarePValue, isDistributionNormal, volatilityIndex, markovMatrix, hottestSegment, coldestSegment, overdueSegment, longestStreak, analysisPipeline, predictionMethod, predictionSample.
+- Updated `RevoLiveResults.tsx` UI with new panels:
+  - **AI Prediction (Evidence-Weighted)** — shows "NO FIXED SIGNALS" badge, evidence score per card, method explanation. Shows INSUFFICIENT DATA when <10 spins.
+  - **Shannon Entropy** card — value/3.000 bits, ratio bar, interpretation.
+  - **Chi-Square Fit** card — statistic, p-value, Normal/Abnormal badge.
+  - **Volatility Index** card — 0/100, bar, interpretation.
+  - **Markov Transition Matrix** — 8×8 table, green/red color-coded (follows more/less than theoretical).
+  - **Analysis-First Pipeline** — 12-step audit trail (Raw Data → Z-Score → Drought → Moving Avg → Bayesian → Entropy → Markov → Volatility → Chi-Square → Streak → Evidence Score → Prediction) with "No-Fix Guarantee" banner.
+  - **Evidence Ranking** — 8 segments ranked by combined evidence score, with bar chart + z-score + gap.
+  - Updated footer: "Powerful AI: Z-Score, Bayesian, Drought, Moving Avg, Entropy, Markov, Volatility, Chi-Square & Streak analysis... AI never fixes any signal — prediction emerges purely from statistical evidence via weighted sampling."
+- Fixed `THEORETICAL_PROB` import in RevoLiveResults (was used in Markov table but not imported).
+- Fixed SSR hydration mismatch in RevoGame: added `mounted` guard via `useSyncExternalStore` (server snapshot = false, client = true) to gate prediction-derived UI rendering. `displayPredictions` is null until mount → stable server/client render.
+- Fixed `decisionEngine.ts` SSR safety: `runEngine` skips `sampleWeighted` (Math.random) when no data (rounds=0 AND liveSpins=0) → returns empty predictions → no hydration mismatch.
+- `bun run lint` → 0 errors.
+- agent-browser QA:
+  - All 12 panels render: AI Analysis Summary, Variance & Z-Score, AI Prediction, Top Slot, Moving Averages, Shannon Entropy, Chi-Square Fit, Volatility Index, Markov Matrix, Analysis-First Pipeline, Evidence Ranking, Latest Results.
+  - Summary: "30 spins analyzed • Entropy 84% • Overdue: 10 • Volatility 26/100 • Longest streak: 1 ×3".
+  - AI Prediction shows evidence scores (9.84, 25.72, 42.74, 16.00) + "NO FIXED SIGNALS" badge + method explanation.
+  - Prediction variety verified (3 runs): [1,2,10,COIN FLIP], [1,2,10,PACHINKO], [1,10,COIN FLIP,5] — different bonus rounds sampled each time.
+  - No console/runtime errors, no hydration mismatch.
+
+Stage Summary:
+- Powerful 10-method AI statistical analysis engine built in `aiStats.ts`.
+- AI NEVER fixes any bonus round or number as a signal — every prediction emerges PURELY from statistical evidence via weighted probabilistic sampling.
+- New panels: Shannon Entropy, Chi-Square Fit, Volatility Index, Markov Transition Matrix, Analysis-First Pipeline (with No-Fix Guarantee), Evidence Ranking.
+- Prediction is evidence-weighted probabilistic (not deterministic top-4) → varied each generation.
+- Sample-size-aware confidence (Wilson lower bound). INSUFFICIENT DATA shown when <10 spins.
+- SSR hydration fixed via mount guard + skip-sampling-when-no-data.
+- Lint clean, no errors, agent-browser QA green.
+

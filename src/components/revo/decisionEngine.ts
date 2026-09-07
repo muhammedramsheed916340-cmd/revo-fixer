@@ -889,7 +889,13 @@ export function runEngine(
   // predictions each generation — high-score games are picked MORE often, but
   // low-score games (CRAZY TIME, PACHINKO) DO get picked based on probability.
   // No more "always 1,2,5,10". Weighted by REAL casino data when available.
-  const sampled = sampleWeighted(candidates, SIGNAL_COUNT);
+  //
+  // SSR SAFETY: When there is NO real data (no rounds AND no liveSpins), skip
+  // sampling entirely (Math.random would cause hydration mismatch). Return
+  // empty predictions — the client-side generatePrediction effect populates
+  // them after mount.
+  const hasData = rounds.length > 0 || liveSpins.length > 0;
+  const sampled = hasData ? sampleWeighted(candidates, SIGNAL_COUNT) : [];
   const sampledSet = new Set(sampled.map((c) => c.game.name));
   const excluded = candidates.filter((c) => !sampledSet.has(c.game.name));
   // Sort the sampled 4 by their EVIDENCE rank (so strongest-evidence sampled

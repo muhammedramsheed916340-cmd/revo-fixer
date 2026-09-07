@@ -271,6 +271,16 @@ export function RevoGame() {
   const [countdown, setCountdown] = useState(60);
   const [running, setRunning] = useState(false);
   const [lastRecalibration, setLastRecalibration] = useState<{ triggered: boolean; reason: string } | null>(null);
+  // Hydration guard — `savedSignals`/`roundHistory` come from localStorage which
+  // is null on the server but non-null on the client after mount. Rendering
+  // prediction-derived UI before mount causes hydration mismatches.
+  // Uses useSyncExternalStore (server snapshot = false, client = true after subscribe)
+  // which is the lint-safe pattern for mount detection.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [stats, setStats] = useState({
     total: 1249,
     accuracy: 94,
@@ -284,7 +294,9 @@ export function RevoGame() {
   // setState-during-render when the interval triggers generatePrediction).
   const countdownRef = useRef(60);
 
-  const displayPredictions = predictions ?? savedSignals;
+  // Gate prediction-derived UI by `mounted` to avoid SSR hydration mismatch
+  // (localStorage is null on server but non-null on client after mount).
+  const displayPredictions = mounted ? (predictions ?? savedSignals) : null;
   const isRunning = running || (predictions === null && savedSignals !== null && !loading);
 
   // ===== REAL CASINO SPINS (from CasinoScores API, shared via liveSpinStore) =====
