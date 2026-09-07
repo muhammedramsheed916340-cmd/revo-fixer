@@ -143,6 +143,20 @@ export interface PerformanceDashboard {
   anomalyDetected: boolean;
   patternShiftNote: string;
   anomalyNote: string;
+  // ===== NEW: separate performance windows (5/10/20/50/100+) =====
+  recent5HitRate: number;             // last 5 rounds hit-rate
+  recent10HitRate: number;            // last 10 rounds hit-rate
+  recent20HitRate: number;            // last 20 rounds hit-rate
+  recent50HitRate: number;            // last 50 rounds hit-rate
+  recent100HitRate: number;           // last 100 rounds hit-rate
+  recent5Count: number;               // how many rounds in the 5-window
+  recent10Count: number;
+  recent20Count: number;
+  recent50Count: number;
+  recent100Count: number;
+  hitStreak: number;                   // current consecutive HITs
+  missStreak: number;                  // current consecutive MISSes
+  predictionCoverage: number;         // theoretical coverage of active prediction (0..1)
 }
 
 // ============================================================
@@ -424,6 +438,8 @@ function buildDashboard(rounds: RoundResult[]): PerformanceDashboard {
   // Current streak
   let streakType: "HIT" | "MISS" = "HIT";
   let streakLen = 0;
+  let hitStreak = 0;
+  let missStreak = 0;
   if (totalRounds > 0) {
     const last = rounds[totalRounds - 1];
     streakType = last.hit ? "HIT" : "MISS";
@@ -431,6 +447,42 @@ function buildDashboard(rounds: RoundResult[]): PerformanceDashboard {
       if ((rounds[i].hit ? "HIT" : "MISS") === streakType) streakLen++;
       else break;
     }
+    // Separate HIT streak and MISS streak
+    if (last.hit) {
+      for (let i = totalRounds - 1; i >= 0; i--) {
+        if (rounds[i].hit) hitStreak++;
+        else break;
+      }
+    } else {
+      for (let i = totalRounds - 1; i >= 0; i--) {
+        if (!rounds[i].hit) missStreak++;
+        else break;
+      }
+    }
+  }
+
+  // ===== NEW: separate performance windows (5/10/20/50/100+) =====
+  const calcWindowRate = (windowSize: number): { rate: number; count: number } => {
+    const slice = rounds.slice(-windowSize);
+    if (slice.length === 0) return { rate: 0, count: 0 };
+    const h = slice.filter((r) => r.hit).length;
+    return { rate: h / slice.length, count: slice.length };
+  };
+  const w5 = calcWindowRate(5);
+  const w10 = calcWindowRate(10);
+  const w20 = calcWindowRate(20);
+  const w50 = calcWindowRate(50);
+  const w100 = calcWindowRate(100);
+
+  // ===== NEW: prediction coverage (theoretical % of wheel covered by active pred) =====
+  // Computed from the last round's prediction (if any).
+  let predictionCoverage = 0;
+  const lastRoundForCov = rounds[totalRounds - 1];
+  if (lastRoundForCov && lastRoundForCov.prediction.length > 0) {
+    predictionCoverage = lastRoundForCov.prediction.reduce(
+      (s, p) => s + (THEORETICAL[p.game.name] ?? 0),
+      0,
+    );
   }
 
   // Signal-wise hit rate: for each game, when it was in the prediction set,
@@ -476,6 +528,20 @@ function buildDashboard(rounds: RoundResult[]): PerformanceDashboard {
     anomalyDetected: anomaly.isAnomaly,
     patternShiftNote: patternShift.note,
     anomalyNote: anomaly.note,
+    // NEW performance windows:
+    recent5HitRate: w5.rate,
+    recent10HitRate: w10.rate,
+    recent20HitRate: w20.rate,
+    recent50HitRate: w50.rate,
+    recent100HitRate: w100.rate,
+    recent5Count: w5.count,
+    recent10Count: w10.count,
+    recent20Count: w20.count,
+    recent50Count: w50.count,
+    recent100Count: w100.count,
+    hitStreak,
+    missStreak,
+    predictionCoverage,
   };
 }
 

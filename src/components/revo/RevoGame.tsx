@@ -268,9 +268,10 @@ export function RevoGame() {
   const roundHistory = useRoundHistory();
   const [predictions, setPredictions] = useState<Prediction[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [countdown, setCountdown] = useState(60);
   const [running, setRunning] = useState(false);
   const [lastRecalibration, setLastRecalibration] = useState<{ triggered: boolean; reason: string } | null>(null);
+  // NOTE: NO countdown, NO auto-refresh. Prediction is LOCKED until the next
+  // live result arrives (per user spec — LIVE AUTO mode, no manual intervention).
   // Hydration guard — `savedSignals`/`roundHistory` come from localStorage which
   // is null on the server but non-null on the client after mount. Rendering
   // prediction-derived UI before mount causes hydration mismatches.
@@ -288,11 +289,7 @@ export function RevoGame() {
     liveUsers: 1247,
   });
   const [clock, setClock] = useState("");
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const liveRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Mirror of countdown state for use inside interval callbacks (avoids
-  // setState-during-render when the interval triggers generatePrediction).
-  const countdownRef = useRef(60);
 
   // Gate prediction-derived UI by `mounted` to avoid SSR hydration mismatch
   // (localStorage is null on server but non-null on client after mount).
@@ -361,9 +358,10 @@ export function RevoGame() {
     return () => clearInterval(t);
   }, []);
 
-  // ===== GENERATE PREDICTION (GET SIGNAL) =====
-  // Uses the unified engine. The engine re-derives everything from history +
-  // REAL casino spins (weighted probabilistic sampling → varied predictions).
+  // ===== GENERATE PREDICTION (initial only — NO auto-refresh) =====
+  // Prediction is LOCKED once generated. It only changes when a new LIVE
+  // result arrives (via selectActualResult). No countdown, no refresh,
+  // no manual intervention — pure LIVE AUTO mode.
   const generatePrediction = useCallback(() => {
     setLoading(true);
     setPredictions(null);
@@ -384,15 +382,7 @@ export function RevoGame() {
     });
   }, []);
 
-  const refreshPrediction = useCallback(() => {
-    setPredictions(null);
-    setRunning(false);
-    if (timerRef.current) clearInterval(timerRef.current);
-    clearSignals();
-    setTimeout(() => generatePrediction(), 50);
-  }, [generatePrediction]);
-
-  // AUTO-GENERATE on mount
+  // AUTO-GENERATE on mount ONLY (no countdown refresh)
   const autoStarted = useRef(false);
   useEffect(() => {
     if (autoStarted.current) return;
@@ -477,8 +467,7 @@ export function RevoGame() {
       setPredictions(nextPreds);
       setLastRecalibration(nextRecal);
       setRunning(true);
-      setCountdown(60);
-      countdownRef.current = 60;
+      // NO countdown reset — prediction is LOCKED until next live result.
       saveSignals(nextPreds);
     },
     [predictions, savedSignals, lastRecalibration],
@@ -489,23 +478,9 @@ export function RevoGame() {
     setLastRecalibration(null);
   }, []);
 
-  // Auto-refresh countdown (60s → regenerate)
-  useEffect(() => {
-    if (!isRunning) return;
-    timerRef.current = setInterval(() => {
-      const next = countdownRef.current - 1;
-      if (next <= 0) {
-        generatePrediction();
-        countdownRef.current = 60;
-      } else {
-        countdownRef.current = next;
-      }
-      setCountdown(countdownRef.current);
-    }, 1000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isRunning, generatePrediction]);
+  // NOTE: NO auto-refresh countdown. Prediction is LOCKED until next live result.
+  // The only thing that regenerates the prediction is selectActualResult()
+  // (called automatically when a new live result arrives via liveResultsBus).
 
   // Live users fluctuation (every 8s)
   useEffect(() => {
@@ -520,26 +495,8 @@ export function RevoGame() {
     };
   }, []);
 
-  // Pause auto-refresh when tab hidden
-  useEffect(() => {
-    const onHide = () => {
-      if (document.hidden && timerRef.current) clearInterval(timerRef.current);
-      else if (!document.hidden && isRunning && !timerRef.current) {
-        timerRef.current = setInterval(() => {
-          const next = countdownRef.current - 1;
-          if (next <= 0) {
-            generatePrediction();
-            countdownRef.current = 60;
-          } else {
-            countdownRef.current = next;
-          }
-          setCountdown(countdownRef.current);
-        }, 1000);
-      }
-    };
-    document.addEventListener("visibilitychange", onHide);
-    return () => document.removeEventListener("visibilitychange", onHide);
-  }, [isRunning, generatePrediction]);
+  // NOTE: NO visibility-change auto-refresh. Prediction is LOCKED regardless
+  // of tab visibility — it only changes on new live result.
 
   // AUTO-RESULT from live API
   const [popupResult, setPopupResult] = useState<Game | null>(null);
@@ -577,13 +534,22 @@ export function RevoGame() {
           </p>
         </div>
 
-        {/* ===== NEXT PREDICTION (4 boxes) — single source of truth ===== */}
+        {/* ===== NEXT PREDICTION (4 boxes) — LOCKED until next live result ===== */}
         <div className="revo-card revo-card-glow overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#448AFF]/10 to-transparent px-4 py-3">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
               <i className="fas fa-bolt text-[#FFD700]" /> Next Prediction
             </span>
             <div className="flex items-center gap-2">
+              {/* LIVE AUTO badge — prediction auto-settles on new live result */}
+              <span className="flex items-center gap-1.5 rounded-full bg-[#2ed573]/15 px-2 py-0.5 text-[9px] font-bold uppercase text-[#2ed573]" title="LIVE AUTO mode — prediction auto-settles when a new live result arrives. No manual refresh.">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#2ed573]" />
+                <i className="fas fa-bolt" /> LIVE AUTO
+              </span>
+              {/* LOCK indicator — prediction immutable until next result */}
+              <span className="flex items-center gap-1 rounded-full bg-[#448AFF]/15 px-2 py-0.5 text-[9px] font-bold uppercase text-[#448AFF]" title="Prediction is LOCKED. Will not change until the next live result arrives.">
+                <i className="fas fa-lock" /> LOCKED
+              </span>
               {lastRecalibration?.triggered && (
                 <span className="rounded-full bg-[#ffa502]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ffa502]">
                   <i className="fas fa-wrench mr-1" /> Recalibrated
@@ -926,6 +892,20 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
     patternShiftNote,
     anomalyNote,
     signalWiseHitRate,
+    // NEW performance windows:
+    recent5HitRate,
+    recent10HitRate,
+    recent20HitRate,
+    recent50HitRate,
+    recent100HitRate,
+    recent5Count,
+    recent10Count,
+    recent20Count,
+    recent50Count,
+    recent100Count,
+    hitStreak,
+    missStreak,
+    predictionCoverage,
   } = dashboard;
 
   return (
@@ -935,15 +915,14 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
           <i className="fas fa-gauge-high text-[#00d4ff]" /> Performance Dashboard
         </span>
         <div className="flex items-center gap-1.5">
-          {currentStreak.length > 0 && (
-            <span
-              className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${
-                currentStreak.type === "HIT"
-                  ? "bg-[#2ed573]/15 text-[#2ed573]"
-                  : "bg-[#ff4757]/15 text-[#ff4757]"
-              }`}
-            >
-              {currentStreak.length}× {currentStreak.type}
+          {hitStreak > 0 && (
+            <span className="rounded-full bg-[#2ed573]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#2ed573]">
+              {hitStreak}× HIT streak
+            </span>
+          )}
+          {missStreak > 0 && (
+            <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#ff4757]">
+              {missStreak}× MISS streak
             </span>
           )}
           <span className="rounded-full bg-[#1e2240] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#5a6a99]">
@@ -957,15 +936,46 @@ function PerformanceDashboardPanel({ dashboard }: { dashboard: PerformanceDashbo
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Kpi label="Hit Rate" value={`${Math.round(predictionHitRate * 100)}%`} color="#2ed573" />
           <Kpi label="Miss Rate" value={`${Math.round(predictionMissRate * 100)}%`} color="#ff4757" />
-          <Kpi label="Recent (5)" value={`${Math.round(recentHitRate * 100)}%`} color="#448AFF" />
-          <Kpi label="Recent (10)" value={`${Math.round(recentHitRateLong * 100)}%`} color="#00d4ff" />
+          <Kpi label="Coverage" value={`${Math.round(predictionCoverage * 100)}%`} color="#FFD700" />
+          <Kpi label="Stability" value={`${modelStability}%`} color={modelStability >= 50 ? "#2ed573" : "#ffa502"} />
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Kpi label="Long-Term" value={`${Math.round(longTermHitRate * 100)}%`} color="#a78bfa" />
           <Kpi label="Excluded Rate" value={`${Math.round(excludedResultRate * 100)}%`} color="#ff4757" />
-          <Kpi label="Stability" value={`${modelStability}%`} color={modelStability >= 50 ? "#2ed573" : "#ffa502"} />
           <Kpi label="Adaptive Wt" value={`${Math.round(adaptiveWeight * 100)}%`} color="#FFD700" />
+          <Kpi label="Recent (5)" value={`${Math.round(recentHitRate * 100)}%`} color="#448AFF" />
+        </div>
+
+        {/* ===== NEW: Performance Windows (5/10/20/50/100+) ===== */}
+        <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+            Performance Windows (separate hit-rates)
+          </div>
+          <div className="grid grid-cols-5 gap-1.5">
+            {[
+              { label: "5", rate: recent5HitRate, count: recent5Count },
+              { label: "10", rate: recent10HitRate, count: recent10Count },
+              { label: "20", rate: recent20HitRate, count: recent20Count },
+              { label: "50", rate: recent50HitRate, count: recent50Count },
+              { label: "100+", rate: recent100HitRate, count: recent100Count },
+            ].map((w) => {
+              const pct = Math.round(w.rate * 100);
+              const color = w.count === 0 ? "#5a6a99" : w.rate >= 0.7 ? "#2ed573" : w.rate >= 0.5 ? "#448AFF" : w.rate >= 0.3 ? "#ffa502" : "#ff4757";
+              return (
+                <div key={w.label} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Last {w.label}</div>
+                  <div className="text-sm font-black" style={{ color }}>{w.count > 0 ? `${pct}%` : "—"}</div>
+                  <div className="text-[7px] text-[#5a6a99]">{w.count} rounds</div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-1.5 text-[9px] text-[#5a6a99]">
+            <i className="fas fa-circle-info mr-1" />
+            Separate windows prevent small streaks from inflating perceived accuracy.
+            A few HITs do NOT prove predictive performance.
+          </div>
         </div>
 
         {/* Hits / Misses / Sample size */}

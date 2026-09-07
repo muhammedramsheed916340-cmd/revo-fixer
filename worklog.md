@@ -975,3 +975,61 @@ Stage Summary:
 - Sample-size validation tiers + honest disclaimers in UI.
 - Lint clean, no errors, agent-browser QA green.
 
+
+---
+
+Task ID: 25 (user request — FINAL PREDICTION ENGINE FIX)
+Agent: Z.ai Code
+Task: User requested LOCK-based prediction engine. Prediction LOCKED until next live result. No countdown, no auto-refresh, no manual intervention. LIVE AUTO mode only. Plus separate performance tracking (5/10/20/50/100+ rounds).
+
+Fixes Applied:
+
+1. **Removed countdown + auto-refresh** (`RevoGame.tsx`):
+   - Removed `countdown` state, `countdownRef`, `timerRef`.
+   - Removed auto-refresh countdown effect (60s → regenerate).
+   - Removed visibility-change auto-refresh effect.
+   - Removed `refreshPrediction` callback.
+   - Prediction is now LOCKED once generated. Only changes when a new LIVE result arrives via `selectActualResult()` (called automatically by `liveResultsBus`).
+
+2. **Added LIVE AUTO + LOCKED badges** in the Next Prediction header:
+   - "LIVE AUTO" badge (green, with pulse animation) — indicates auto-settle mode.
+   - "LOCKED" badge (blue, with lock icon) — indicates prediction immutability.
+   - Tooltip: "Prediction is LOCKED. Will not change until the next live result arrives."
+
+3. **Added separate performance windows** (`PerformanceDashboard` interface + `buildDashboard`):
+   - `recent5HitRate` / `recent5Count` — last 5 rounds hit-rate + count
+   - `recent10HitRate` / `recent10Count` — last 10 rounds
+   - `recent20HitRate` / `recent20Count` — last 20 rounds
+   - `recent50HitRate` / `recent50Count` — last 50 rounds
+   - `recent100HitRate` / `recent100Count` — last 100+ rounds
+   - `hitStreak` — current consecutive HITs
+   - `missStreak` — current consecutive MISSes
+   - `predictionCoverage` — theoretical coverage of active prediction (sum of theoretical probs)
+
+4. **Added Performance Windows UI panel** (in PerformanceDashboardPanel):
+   - 5-column grid: Last 5 / 10 / 20 / 50 / 100+ with hit-rate % + round count.
+   - Color-coded: green >= 70%, blue >= 50%, orange >= 30%, red < 30%.
+   - Disclaimer: "Separate windows prevent small streaks from inflating perceived accuracy. A few HITs do NOT prove predictive performance."
+
+5. **Updated KPI grid**: replaced "Recent (5)" / "Recent (10)" with "Coverage" + "Stability" + "Long-Term" + "Adaptive Wt" + "Recent (5)".
+
+6. **Updated streak badges**: separate "HIT streak" and "MISS streak" badges (was combined "N× HIT/MISS").
+
+Verification (agent-browser QA):
+- `bun run lint` → 0 errors.
+- No console/runtime errors.
+- LIVE AUTO + LOCKED badges render in Next Prediction header.
+- Performance Dashboard renders with Performance Windows (Last 5/10/20/50/100+ columns).
+- Verified Accuracy panel (separate) with 5/10/20/50/100+ tier progress bars.
+- Prediction LOCK test: initial prediction [1,5,2,10] stayed LOCKED for 60s, then updated to [2,1,5,10] only when live results arrived (2 rounds, 2 HITs).
+- No countdown timer in UI (confirmed via snapshot — no countdown text).
+- VLM confirmed: LIVE AUTO + LOCKED badges visible, 4 prediction cards visible.
+
+Stage Summary:
+- Prediction engine is now LOCK-based: prediction is immutable between live results.
+- No countdown, no auto-refresh, no GET SIGNAL, no REFRESH — pure LIVE AUTO mode.
+- New live result → auto-settle previous prediction → HIT/MISS → RCA → fresh recalculation → new Top-4.
+- Separate performance windows (5/10/20/50/100+) prevent small streaks from inflating perceived accuracy.
+- LIVE AUTO + LOCKED badges in UI clearly communicate the mode.
+- Lint clean, no errors, agent-browser QA green.
+
