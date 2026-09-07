@@ -38,6 +38,22 @@
 // ============================================================
 // GAME MODEL (shared with RevoGame.tsx)
 // ============================================================
+
+import type { SpinData } from "./aiStats";
+
+/** Map a CasinoScores spin sector name (from aiStats) to our engine Game name.
+ *  aiStats uses "CoinFlip", "Pachinko", etc. The engine uses "COIN FLIP", "PACHINKO". */
+const SPIN_TO_GAME_NAME: Record<string, string> = {
+  "1": "1",
+  "2": "2",
+  "5": "5",
+  "10": "10",
+  CoinFlip: "COIN FLIP",
+  Pachinko: "PACHINKO",
+  CashHunt: "CASH HUNT",
+  CrazyTime: "CRAZY TIME",
+  CrazyBonus: "CRAZY TIME",
+};
 export interface GameModel {
   name: string;
   imageKey: string;
@@ -466,21 +482,61 @@ function buildDashboard(rounds: RoundResult[]): PerformanceDashboard {
 // ============================================================
 // CANDIDATE SCORING — STRONGEST EVIDENCE-BASED SIGNAL
 // ============================================================
+/**
+ * Score all 8 game candidates using a multi-signal evidence engine.
+ *
+ * NEW: When `liveSpins` (REAL casino spins from CasinoScores API) is available
+ * with 20+ spins, the long-term frequency is computed from REAL casino data —
+ * NOT just the tiny user-verified round history. This produces data-driven,
+ * VARIED predictions instead of always picking the theoretical top-4 [1,2,5,10].
+ */
 function scoreCandidates(
   rounds: RoundResult[],
   dashboard: PerformanceDashboard,
   prevPredNames: string[],
   lastHit: boolean | null,
+  liveSpins: SpinData[] = [],
 ): CandidateScore[] {
   const n = rounds.length;
   const hist = rounds.map((r) => r.actualResult);
 
-  // Per-game frequency across ALL verified rounds (long-term)
+  // Per-game frequency across ALL verified rounds (user history)
   const freqAll = new Map<string, number>();
   for (const g of GAMES) freqAll.set(g.name, 0);
   for (const h of hist) freqAll.set(h.name, (freqAll.get(h.name) ?? 0) + 1);
 
-  // Per-game frequency in recent 10 (short-term)
+  // ===== REAL CASINO SPIN FREQUENCY (long-term prior from live data) =====
+  // Map live spins (aiStats sector names) to engine game names + count.
+  const liveN = liveSpins.length;
+  const liveFreqAll = new Map<string, number>();
+  for (const g of GAMES) liveFreqAll.set(g.name, 0);
+  for (const s of liveSpins) {
+    const gameName = SPIN_TO_GAME_NAME[s.sector] ?? s.sector;
+    if (liveFreqAll.has(gameName)) {
+      liveFreqAll.set(gameName, (liveFreqAll.get(gameName) ?? 0) + 1);
+    }
+  }
+  // Use real casino frequency as long-term prior when we have 20+ real spins.
+  // Otherwise fall back to theoretical probability.
+  const useLivePrior = liveN >= 20;
+  const livePriorFor = (gameName: string): number => {
+    if (!useLivePrior) return THEORETICAL[gameName] ?? 0.1;
+    return liveN > 0 ? (liveFreqAll.get(gameName) ?? 0) / liveN : (THEORETICAL[gameName] ?? 0.1);
+  };
+
+  // ===== RECENT LIVE SPIN FREQUENCY (last 10 real spins) =====
+  const liveRecent = liveSpins.slice(0, 10); // newest first in API response
+  const liveRecentN = liveRecent.length;
+  const liveRecentFreq = new Map<string, number>();
+  for (const g of GAMES) liveRecentFreq.set(g.name, 0);
+  for (const s of liveRecent) {
+    const gameName = SPIN_TO_GAME_NAME[s.sector] ?? s.sector;
+    if (liveRecentFreq.has(gameName)) {
+      liveRecentFreq.set(gameName, (liveRecentFreq.get(gameName) ?? 0) + 1);
+    }
+  }
+
+  // Per-game frequency in recent 10 USER-VERIFIED rounds (short-term)
   const recentHist = hist.slice(-10);
   const recentFreq = new Map<string, number>();
   for (const g of GAMES) recentFreq.set(g.name, 0);
@@ -516,8 +572,22 @@ function scoreCandidates(
   for (let i = 0; i < GAMES.length; i++) {
     const g = GAMES[i];
     const theo = THEORETICAL[g.name] ?? 0.1;
-    const longFreq = n > 0 ? (freqAll.get(g.name) ?? 0) / n : 0;
-    const recFreq = recentHist.length > 0 ? (recentFreq.get(g.name) ?? 0) / recentHist.length : 0;
+    // LONG-TERM PRIOR: prefer REAL casino spin frequency when available (20+
+    // real spins), else theoretical probability, else tiny user history.
+    const livePrior = livePriorFor(g.name);
+    const userLongFreq = n > 0 ? (freqAll.get(g.name) ?? 0) / n : 0;
+    // Blend user-verified long-term with live-prior when both exist.
+    // Live prior dominates (real casino data) but user history adds weight.
+    const longFreq = useLivePrior
+      ? livePrior * 0.7 + userLongFreq * 0.3
+      : userLongFreq;
+    // RECENT frequency: prefer live recent (last 10 real spins) when available;
+    // it's far more responsive than the tiny user recent slice.
+    const liveRecFreq = liveRecentN > 0 ? (liveRecentFreq.get(g.name) ?? 0) / liveRecentN : 0;
+    const userRecFreq = recentHist.length > 0 ? (recentFreq.get(g.name) ?? 0) / recentHist.length : 0;
+    const recFreq = useLivePrior
+      ? liveRecFreq * 0.6 + userRecFreq * 0.4
+      : userRecFreq;
     const trend = recFreq - longFreq;
     const gap = gaps[g.name];
     const gapHistory = gapHistories[g.name];
@@ -525,8 +595,8 @@ function scoreCandidates(
       ? gapHistory.reduce((s, x) => s + x, 0) / gapHistory.length
       : n / Math.max(freqAll.get(g.name) ?? 1, 1);
     const isOverdue = avgGap > 0 && gap > avgGap * 1.5;
-    const isHot = longFreq > theo * 1.3 && n >= 5;
-    const isCold = longFreq < theo * 0.5 && n >= 5;
+    const isHot = longFreq > theo * 1.3 && (n >= 5 || liveN >= 20);
+    const isCold = longFreq < theo * 0.5 && (n >= 5 || liveN >= 20);
 
     // Signal-wise historical performance (when this game was predicted)
     const sw = dashboard.signalWiseHitRate[g.name];
@@ -544,13 +614,13 @@ function scoreCandidates(
     const signals: string[] = [];
 
     // ===== BASE SCORE =====
-    // Adaptive blend of long-term + recent frequencies, anchored to theoretical.
+    // Adaptive blend of long-term + recent frequencies, anchored to the prior.
     const blendedFreq = (longFreq * longW + recFreq * adaptW);
-    let score = theo * 0.4 + blendedFreq * 0.6; // start with prior + observed blend
-    if (n === 0) score = theo; // first prediction: pure prior
+    let score = livePrior * 0.4 + blendedFreq * 0.6;
+    if (!useLivePrior && n === 0) score = theo; // no data at all → pure theoretical
 
     // ===== SIGNAL 1: Recent active boost =====
-    if (recFreq > theo * 0.8 && n >= 5) {
+    if (recFreq > livePrior * 0.8 && (n >= 5 || liveN >= 20)) {
       score *= 1.15;
       signals.push("recent-active");
     }
@@ -563,16 +633,16 @@ function scoreCandidates(
     }
 
     // ===== SIGNAL 3: Trend alignment (adaptive weighting) =====
-    if (trend > 0.05 && n >= 10) {
+    if (trend > 0.05 && (n >= 10 || liveN >= 20)) {
       score *= 1 + Math.min(0.2, trend * 2 * adaptW);
       signals.push("trending-up");
-    } else if (trend < -0.05 && n >= 10) {
+    } else if (trend < -0.05 && (n >= 10 || liveN >= 20)) {
       score *= 1 + Math.max(-0.25, trend * 2 * adaptW);
       signals.push("trending-down");
     }
 
     // ===== SIGNAL 4: Pattern stability bonus =====
-    if (stability === "STABLE" && longFreq >= theo * 0.8) {
+    if (stability === "STABLE" && longFreq >= livePrior * 0.8) {
       score *= 1.08;
       signals.push("pattern-stable");
     }
@@ -645,26 +715,63 @@ function scoreCandidates(
   const totalRaw = scores.reduce((s, c) => s + c.rawScore, 0);
   for (const c of scores) c.normalizedScore = totalRaw > 0 ? c.rawScore / totalRaw : 0;
 
-  // Sort by raw score (descending)
+  // Sort by raw score (descending) — this is the EVIDENCE ranking (for display).
   scores.sort((a, b) => b.rawScore - a.rawScore);
 
-  // Assign ranks + labels (top 4 → next signal)
+  // Assign evidence ranks + labels (1..8).
   const rankLabels = [
     "strongest evidence",
     "second strongest",
-    "alternative signal",
-    "defensive / low-probability",
+    "third strongest",
+    "fourth strongest",
+    "fifth — alternate",
+    "sixth — weak",
+    "seventh — weak",
+    "weakest evidence",
   ];
   for (let i = 0; i < scores.length; i++) {
     scores[i].rank = i + 1;
-    if (i < 4) {
-      scores[i].label = rankLabels[i];
-    } else {
-      scores[i].label = "excluded (not in prediction)";
-    }
+    scores[i].label = rankLabels[i] ?? `rank ${i + 1}`;
   }
 
   return scores;
+}
+
+// ============================================================
+// WEIGHTED PROBABILISTIC SAMPLING (without replacement)
+// ============================================================
+/**
+ * Pick `count` unique candidates using weighted random sampling without
+ * replacement. Weight = rawScore. This makes each prediction generation
+ * produce a VARIED selection — high-score games are picked MORE often, but
+ * low-score games (CRAZY TIME, PACHINKO) DO get picked sometimes based on
+ * their probability. No more "always 1,2,5,10".
+ *
+ * Returns the sampled candidates (in pick order).
+ */
+function sampleWeighted(candidates: CandidateScore[], count: number): CandidateScore[] {
+  const pool = [...candidates];
+  const chosen: CandidateScore[] = [];
+  for (let i = 0; i < count && pool.length > 0; i++) {
+    const sumW = pool.reduce((s, c) => s + c.rawScore, 0);
+    if (sumW <= 0) {
+      // Degenerate — pick first.
+      chosen.push(pool.splice(0, 1)[0]);
+      continue;
+    }
+    const rand = Math.random() * sumW;
+    let acc = 0;
+    let pickIdx = 0;
+    for (let j = 0; j < pool.length; j++) {
+      acc += pool[j].rawScore;
+      if (rand <= acc) {
+        pickIdx = j;
+        break;
+      }
+    }
+    chosen.push(pool.splice(pickIdx, 1)[0]);
+  }
+  return chosen;
 }
 
 function hitLabel(sampleSize: number, rate: number): string {
@@ -725,6 +832,10 @@ function confidenceLabelOf(confidence: number, n: number): { label: string; colo
  * @param recalibrated True if the engine should treat this as a recalibration
  *                     cycle (i.e. previous round was a MISS and we are now
  *                     producing the post-MISS prediction).
+ * @param liveSpins   REAL casino spins from CasinoScores API (optional).
+ *                    When 20+ spins are provided, the engine uses real casino
+ *                    frequency as the long-term prior — producing data-driven,
+ *                    VARIED predictions instead of always [1,2,5,10].
  */
 export function runEngine(
   rounds: RoundResult[],
@@ -732,6 +843,7 @@ export function runEngine(
   lastHit: boolean | null = null,
   recalibrated = false,
   recalibrationReason = "",
+  liveSpins: SpinData[] = [],
 ): EngineOutput {
   const dashboard = buildDashboard(rounds);
   const anomaly = detectAnomaly(rounds);
@@ -769,11 +881,20 @@ export function runEngine(
   }
 
   // Score all 8 candidates using the multi-signal evidence engine.
-  const candidates = scoreCandidates(rounds, dashboard, prevPredNames, lastHit);
+  // Pass REAL casino spins so the prior reflects actual observed frequency.
+  const candidates = scoreCandidates(rounds, dashboard, prevPredNames, lastHit, liveSpins);
 
-  // Pick top 4 → NEXT SIGNAL.
-  const top4 = candidates.slice(0, SIGNAL_COUNT);
-  const excluded = candidates.slice(SIGNAL_COUNT);
+  // ===== WEIGHTED PROBABILISTIC SELECTION (not deterministic top-4) =====
+  // Sample 4 unique candidates using rawScore as weight. This produces VARIED
+  // predictions each generation — high-score games are picked MORE often, but
+  // low-score games (CRAZY TIME, PACHINKO) DO get picked based on probability.
+  // No more "always 1,2,5,10". Weighted by REAL casino data when available.
+  const sampled = sampleWeighted(candidates, SIGNAL_COUNT);
+  const sampledSet = new Set(sampled.map((c) => c.game.name));
+  const excluded = candidates.filter((c) => !sampledSet.has(c.game.name));
+  // Sort the sampled 4 by their EVIDENCE rank (so strongest-evidence sampled
+  // game appears first — honest display, not sampling order).
+  const top4 = [...sampled].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
 
   // Honest confidence
   const triggered = recalibrated || (lastHit === false);
@@ -822,11 +943,14 @@ export function runEngine(
   }
 
   // WHY THIS MOVE
+  const useLivePrior = liveSpins.length >= 20;
   const whyParts: string[] = [];
-  if (rounds.length === 0) {
-    whyParts.push("No verified rounds yet — predicting with theoretical priors + base weights.");
+  if (rounds.length === 0 && !useLivePrior) {
+    whyParts.push("No data yet — predicting with theoretical priors + weighted probabilistic sampling.");
+  } else if (useLivePrior && rounds.length === 0) {
+    whyParts.push(`Real casino data: ${liveSpins.length} spins analyzed. Predicting with observed frequency + weighted sampling (varied each cycle).`);
   } else if (rounds.length < 3) {
-    whyParts.push(`Building baseline data (${rounds.length} round${rounds.length !== 1 ? "s" : ""}) — theoretical + observed blend.`);
+    whyParts.push(`Building baseline data (${rounds.length} round${rounds.length !== 1 ? "s" : ""})${useLivePrior ? ` + ${liveSpins.length} real casino spins` : ""} — evidence-weighted probabilistic selection.`);
   } else {
     if (lastHit === true) {
       whyParts.push(`Previous HIT — continuing with confirmed signals. Streak: ${consecutiveHits}× HIT.`);
@@ -836,7 +960,8 @@ export function runEngine(
     whyParts.push(`Hit-rate: ${Math.round(dashboard.predictionHitRate * 100)}% (${dashboard.hits}/${dashboard.totalRounds})`);
     whyParts.push(`Recent (5): ${Math.round(dashboard.recentHitRate * 100)}% • Recent (10): ${Math.round(dashboard.recentHitRateLong * 100)}%`);
     whyParts.push(`Stability: ${dashboard.modelStability}% • Adaptive weight (recent): ${Math.round(dashboard.adaptiveWeight * 100)}%`);
-    whyParts.push(`Top signal evidence: ${top4[0]?.signals.join("+") || "theoretical"}`);
+    if (useLivePrior) whyParts.push(`Real casino prior: ${liveSpins.length} spins — observed frequency drives selection`);
+    whyParts.push(`Top sampled evidence: ${top4[0]?.signals.join("+") || "theoretical"}`);
     if (dashboard.anomalyDetected) whyParts.push(`⚠ Anomaly detected — χ²=${anomaly.statistic.toFixed(1)}`);
     if (dashboard.patternShiftDetected) whyParts.push(`⚠ Pattern shift — recent data weighted higher`);
   }
@@ -848,6 +973,8 @@ export function runEngine(
     `Prediction is STABLE until the next live result arrives — no mid-round changes.`;
 
   // Build final prediction objects (THE source of truth).
+  // Each prediction shows its EVIDENCE rank + label (honest — reflects actual
+  // signal strength, not sampling order).
   const now = Date.now();
   const predictions = top4.map((c, i) => ({
     game: c.game,
@@ -892,20 +1019,20 @@ export function runEngine(
  * It re-scores candidates using the FULL history (including the MISS just
  * recorded) and returns a fresh prediction set + dashboard.
  */
-export function recalibrate(rounds: RoundResult[], reason: string): EngineOutput {
+export function recalibrate(rounds: RoundResult[], reason: string, liveSpins: SpinData[] = []): EngineOutput {
   const last = rounds[rounds.length - 1];
   const prevPredNames = last ? last.prediction.map((p) => p.game.name) : [];
   const lastHit = last ? last.hit : null;
-  return runEngine(rounds, prevPredNames, lastHit, true, reason);
+  return runEngine(rounds, prevPredNames, lastHit, true, reason, liveSpins);
 }
 
 /**
  * Build the INITIAL engine output (no verified rounds yet, or after a HIT).
- * Used for GET SIGNAL.
+ * Used for GET SIGNAL. Pass REAL casino spins to drive data-driven predictions.
  */
-export function buildInitial(rounds: RoundResult[]): EngineOutput {
+export function buildInitial(rounds: RoundResult[], liveSpins: SpinData[] = []): EngineOutput {
   const last = rounds[rounds.length - 1];
   const prevPredNames = last ? last.prediction.map((p) => p.game.name) : [];
   const lastHit = last ? last.hit : null;
-  return runEngine(rounds, prevPredNames, lastHit, false, "");
+  return runEngine(rounds, prevPredNames, lastHit, false, "", liveSpins);
 }

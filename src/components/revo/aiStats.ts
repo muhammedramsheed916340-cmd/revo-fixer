@@ -103,7 +103,7 @@ export interface AnalysisResult {
   overallAnalysis: string; // human-readable summary
 }
 
-interface SpinData {
+export interface SpinData {
   sector: string;
   topSlotSector?: string;
   topSlotMatched: boolean;

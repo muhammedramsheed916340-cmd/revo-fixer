@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { broadcastLiveResult } from "./liveResultsBus";
+import { setLiveSpins } from "./liveSpinStore";
 import { analyzeSpins, parseSpins, type AnalysisResult, SEGMENT_NAMES, GAME_CARD_IMAGES, DISPLAY_NAMES } from "./aiStats";
 
 function timeAgo(ts: string): string {
@@ -52,6 +53,9 @@ export function RevoLiveResults() {
       if (spins.length > 0) {
         const result = analyzeSpins(spins);
         setAnalysis(result);
+
+        // Share real spin data with the prediction engine (RevoGame).
+        setLiveSpins(spins);
 
         // Broadcast NEW result to prediction system
         const latest = newResults[0];

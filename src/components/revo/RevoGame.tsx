@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { subscribeLiveResults, type LiveResultEvent } from "./liveResultsBus";
+import { getLiveSpins, subscribeLiveSpins } from "./liveSpinStore";
 import {
   GAMES as ENGINE_GAMES,
   type GameModel,
@@ -149,6 +150,7 @@ interface StoredRound {
 }
 
 const EMPTY_ROUNDS: RoundResult[] = [];
+const EMPTY_SPINS: import("./aiStats").SpinData[] = [];
 let cachedRounds: RoundResult[] | undefined;
 let cachedRoundsRaw = "";
 
@@ -285,19 +287,48 @@ export function RevoGame() {
   const displayPredictions = predictions ?? savedSignals;
   const isRunning = running || (predictions === null && savedSignals !== null && !loading);
 
+  // ===== REAL CASINO SPINS (from CasinoScores API, shared via liveSpinStore) =====
+  // RevoLiveResults writes the latest 30 real spins here. We subscribe so the
+  // engine re-derives predictions whenever fresh real casino data arrives.
+  const liveSpins = useSyncExternalStore(
+    subscribeLiveSpins,
+    getLiveSpins,
+    () => EMPTY_SPINS, // server snapshot — stable empty constant
+  );
+
   // ===== UNIFIED ENGINE OUTPUT =====
   // This is THE single source of truth for ALL UI sections.
-  // Re-computed whenever round history changes.
+  // Re-computed whenever round history OR live casino spins change.
+  // Passes REAL casino spins to the engine so predictions are data-driven
+  // (not always [1,2,5,10]) and varied via weighted probabilistic sampling.
   const engine: EngineOutput = useMemo(() => {
-    const last = roundHistory[roundHistory.length - 1];
-    const prevPredNames = last ? last.prediction.map((p) => p.game.name) : [];
-    const lastHit = last ? last.hit : null;
-    return buildInitial(roundHistory);
-    // Note: buildInitial calls runEngine internally with (rounds, prevPredNames, lastHit, false, "")
-    // We pass roundHistory directly — the engine derives prevPredNames + lastHit itself.
-    void prevPredNames;
-    void lastHit;
-  }, [roundHistory]);
+    return buildInitial(roundHistory, liveSpins);
+  }, [roundHistory, liveSpins]);
+
+  // ===== STABLE PREDICTION VIEW =====
+  // The engine re-samples every time liveSpins changes (every 4s poll). But
+  // per the stability rule, the prediction cards must NOT change until the
+  // next live result arrives. So we derive the prediction-derived fields
+  // (predictions, excludedOutcomes, nextSignalNames, excludedNames) from the
+  // STABLE displayPredictions (state/localStorage), while using the engine's
+  // live analysis (dashboard, candidateScores, RCA, confidence, decision).
+  const view: EngineOutput = useMemo(() => {
+    const active = displayPredictions ?? engine.predictions.map((p) => ({
+      game: p.game,
+      confidence: p.confidence,
+      time: p.time,
+    }));
+    const activeNames = active.map((p) => p.game.name);
+    const excludedGames = ENGINE_GAMES.filter((g) => !activeNames.includes(g.name));
+    return {
+      ...engine,
+      // Stable prediction-derived fields (from displayPredictions):
+      nextSignalNames: activeNames,
+      excludedOutcomes: excludedGames,
+      excludedNames: excludedGames.map((g) => g.name),
+      // Keep engine's analysis fields (dashboard, candidateScores, RCA, etc.)
+    };
+  }, [engine, displayPredictions]);
 
   // Derived display values (hydration-safe)
   const verifiedRounds = roundHistory.length;
@@ -319,12 +350,14 @@ export function RevoGame() {
   }, []);
 
   // ===== GENERATE PREDICTION (GET SIGNAL) =====
-  // Uses the unified engine. The engine re-derives everything from history.
+  // Uses the unified engine. The engine re-derives everything from history +
+  // REAL casino spins (weighted probabilistic sampling → varied predictions).
   const generatePrediction = useCallback(() => {
     setLoading(true);
     setPredictions(null);
     const allRounds = readRoundHistory();
-    const eng = buildInitial(allRounds);
+    const spins = getLiveSpins();
+    const eng = buildInitial(allRounds, spins);
     const preds = engineToPredictions(eng);
     setPredictions(preds);
     setLoading(false);
@@ -399,18 +432,20 @@ export function RevoGame() {
       persistRounds(updated);
 
       // === BUILD NEXT PREDICTION USING THE UNIFIED ENGINE ===
+      // Pass REAL casino spins so recalibration uses observed frequency.
+      const spins = getLiveSpins();
       let nextPreds: Prediction[];
       let nextRecal: { triggered: boolean; reason: string } | null = null;
 
       if (!hit) {
         // MISS → RCA → RECALIBRATE → new evidence-based prediction
         const reason = `Recalibration triggered by MISS. RCA: analyzing pattern shift, anomaly, signal-wise performance, recent vs long-term. Adaptive weighting applied.`;
-        const eng = recalibrate(updated, reason);
+        const eng = recalibrate(updated, reason, spins);
         nextPreds = engineToPredictions(eng);
         nextRecal = { triggered: true, reason };
       } else {
         // HIT → continue with the unified engine (no recalibration flag)
-        const eng = buildInitial(updated);
+        const eng = buildInitial(updated, spins);
         nextPreds = engineToPredictions(eng);
         nextRecal = null;
       }
@@ -659,7 +694,7 @@ export function RevoGame() {
             </p>
 
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              {engine.excludedOutcomes.map((g) => (
+              {view.excludedOutcomes.map((g) => (
                 <div
                   key={g.name}
                   className={`flex flex-col items-center rounded-xl border p-2.5 ${
@@ -703,10 +738,10 @@ export function RevoGame() {
         </div>
 
         {/* ===== PERFORMANCE DASHBOARD (NEW — unified engine data) ===== */}
-        <PerformanceDashboardPanel dashboard={engine.dashboard} />
+        <PerformanceDashboardPanel dashboard={view.dashboard} />
 
         {/* ===== ADVANCED DECISION ENGINE ===== */}
-        <DecisionEnginePanel engine={engine} />
+        <DecisionEnginePanel engine={view} />
 
         {/* ===== VERIFIED ACCURACY (from manual results only) ===== */}
         {verifiedRounds > 0 && (
