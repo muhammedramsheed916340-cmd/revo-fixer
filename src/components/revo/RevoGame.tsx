@@ -93,13 +93,36 @@ function confidenceFor(game: Game): number {
   return Math.floor(Math.random() * (hi - lo + 1)) + lo;
 }
 
-/** Build N unique predictions (no two boxes show the same game). */
-function buildPredictions(): Prediction[] {
+/**
+ * Honest confidence calculation based on REAL verified data.
+ *   - With <3 verified rounds → "INSUFFICIENT DATA" → low confidence (20-35%)
+ *   - As rounds accumulate → tracks the real hit-rate
+ *   - After a MISS → dampened (model just failed)
+ * NEVER produces fake high confidence (90/95/99%).
+ */
+function honestConfidence(
+  verifiedRounds: number,
+  hitRate: number,
+  triggered: boolean,
+): number {
+  if (verifiedRounds < 3) {
+    // Not enough verified data → honestly low confidence.
+    return 20 + Math.floor(Math.random() * 15); // 20-34%
+  }
+  // Base on real hit-rate, dampened after a MISS.
+  const baseConf = Math.round(hitRate * 100);
+  const dampening = triggered ? 10 : 0; // -10% after a MISS
+  return Math.max(20, Math.min(75, baseConf - dampening));
+}
+
+/** Build N unique predictions (no two boxes show the same game).
+ *  Uses honest confidence (low when no verified data exists). */
+function buildPredictions(verifiedRounds = 0, hitRate = 0): Prediction[] {
   const games = pickUniqueGames(SIGNAL_COUNT);
   const now = Date.now();
   return games.map((game) => ({
     game,
-    confidence: confidenceFor(game),
+    confidence: honestConfidence(verifiedRounds, hitRate, false),
     time: now,
   }));
 }
@@ -112,9 +135,13 @@ function buildPredictions(): Prediction[] {
  *
  * This is NOT random/fake — it derives from the real, user-verified history.
  */
-function buildHistoryInformedPredictions(history: Game[]): Prediction[] {
+function buildHistoryInformedPredictions(
+  history: Game[],
+  verifiedRounds = 0,
+  hitRate = 0,
+): Prediction[] {
   if (history.length === 0) {
-    return buildPredictions();
+    return buildPredictions(verifiedRounds, hitRate);
   }
   // Count frequency of each game in the actual-result history.
   const freq = new Map<string, number>();
@@ -152,7 +179,7 @@ function buildHistoryInformedPredictions(history: Game[]): Prediction[] {
   const now = Date.now();
   return chosen.map((game) => ({
     game,
-    confidence: confidenceFor(game),
+    confidence: honestConfidence(verifiedRounds, hitRate, false),
     time: now,
   }));
 }
@@ -224,8 +251,9 @@ function analyzeRecalibration(rounds: RoundResult[]): RecalibrationContext {
   const suppress = new Set<string>();
   const recentFreq = new Map<string, number>();
   for (const g of GAMES) recentFreq.set(g.name, 0);
-  for (const r of recentResults) {
-    recentFreq.set(r.actualResult.name, (recentFreq.get(r.actualResult.name) ?? 0) + 1);
+  // recentResults is already an array of Game objects (mapped from r.actualResult)
+  for (const g of recentResults) {
+    recentFreq.set(g.name, (recentFreq.get(g.name) ?? 0) + 1);
   }
   const recentTotal = recentResults.length || 1;
   for (const g of GAMES) {
@@ -322,30 +350,11 @@ function buildRecalibratedPredictions(ctx: RecalibrationContext): Prediction[] {
     chosen.push(pool.splice(pickIdx, 1)[0].game);
   }
 
-  // Confidence derived from REAL historical performance.
-  //   - With few rounds, confidence is LOW ("INSUFFICIENT DATA").
-  //   - As verified rounds accumulate, confidence tracks the real hit-rate.
-  //   - On a MISS (recalibration), confidence is dampened because the model
-  //     just failed and is readjusting.
+  // Confidence derived from REAL historical performance using the unified
+  // honest confidence function. Never produces fake high numbers.
   const now = Date.now();
   return chosen.map((game) => {
-    let confidence: number;
-    if (totalRounds < 3) {
-      // Not enough verified data → low confidence, honest signal.
-      confidence = 25 + Math.floor(Math.random() * 15); // 25-39%
-    } else {
-      // Base on real hit-rate, dampened after a MISS.
-      const baseConf = Math.round(hitRate * 100);
-      const dampening = ctx.triggered ? 10 : 0; // -10% after a MISS
-      confidence = Math.max(20, Math.min(95, baseConf - dampening));
-    }
-    // Small per-game variation within the recalibrated band so the 4 boxes
-    // aren't identical, but NEVER fake high numbers.
-    const variation = (game.confidenceRange[1] - game.confidenceRange[0]) % 8;
-    confidence = Math.max(
-      20,
-      Math.min(95, confidence + (variation - 4)),
-    );
+    const confidence = honestConfidence(totalRounds, hitRate, ctx.triggered);
     return { game, confidence, time: now };
   });
 }
@@ -585,13 +594,15 @@ export function RevoGame() {
     setLoading(true);
     setPredictions(null);
     setTimeout(() => {
-      // If we have verified actual-result history, use it to inform the next
-      // prediction. Otherwise fall back to the base weighted algorithm.
-      const hist = readRoundHistory().map((r) => r.actualResult);
+      const allRounds = readRoundHistory();
+      const vRounds = allRounds.length;
+      const vHits = allRounds.filter((r) => r.hit).length;
+      const vHitRate = vRounds > 0 ? vHits / vRounds : 0;
+      const hist = allRounds.map((r) => r.actualResult);
       const preds =
         hist.length > 0
-          ? buildHistoryInformedPredictions(hist)
-          : buildPredictions();
+          ? buildHistoryInformedPredictions(hist, vRounds, vHitRate)
+          : buildPredictions(vRounds, vHitRate);
       setPredictions(preds);
       setLoading(false);
       setRunning(true);
@@ -696,12 +707,17 @@ export function RevoGame() {
             boost: new Set(),
             suppress: new Set(),
           };
-          newPreds = buildPredictions();
+          newPreds = buildPredictions(updated.length, 0);
         }
       } else {
         // HIT → continue with the (cheaper) history-informed prediction.
+        const vRounds = updated.length;
+        const vHits = updated.filter((r) => r.hit).length;
+        const vHitRate = vRounds > 0 ? vHits / vRounds : 0;
         newPreds = buildHistoryInformedPredictions(
           updated.map((r) => r.actualResult),
+          vRounds,
+          vHitRate,
         );
       }
       setPredictions(newPreds);

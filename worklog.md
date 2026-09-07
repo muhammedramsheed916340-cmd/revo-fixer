@@ -405,3 +405,38 @@ Stage Summary:
 - Confidence labels: INSUFFICIENT DATA / STRONG / MODERATE / LOW CONFIDENCE.
 - Recalibration banner + badge in UI, metadata in history rows.
 - Lint clean, agent-browser QA green across full HIT→MISS→recalibrate→next-prediction flow.
+
+---
+
+Task ID: 13 (user request — fix wrong predictions)
+Agent: Z.ai Code
+Task: User reported "predictions are wrong all check proper after result also." Fixed the prediction system so it properly accounts for actual results and uses honest confidence.
+
+Root Causes Found & Fixed:
+1. **BUG in `analyzeRecalibration` (line 228)**: `r.actualResult.name` should have been `g.name`. `recentResults` was already an array of `Game` objects (mapped from `rounds.slice(-8).map(r => r.actualResult)`), so accessing `r.actualResult` was `undefined` → TypeError → `buildRecalibratedPredictions` threw → catch block fell back to `buildPredictions()` → which used `confidenceFor()` → fake high confidence (85-95%). This is why predictions were "wrong" — the recalibration engine was silently failing.
+
+2. **Fake high confidence everywhere**: `buildPredictions()`, `buildHistoryInformedPredictions()`, and the catch fallback ALL used `confidenceFor(game)` which generates values from the original app's per-game confidence ranges (85-95% for game "1", 80-92% for game "2", etc.) — NOT from real verified data. This produced fake 85-95% confidence even with 0 verified rounds.
+
+3. **`buildRecalibratedPredictions` inline confidence had max 95%** — too high, and per-game variation could push it even higher.
+
+Fixes Applied:
+1. Fixed `analyzeRecalibration`: `r.actualResult.name` → `g.name` (recentResults are Game objects, not RoundResult).
+2. Created unified `honestConfidence(verifiedRounds, hitRate, triggered)`:
+   - <3 verified rounds → 20-34% ("INSUFFICIENT DATA")
+   - 3+ rounds → tracks REAL hit-rate, dampened -10% after MISS, capped at 75%
+   - NEVER produces fake 90/95/99%
+3. Updated ALL prediction builders to use `honestConfidence`:
+   - `buildPredictions(verifiedRounds, hitRate)` — initial GET SIGNAL
+   - `buildHistoryInformedPredictions(history, verifiedRounds, hitRate)` — HIT case
+   - `buildRecalibratedPredictions(ctx)` — MISS case (uses ctx.totalRounds + ctx.hitRate)
+4. Updated all callers (`generatePrediction`, `selectActualResult`) to pass verified rounds + hit rate.
+5. Updated catch fallback to also use `buildPredictions(updated.length, 0)` with honest confidence.
+
+Verified:
+- GET SIGNAL (0 rounds) → confidence 27-34%, label "INSUFFICIENT DATA" ✓
+- Round 1 MISS (CASH HUNT) → recalibration banner shows → new preds with 25-33% confidence ✓
+- Round 2 HIT ("5") → no banner → accuracy 50%, confidence 24-25% ✓
+- Round 3 MISS (PACHINKO) → recalibration banner → accuracy 33% → confidence 23% (33% hit-rate - 10% dampening) ✓
+- Page refresh → history + predictions + confidence preserved ✓
+- All 4 prediction boxes always show different outcomes ✓
+- `bun run lint` → 0 errors ✓
