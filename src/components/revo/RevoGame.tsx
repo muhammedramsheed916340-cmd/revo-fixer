@@ -420,16 +420,27 @@ export function RevoGame() {
     (game: Game) => {
       const currentPreds =
         predictions ?? readSavedSignals() ?? [];
+      // If there's no active prediction, don't record an unfair MISS.
+      // Wait for the prediction to be generated first.
+      if (currentPreds.length === 0) {
+        // Generate a prediction immediately so the next round has something
+        // to compare against. Don't record this round.
+        const allRounds = readRoundHistory();
+        const spins = getLiveSpins();
+        const eng = buildInitial(allRounds, spins);
+        const preds = engineToPredictions(eng);
+        setPredictions(preds);
+        setRunning(true);
+        saveSignals(preds);
+        return;
+      }
       const hit =
-        currentPreds.length > 0 &&
         currentPreds.some((p) => p.game.name === game.name);
       const predConfidence =
-        currentPreds.length > 0
-          ? Math.round(
-              currentPreds.reduce((s, p) => s + p.confidence, 0) /
-                currentPreds.length,
-            )
-          : 0;
+        Math.round(
+          currentPreds.reduce((s, p) => s + p.confidence, 0) /
+            currentPreds.length,
+        );
       const wasRecalibrated = lastRecalibration?.triggered ?? false;
       const round: RoundResult = {
         prediction: currentPreds,

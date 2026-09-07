@@ -817,39 +817,69 @@ function scoreCandidates(
 }
 
 // ============================================================
-// WEIGHTED PROBABILISTIC SAMPLING (without replacement)
+// HYBRID SELECTION — deterministic top + weighted variety
 // ============================================================
 /**
- * Pick `count` unique candidates using weighted random sampling without
- * replacement. Weight = rawScore. This makes each prediction generation
- * produce a VARIED selection — high-score games are picked MORE often, but
- * low-score games (CRAZY TIME, PACHINKO) DO get picked sometimes based on
- * their probability. No more "always 1,2,5,10".
+ * Pick `count` unique candidates using a hybrid approach:
  *
- * Returns the sampled candidates (in pick order).
+ *   1. DETERMINISTIC TOP: Always pick the top `floor(count/2)` candidates by
+ *      evidence score. These are the highest-probability outcomes — picking
+ *      them deterministically maximizes coverage (and HIT rate).
+ *
+ *   2. WEIGHTED SAMPLING: Pick the remaining `ceil(count/2)` candidates via
+ *      weighted random sampling (without replacement) from the rest. Weight
+ *      = rawScore^2 (squared — sharpens distribution toward higher-evidence
+ *      outcomes, so rare outcomes get picked less often).
+ *
+ * Why this works:
+ *   - The top 2 outcomes (almost always "1" + "2") cover ~63% of all spins.
+ *     Picking them deterministically guarantees that base coverage.
+ *   - The weighted-sampled slots 3-4 allow intelligent variety (5, 10,
+ *     COIN FLIP, occasionally a bonus round) based on real evidence — not
+ *     the exact same 4 every time, but still favoring higher-probability
+ *     outcomes.
+ *   - Squaring the weights (rawScore^2) makes rare outcomes (CRAZY TIME 1.85%,
+ *     PACHINKO 3.7%) much less likely to be sampled — they'd only get picked
+ *     when their evidence is genuinely strong, not randomly.
+ *
+ * Result: ~80-83% theoretical coverage (near-optimal) + natural variety.
  */
 function sampleWeighted(candidates: CandidateScore[], count: number): CandidateScore[] {
-  const pool = [...candidates];
+  // Candidates must already be sorted by rawScore descending (done in scoreCandidates).
+  const sorted = [...candidates].sort((a, b) => b.rawScore - a.rawScore);
   const chosen: CandidateScore[] = [];
-  for (let i = 0; i < count && pool.length > 0; i++) {
-    const sumW = pool.reduce((s, c) => s + c.rawScore, 0);
+  const chosenNames = new Set<string>();
+
+  // Step 1: Deterministic top floor(count/2).
+  const topCount = Math.floor(count / 2);
+  for (let i = 0; i < topCount && i < sorted.length; i++) {
+    chosen.push(sorted[i]);
+    chosenNames.add(sorted[i].game.name);
+  }
+
+  // Step 2: Weighted sampling for the remaining slots.
+  const remaining = sorted.filter((c) => !chosenNames.has(c.game.name));
+  const varietyCount = count - chosen.length;
+  for (let i = 0; i < varietyCount && remaining.length > 0; i++) {
+    // Squared weights → sharper distribution, rare outcomes picked less often.
+    const sumW = remaining.reduce((s, c) => s + c.rawScore * c.rawScore, 0);
     if (sumW <= 0) {
-      // Degenerate — pick first.
-      chosen.push(pool.splice(0, 1)[0]);
+      chosen.push(remaining.splice(0, 1)[0]);
       continue;
     }
     const rand = Math.random() * sumW;
     let acc = 0;
     let pickIdx = 0;
-    for (let j = 0; j < pool.length; j++) {
-      acc += pool[j].rawScore;
+    for (let j = 0; j < remaining.length; j++) {
+      acc += remaining[j].rawScore * remaining[j].rawScore;
       if (rand <= acc) {
         pickIdx = j;
         break;
       }
     }
-    chosen.push(pool.splice(pickIdx, 1)[0]);
+    chosen.push(remaining.splice(pickIdx, 1)[0]);
   }
+
   return chosen;
 }
 
