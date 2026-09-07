@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { subscribeLiveResults, type LiveResultEvent } from "./liveResultsBus";
+import { subscribeLiveResults, isResultProcessed, type LiveResultEvent } from "./liveResultsBus";
 import { getLiveSpins, subscribeLiveSpins } from "./liveSpinStore";
 import {
   GAMES as ENGINE_GAMES,
@@ -563,10 +563,31 @@ export function RevoGame() {
   });
   const staleCountRef = useRef(0);
   const duplicateCountRef = useRef(0);
+  // Secondary dedup guard: Set of all processed result keys
+  const processedResultKeysRef = useRef<Set<string>>(new Set());
   const [eventStats, setEventStats] = useState({ stale: 0, duplicate: 0, dropped: 0, total: 0 });
 
   useEffect(() => {
     const unsub = subscribeLiveResults((e: LiveResultEvent) => {
+      // ===== SECONDARY DEDUP GUARD =====
+      // Even though broadcastLiveResult already deduplicates, we add a
+      // secondary check here to be absolutely certain the same result
+      // never triggers the popup or selectActualResult twice.
+      // This prevents duplicate popups from React batched renders or
+      // concurrent polling cycles.
+      const resultKey = `${e.sector}-${e.time}`;
+      if (processedResultKeysRef.current.has(resultKey)) {
+        duplicateCountRef.current++;
+        setEventStats((prev) => ({ ...prev, duplicate: prev.duplicate + 1 }));
+        return; // Already processed — skip completely
+      }
+      processedResultKeysRef.current.add(resultKey);
+      // Keep only last 50 keys
+      if (processedResultKeysRef.current.size > 50) {
+        const firstKey = processedResultKeysRef.current.values().next().value;
+        if (firstKey) processedResultKeysRef.current.delete(firstKey);
+      }
+
       const eventReceivedAt = performance.now();
       const game = SECTOR_TO_GAME[e.sector];
       if (game) {
