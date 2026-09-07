@@ -1,102 +1,95 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-/**
- * Live Crazy Time Results section.
- *
- * The casino page (casinoorg-india.com) sends X-Frame-Options: DENY, so it
- * CANNOT be embedded in an iframe. Instead we:
- *  1. Embed the live HLS video stream via an HTML5 video + hls.js player
- *     (stream URL from the casino page's JSON-LD structured data).
- *  2. Provide a prominent "Open Full Live Results" button that opens the
- *     casino page in a new tab (results, stats, spin history, etc).
- *
- * NOT "Crazy Time A" — this is the main Crazy Time table.
- */
-
-// Real HLS stream URL from the casino page's JSON-LD (contentUrl field).
-const STREAM_URL =
-  "https://live101.egprom.com/app/43/amlst:dc3_ct_auto/playlist.m3u8";
-
-// Cloudinary game card images (same as the game section).
 const GAME_CARD_IMAGES: Record<string, string> = {
   "1": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539269/one-card_r0ffuy.png",
   "2": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539364/two-card_ayl9lu.png",
   "5": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539403/five-card_msp0cr.png",
   "10": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539416/ten-card_cx3cvj.png",
-  PACHINKO: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539441/pachiko-card_zxiw7r.png",
-  "COIN FLIP": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539429/coin-flip-card_kbbg7m.png",
-  "CASH HUNT": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539519/cash-hunt-card_jp8hr3.png",
-  "CRAZY TIME": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539531/crazy-time-card_dftfw3.png",
+  Pachinko: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539441/pachiko-card_zxiw7r.png",
+  CoinFlip: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539429/coin-flip-card_kbbg7m.png",
+  CashHunt: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539519/cash-hunt-card_jp8hr3.png",
+  CrazyTime: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539531/crazy-time-card_dftfw3.png",
 };
 
-const ALL_OUTCOMES = ["1", "2", "5", "10", "COIN FLIP", "CASH HUNT", "PACHINKO", "CRAZY TIME"];
+// Map API sector names to display names + image keys
+function sectorToDisplay(sector: string): { name: string; imgKey: string; isBonus: boolean } {
+  switch (sector) {
+    case "1": return { name: "1", imgKey: "1", isBonus: false };
+    case "2": return { name: "2", imgKey: "2", isBonus: false };
+    case "5": return { name: "5", imgKey: "5", isBonus: false };
+    case "10": return { name: "10", imgKey: "10", isBonus: false };
+    case "Pachinko": return { name: "PACHINKO", imgKey: "Pachinko", isBonus: true };
+    case "CoinFlip": return { name: "COIN FLIP", imgKey: "CoinFlip", isBonus: true };
+    case "CashHunt": return { name: "CASH HUNT", imgKey: "CashHunt", isBonus: true };
+    case "CrazyTime":
+    case "CrazyBonus": return { name: "CRAZY TIME", imgKey: "CrazyTime", isBonus: true };
+    default: return { name: sector, imgKey: "1", isBonus: false };
+  }
+}
+
+function timeAgo(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime();
+  if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  return `${Math.floor(diff / 3600000)}h ago`;
+}
+
+interface SpinResult {
+  data: {
+    settledAt: string;
+    result: {
+      outcome: {
+        topSlot?: { wheelSector: string; multiplier?: number };
+        wheelResult?: { wheelSector: string; type?: string };
+        maxMultiplier?: number;
+      };
+    };
+    dealer?: { name: string };
+  };
+}
+
+interface StatItem {
+  wheelResult: string;
+  count: number;
+  percentage: number;
+  lastOccurredAt: string;
+  lastSeenBefore: number;
+  hotFrequencyPercentage: number;
+}
 
 export function RevoLiveResults() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [streamStatus, setStreamStatus] = useState<
-    "idle" | "loading" | "playing" | "error"
-  >("idle");
+  const [results, setResults] = useState<SpinResult[]>([]);
+  const [stats, setStats] = useState<StatItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Load hls.js dynamically (client-side only) to play the HLS stream.
-  useEffect(() => {
-    let hls: { destroy: () => void } | null = null;
-
-    async function initStream() {
-      const video = videoRef.current;
-      if (!video) return;
-
-      setStreamStatus("loading");
-
-      try {
-        // Dynamically import hls.js (it's not an SSR-safe import).
-        const Hls = (await import("hls.js")).default;
-
-        if (Hls.isSupported()) {
-          hls = new Hls({
-            enableWorker: true,
-            lowLatencyMode: true,
-            backBufferLength: 30,
-          });
-          hls.loadSource(STREAM_URL);
-          hls.attachMedia(video);
-
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            video
-              .play()
-              .then(() => setStreamStatus("playing"))
-              .catch(() => setStreamStatus("error"));
-          });
-
-          hls.on(Hls.Events.ERROR, (_event: unknown, data: { fatal: boolean }) => {
-            if (data.fatal) {
-              setStreamStatus("error");
-            }
-          });
-        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-          // Safari / iOS native HLS support.
-          video.src = STREAM_URL;
-          video.addEventListener("loadedmetadata", () => {
-            video
-              .play()
-              .then(() => setStreamStatus("playing"))
-              .catch(() => setStreamStatus("error"));
-          });
-        } else {
-          setStreamStatus("error");
-        }
-      } catch {
-        setStreamStatus("error");
-      }
+  async function loadData() {
+    try {
+      const [resRes, statsRes] = await Promise.all([
+        fetch("/api/crazy-time?type=recent&size=15&duration=24"),
+        fetch("/api/crazy-time?type=stats&duration=24"),
+      ]);
+      const rData = await resRes.json();
+      const sData = await statsRes.json();
+      setResults(Array.isArray(rData) ? rData : []);
+      setStats(sData?.aggStats ?? []);
+      setError("");
+    } catch {
+      setError("Failed to load live results");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    initStream();
-
-    return () => {
-      if (hls) hls.destroy();
-    };
+  useEffect(() => {
+    loadData();
+    const t = setInterval(loadData, 15000); // refresh every 15s
+    return () => clearInterval(t);
   }, []);
+
+  const totalCount = stats.reduce((s, st) => s + st.count, 0);
 
   return (
     <section id="live-results" className="scroll-mt-20 px-4 py-12 sm:px-6">
@@ -109,177 +102,153 @@ export function RevoLiveResults() {
             Crazy Time <span className="revo-gradient-text">Live Results</span>
           </h2>
           <p className="mx-auto mt-1 max-w-lg text-sm text-[#8899cc]">
-            Watch the Crazy Time live stream &amp; check real-time results from
-            CasinoScores. See every spin outcome as it happens.
+            Real-time Crazy Time results &amp; statistics — tracked live. Every
+            spin outcome, frequency, and bonus trigger updated automatically.
           </p>
         </div>
 
-        {/* Live stream player */}
-        <div className="revo-card revo-card-glow overflow-hidden p-0">
+        {/* Latest Results */}
+        <div className="revo-card revo-card-glow overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#2ed573]/10 to-transparent px-4 py-3">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-video text-[#2ed573]" /> Live Stream
+              <i className="fas fa-bolt text-[#2ed573]" /> Latest Results
             </span>
-            <div className="flex items-center gap-2">
-              {streamStatus === "playing" && (
-                <span className="flex items-center gap-1 rounded-full bg-[#ff4757]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ff4757]">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff4757]" />
-                  LIVE
-                </span>
-              )}
-              {streamStatus === "loading" && (
-                <span className="flex items-center gap-1 rounded-full bg-[#448AFF]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#448AFF]">
-                  <i className="fas fa-spinner fa-spin" /> Connecting
-                </span>
-              )}
-              {streamStatus === "error" && (
-                <span className="flex items-center gap-1 rounded-full bg-[#ffa502]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ffa502]">
-                  <i className="fas fa-triangle-exclamation" /> Offline
-                </span>
-              )}
+            <span className="flex items-center gap-1.5 rounded-full bg-[#ff4757]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ff4757]">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff4757]" />
+              LIVE · auto-refresh 15s
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="space-y-2 p-4">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-14 rounded-xl revo-shimmer" />
+              ))}
             </div>
-          </div>
+          ) : error ? (
+            <div className="p-8 text-center text-sm text-[#ff4757]">{error}</div>
+          ) : results.length === 0 ? (
+            <div className="p-8 text-center text-sm text-[#5a6a99]">
+              No recent results available.
+            </div>
+          ) : (
+            <div className="max-h-[28rem] overflow-y-auto revo-scroll">
+              <div className="grid grid-cols-1 gap-1.5 p-3 sm:grid-cols-2">
+                {results.map((r, i) => {
+                  const sector =
+                    r.data?.result?.outcome?.wheelResult?.wheelSector ??
+                    r.data?.result?.outcome?.topSlot?.wheelSector ??
+                    "—";
+                  const disp = sectorToDisplay(sector);
+                  const multiplier = r.data?.result?.outcome?.maxMultiplier;
+                  const topSlot = r.data?.result?.outcome?.topSlot?.wheelSector;
+                  const topSlotMatched = topSlot && topSlot !== sector;
 
-          {/* Video player */}
-          <div className="relative bg-black">
-            <video
-              ref={videoRef}
-              className="aspect-video w-full bg-black"
-              controls
-              autoPlay
-              muted
-              playsInline
-            />
-
-            {/* Loading overlay */}
-            {streamStatus === "loading" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-                <div className="mb-3 h-12 w-12 animate-spin rounded-full border-4 border-[#2ed573]/20 border-t-[#2ed573]" />
-                <div className="text-sm font-bold text-white">
-                  Connecting to live stream…
-                </div>
-                <div className="text-xs text-[#5a6a99]">
-                  CasinoScores Crazy Time feed
-                </div>
-              </div>
-            )}
-
-            {/* Error overlay */}
-            {streamStatus === "error" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 p-6 text-center">
-                <span className="mb-3 grid h-14 w-14 place-items-center rounded-full bg-[#ffa502]/15 text-2xl text-[#ffa502]">
-                  <i className="fas fa-video-slash" />
-                </span>
-                <div className="text-sm font-bold text-white">
-                  Stream temporarily unavailable
-                </div>
-                <div className="mt-1 text-xs text-[#5a6a99]">
-                  The live stream may be geo-restricted or the source is
-                  temporarily offline.
-                </div>
-                <a
-                  href="https://www.casinoorg-india.com/india/casinoscores/crazy-time/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="revo-btn mt-4 flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold"
-                >
-                  <i className="fas fa-arrow-up-right-from-square" /> Open on
-                  CasinoScores
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Full results button — opens casino page in new tab */}
-        <div className="revo-card mt-4 p-4">
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
-            <div className="text-center sm:text-left">
-              <div className="text-sm font-bold text-white">
-                Full Live Results &amp; Statistics
-              </div>
-              <div className="text-xs text-[#8899cc]">
-                Spin history, segment frequency, bonus triggers, biggest wins &amp;
-                more — tracked in real-time by CasinoScores.
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 rounded-xl border border-[#1e2240] bg-[#0d1020]/60 p-2.5 transition hover:bg-white/[0.02]"
+                    >
+                      <img
+                        src={GAME_CARD_IMAGES[disp.imgKey]}
+                        alt={disp.name}
+                        className="h-12 w-12 shrink-0 rounded-lg object-contain"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-black text-white">
+                            {disp.name}
+                          </span>
+                          {disp.isBonus && (
+                            <span className="rounded-full bg-[#FFD700]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+                              ★ Bonus
+                            </span>
+                          )}
+                          {topSlotMatched && (
+                            <span className="rounded-full bg-[#448AFF]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#448AFF]">
+                              ⚡ Top Slot
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-[#5a6a99]">
+                          {r.data?.dealer?.name ? `Dealer: ${r.data.dealer.name}` : ""}
+                          {multiplier ? ` · ×${multiplier}` : ""}
+                          {" · "}
+                          {timeAgo(r.data?.settledAt ?? new Date().toISOString())}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <a
-              href="https://www.casinoorg-india.com/india/casinoscores/crazy-time/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="revo-btn flex shrink-0 items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold"
-            >
-              <i className="fas fa-tower-broadcast" /> Open Live Results
-              <i className="fas fa-arrow-up-right-from-square text-[10px]" />
-            </a>
-          </div>
+          )}
         </div>
 
-        {/* Possible outcomes reference (same 8 as the game) */}
-        <div className="mt-4">
-          <div className="mb-2 text-center text-[11px] font-bold uppercase tracking-wider text-[#5a6a99]">
-            Crazy Time outcomes
-          </div>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
-            {ALL_OUTCOMES.map((name) => {
-              const isBonus = ["COIN FLIP", "CASH HUNT", "PACHINKO", "CRAZY TIME"].includes(name);
-              return (
-                <div
-                  key={name}
-                  className={`flex flex-col items-center rounded-lg border p-2 ${
-                    isBonus
-                      ? "border-[#FFD700]/40 bg-[#FFD700]/5"
-                      : "border-[#1e2240] bg-[#0d1020]"
-                  }`}
-                >
-                  <img
-                    src={GAME_CARD_IMAGES[name]}
-                    alt={name}
-                    className="h-10 w-full object-contain"
-                  />
-                  <div className="mt-0.5 text-[10px] font-bold text-white">{name}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        {/* Statistics */}
+        {!loading && !error && stats.length > 0 && (
+          <div className="revo-card mt-4 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#448AFF]/10 to-transparent px-4 py-3">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-chart-column text-[#448AFF]" /> Statistics
+                <span className="text-[10px] font-normal text-[#5a6a99]">
+                  (last 24h · {totalCount.toLocaleString()} spins)
+                </span>
+              </span>
+            </div>
 
-        {/* Info cards */}
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="revo-card flex items-center gap-3 p-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#2ed573]/15 text-[#2ed573]">
-              <i className="fas fa-bolt" />
-            </span>
-            <div>
-              <div className="text-xs font-bold text-white">Real-Time Results</div>
-              <div className="text-[10px] text-[#5a6a99]">Every spin tracked live</div>
+            <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
+              {stats.map((st) => {
+                const disp = sectorToDisplay(st.wheelResult);
+                const isHot = st.hotFrequencyPercentage > 5;
+                const isCold = st.hotFrequencyPercentage < -5;
+
+                return (
+                  <div
+                    key={st.wheelResult}
+                    className="rounded-xl border border-[#1e2240] bg-[#0d1020]/60 p-3 text-center"
+                  >
+                    <img
+                      src={GAME_CARD_IMAGES[disp.imgKey]}
+                      alt={disp.name}
+                      className="mx-auto h-10 w-10 object-contain"
+                    />
+                    <div className="mt-1 text-sm font-black text-white">
+                      {disp.name}
+                    </div>
+                    <div className="text-lg font-black text-[#448AFF]">
+                      {st.percentage.toFixed(1)}%
+                    </div>
+                    <div className="text-[10px] text-[#5a6a99]">
+                      {st.count} hits
+                    </div>
+                    <div className="mt-1 flex items-center justify-center gap-1">
+                      {isHot && (
+                        <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]">
+                          🔥 Hot
+                        </span>
+                      )}
+                      {isCold && (
+                        <span className="rounded-full bg-[#00d4ff]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#00d4ff]">
+                          ❄️ Cold
+                        </span>
+                      )}
+                      <span className="text-[9px] text-[#5a6a99]">
+                        {st.lastSeenBefore === 0 ? "just now" : `${st.lastSeenBefore} ago`}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <div className="revo-card flex items-center gap-3 p-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#448AFF]/15 text-[#448AFF]">
-              <i className="fas fa-chart-column" />
-            </span>
-            <div>
-              <div className="text-xs font-bold text-white">Statistics</div>
-              <div className="text-[10px] text-[#5a6a99]">Frequency & bonus triggers</div>
-            </div>
-          </div>
-          <div className="revo-card flex items-center gap-3 p-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#FFD700]/15 text-[#FFD700]">
-              <i className="fas fa-video" />
-            </span>
-            <div>
-              <div className="text-xs font-bold text-white">Live Stream</div>
-              <div className="text-[10px] text-[#5a6a99]">Watch the wheel spin</div>
-            </div>
-          </div>
-        </div>
+        )}
 
         <p className="mt-4 text-center text-[11px] text-[#5a6a99]">
           <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
-          Live stream &amp; results provided by CasinoScores (casino.org). The
-          stream may be geo-restricted in some regions. For entertainment only —
-          play responsibly.
+          Real-time data from CasinoScores (casino.org). Results update
+          automatically every 15 seconds. For entertainment only — play
+          responsibly.
         </p>
       </div>
     </section>
