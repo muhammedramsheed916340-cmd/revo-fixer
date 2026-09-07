@@ -942,6 +942,20 @@ export function RevoGame() {
     setTimeout(() => generatePrediction(), 300);
   }, [generatePrediction]);
 
+  // ===== AUTO-GENERATE PREDICTIONS ON MOUNT =====
+  // Automatically generate the first prediction when the component loads,
+  // without requiring any button click. If saved signals exist (from a
+  // previous session), they are used instead.
+  // Uses a ref + setTimeout to avoid setState-in-effect lint issue.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current) return;
+    if (savedSignals) return;
+    autoStarted.current = true;
+    const t = setTimeout(() => generatePrediction(), 100);
+    return () => clearTimeout(t);
+  }, [savedSignals, generatePrediction]);
+
   /**
    * Manual actual-result selection. The user touches one of the 8 result boxes
    * after the real Crazy Time round resolves. This:
@@ -1137,15 +1151,7 @@ export function RevoGame() {
           </p>
         </div>
 
-        {/* Auto-refresh timer */}
-        {isRunning && !loading && (
-          <div className="mb-3 flex items-center justify-center gap-2 text-[11px] font-semibold text-[#8899cc]">
-            <i className="fas fa-sync-alt fa-spin text-[#448AFF]" />
-            Next signal in {countdown}s
-          </div>
-        )}
-
-        {/* ===== NEXT PREDICTION (4 boxes) — kept exactly as-is ===== */}
+        {/* ===== NEXT PREDICTION (4 boxes) — auto-updating ===== */}
         <div className="revo-card revo-card-glow overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#448AFF]/10 to-transparent px-4 py-3">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
@@ -1179,25 +1185,11 @@ export function RevoGame() {
           )}
 
           <div className="p-4 sm:p-6">
-            {!displayPredictions && !loading && (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <span className="mb-3 grid h-16 w-16 place-items-center rounded-full bg-[#448AFF]/10 text-2xl text-[#448AFF] ring-2 ring-[#448AFF]/20">
-                  <i className="fas fa-hand-pointer" />
-                </span>
-                <div className="text-sm font-bold text-white">
-                  Click Get Signal To Start Live Session
-                </div>
-                <div className="text-xs text-[#5a6a99]">
-                  Get {SIGNAL_COUNT} instant predictions
-                </div>
-              </div>
-            )}
-
             {loading && (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <div className="mb-3 h-11 w-11 animate-spin rounded-full border-4 border-[#448AFF]/15 border-t-[#448AFF]" />
                 <div className="text-sm font-bold text-white">Analyzing Patterns…</div>
-                <div className="text-xs text-[#5a6a99]">Please wait</div>
+                <div className="text-xs text-[#5a6a99]">Generating predictions</div>
               </div>
             )}
 
@@ -1213,25 +1205,6 @@ export function RevoGame() {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Action buttons — kept as-is */}
-          <div className="grid grid-cols-2 gap-2 border-t border-[#1e2240] p-4">
-            <button
-              onClick={generatePrediction}
-              disabled={loading}
-              className="revo-btn flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-60"
-            >
-              <i className={`fas ${loading ? "fa-spinner fa-spin" : "fa-magic"}`} />
-              {loading ? "Analyzing…" : "GET SIGNAL"}
-            </button>
-            <button
-              onClick={refreshPrediction}
-              disabled={loading}
-              className="flex items-center justify-center gap-2 rounded-xl border border-[#1e2240] bg-[#0d1020] px-4 py-3 text-sm font-bold text-[#bcc6e0] transition hover:bg-[#1e2240] hover:text-white disabled:opacity-60"
-            >
-              <i className="fas fa-sync-alt" /> REFRESH
-            </button>
           </div>
         </div>
 
