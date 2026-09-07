@@ -97,7 +97,7 @@ export function RevoApp() {
       setNotifications(n);
     }
     loadAll();
-    const t = setInterval(loadAll, 25000);
+    const t = setInterval(loadAll, 60000); // reduced from 25s to 60s to save memory
     return () => {
       active = false;
       clearInterval(t);

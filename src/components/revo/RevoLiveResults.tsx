@@ -35,7 +35,7 @@ export function RevoLiveResults() {
   async function loadData() {
     try {
       // Fetch 100 recent results for deep statistical analysis
-      const res = await fetch("/api/crazy-time?type=recent&size=100&duration=24");
+      const res = await fetch("/api/crazy-time?type=recent&size=30&duration=24");
       const rData = await res.json();
       const newResults = Array.isArray(rData) ? rData : [];
       setResults(newResults);
@@ -74,7 +74,7 @@ export function RevoLiveResults() {
 
   useEffect(() => {
     loadData();
-    const t = setInterval(loadData, 20000);
+    const t = setInterval(loadData, 60000); // refresh every 60s (reduced to save memory)
     return () => clearInterval(t);
   }, []);
 
