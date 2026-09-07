@@ -107,10 +107,10 @@ export function RevoLiveResults() {
 
   useEffect(() => {
     loadData();
-    // Poll every 2 seconds for faster live result detection.
-    // The 3s server cache means only ONE external API call per 3 seconds.
-    // Stale-while-reFetching returns cached data instantly during fetches.
-    const t = setInterval(loadData, 2000);
+    // Poll every 1.5 seconds for fastest live result detection.
+    // The API has no cache (fresh fetch every time).
+    // Dedup guard prevents concurrent duplicate API calls.
+    const t = setInterval(loadData, 1500);
     return () => clearInterval(t);
   }, []);
 
