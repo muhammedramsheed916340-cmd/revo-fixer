@@ -170,6 +170,8 @@ export interface CandidateScore {
   smoothedFrequency: number;  // Laplace-smoothed frequency (0..1)
   rawDeviation: number;       // raw (unstabilized) relative deviation
   stabilizedDeviation: number; // sample-size-stabilized relative deviation
+  calibratedProbability?: number; // normalized probability (sum to 1)
+  logEvidence?: number;       // log(posterior / prior) — log-scaled evidence
 }
 
 // ============================================================
@@ -1400,28 +1402,70 @@ function scoreCandidates(
 }
 
 // ============================================================
-// EVIDENCE-RANKED TOP SELECTION (pure, no fixed slots)
+// 70-COMBINATION SUBSET OPTIMIZER (C(8,4) = 70)
 // ============================================================
 /**
- * Pick `count` candidates by ranking ALL candidates using the complete AI
- * evidence score, then selecting the top `count`.
+ * There are C(8,4) = 70 possible 4-outcome combinations. For each, compute
+ * the expected single-result coverage = sum of calibrated probabilities.
+ * Select the combination with the highest expected coverage.
  *
- * KEY RULES (per user spec — REVISED hybrid logic):
- *   - NO always-fixed top 2 (e.g., never lock "1" and "2")
- *   - NO weighted random sampling (deterministic rank instead)
- *   - NO last-hit repetition / HOT / OVERDUE bias
- *   - NO rare-number automatic suppression (rare outcomes CAN enter if
- *     multiple independent signals support them)
- *   - NO previous prediction carry-over
+ * Per user spec (Section N):
+ *   P(any selected outcome occurs) = P(A) + P(B) + P(C) + P(D)
+ *   (outcomes are mutually exclusive — do NOT multiply probabilities)
  *
- * The top 4 changes NATURALLY when the evidence changes. Every round is a
- * fresh, independent recalculation from the complete available evidence.
- *
- * Returns the top `count` candidates, sorted by evidence rank (strongest first).
+ * Calibrated probabilities are computed by normalizing the raw scores to
+ * sum to 1. This gives each outcome a probability estimate that reflects
+ * the model's belief, anchored to the theoretical prior via Bayesian smoothing.
  */
 function selectTopByEvidence(candidates: CandidateScore[], count: number): CandidateScore[] {
-  // Already sorted by rawScore descending in scoreCandidates(). Take top N.
-  return candidates.slice(0, count);
+  // Compute calibrated probabilities (normalize scores to sum to 1)
+  const totalScore = candidates.reduce((s, c) => s + c.rawScore, 0);
+  const calibrated = candidates.map((c) => ({
+    ...c,
+    calibratedProbability: totalScore > 0 ? c.rawScore / totalScore : 1 / candidates.length,
+    logEvidence: c.basePrior > 0 && c.smoothedFrequency > 0
+      ? Math.log(c.smoothedFrequency / c.basePrior)
+      : 0,
+  }));
+
+  // Attach calibratedProbability + logEvidence to original candidates for display
+  for (const c of calibrated) {
+    const orig = candidates.find((x) => x.game.name === c.game.name);
+    if (orig) {
+      (orig as CandidateScore & { calibratedProbability?: number; logEvidence?: number }).calibratedProbability = c.calibratedProbability;
+      (orig as CandidateScore & { logEvidence?: number }).logEvidence = c.logEvidence;
+    }
+  }
+
+  // If we have exactly 8 candidates and need 4, evaluate all 70 combinations
+  if (candidates.length === 8 && count === 4) {
+    let bestCombination: typeof calibrated = [];
+    let bestCoverage = -1;
+
+    // Generate all C(8,4) = 70 combinations
+    for (let a = 0; a < 5; a++) {
+      for (let b = a + 1; b < 6; b++) {
+        for (let c = b + 1; c < 7; c++) {
+          for (let d = c + 1; d < 8; d++) {
+            const combo = [calibrated[a], calibrated[b], calibrated[c], calibrated[d]];
+            // Expected coverage = sum of calibrated probabilities (mutually exclusive)
+            const coverage = combo.reduce((s, x) => s + x.calibratedProbability, 0);
+            if (coverage > bestCoverage) {
+              bestCoverage = coverage;
+              bestCombination = combo;
+            }
+          }
+        }
+      }
+    }
+
+    // Sort the best combination by calibrated probability descending
+    bestCombination.sort((a, b) => b.calibratedProbability - a.calibratedProbability);
+    return bestCombination;
+  }
+
+  // Fallback: take top N by score
+  return calibrated.slice(0, count).sort((a, b) => b.rawScore - a.rawScore);
 }
 
 function hitLabel(sampleSize: number, rate: number): string {

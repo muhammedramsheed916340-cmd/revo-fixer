@@ -1872,6 +1872,11 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
   // Sort by final AI score descending (same as evidence ranking)
   const sorted = [...candidateScores].sort((a, b) => b.finalAIScore - a.finalAIScore);
   const totalCoverage = sorted.slice(0, 4).reduce((s, c) => s + c.basePrior, 0);
+  // Top-4 expected coverage (sum of calibrated probabilities of selected 4)
+  const top4CalProb = sorted.slice(0, 4).reduce((s, c) => {
+    const cp = (c as CandidateScore & { calibratedProbability?: number }).calibratedProbability;
+    return s + (cp ?? 0);
+  }, 0);
 
   return (
     <div className="revo-card mt-4 overflow-hidden">
@@ -1900,13 +1905,12 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
             <thead>
               <tr className="border-b border-[#1e2240] bg-[#0d1020]/60">
                 <th className="px-1.5 py-2 text-left">Outcome</th>
-                <th className="px-1.5 py-2">Base Prior</th>
+                <th className="px-1.5 py-2">Prior</th>
                 <th className="px-1.5 py-2">N</th>
-                <th className="px-1.5 py-2">Observed</th>
                 <th className="px-1.5 py-2">Smoothed</th>
-                <th className="px-1.5 py-2">Raw Dev.</th>
-                <th className="px-1.5 py-2">Stabilized</th>
-                <th className="px-1.5 py-2">Evidence</th>
+                <th className="px-1.5 py-2">Stab. Dev</th>
+                <th className="px-1.5 py-2">Log Ev</th>
+                <th className="px-1.5 py-2">Cal. Prob</th>
                 <th className="px-1.5 py-2">Final</th>
                 <th className="px-1.5 py-2">Rank</th>
                 <th className="px-1.5 py-2">Sel</th>
@@ -1915,10 +1919,10 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
             <tbody>
               {sorted.map((c, i) => {
                 const isTop4 = i < 4;
-                const rawDevPct = (c.rawDeviation * 100);
                 const stabDevPct = (c.stabilizedDeviation * 100);
-                const rawColor = rawDevPct > 5 ? "#ff4757" : rawDevPct < -5 ? "#00d4ff" : "#5a6a99";
                 const stabColor = stabDevPct > 5 ? "#2ed573" : stabDevPct < -5 ? "#ff4757" : "#5a6a99";
+                const calProb = (c as CandidateScore & { calibratedProbability?: number }).calibratedProbability;
+                const logEv = (c as CandidateScore & { logEvidence?: number }).logEvidence;
                 return (
                   <tr
                     key={c.game.name}
@@ -1932,15 +1936,12 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
                     </td>
                     <td className="px-1.5 py-1.5 text-[#448AFF]">{(c.basePrior * 100).toFixed(1)}%</td>
                     <td className="px-1.5 py-1.5 text-[#5a6a99]">{c.sampleN}</td>
-                    <td className="px-1.5 py-1.5 text-[#00d4ff]">{(c.observedFrequency * 100).toFixed(1)}%</td>
                     <td className="px-1.5 py-1.5 text-[#8899cc]">{(c.smoothedFrequency * 100).toFixed(1)}%</td>
-                    <td className="px-1.5 py-1.5" style={{ color: rawColor }}>
-                      {rawDevPct > 0 ? "+" : ""}{rawDevPct.toFixed(0)}%
-                    </td>
                     <td className="px-1.5 py-1.5" style={{ color: stabColor }}>
                       {stabDevPct > 0 ? "+" : ""}{stabDevPct.toFixed(0)}%
                     </td>
-                    <td className="px-1.5 py-1.5 text-[#a78bfa]">{c.evidenceScorePreMultiplier.toFixed(3)}</td>
+                    <td className="px-1.5 py-1.5 text-[#a78bfa]">{logEv !== undefined ? logEv.toFixed(3) : "—"}</td>
+                    <td className="px-1.5 py-1.5 text-[#00d4ff]">{calProb !== undefined ? `${(calProb * 100).toFixed(1)}%` : "—"}</td>
                     <td className="px-1.5 py-1.5 font-black text-[#2ed573]">{(c.finalAIScore * 100).toFixed(2)}</td>
                     <td className="px-1.5 py-1.5">
                       <span className={`grid h-4 w-4 place-items-center rounded-full text-[7px] font-black ${
@@ -1965,6 +1966,23 @@ function WheelProbabilityPanel({ candidateScores }: { candidateScores: Candidate
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* 70-Combination Optimizer result */}
+        <div className="rounded-lg border border-[#a78bfa]/20 bg-[#a78bfa]/5 p-3">
+          <div className="mb-1 flex items-center justify-between text-[10px]">
+            <span className="font-bold uppercase tracking-wider text-[#5a6a99]">
+              70-Combination Optimizer (C(8,4) = 70)
+            </span>
+            <span className="font-black text-[#a78bfa]">
+              Top-4 Expected Coverage: {(top4CalProb * 100).toFixed(1)}%
+            </span>
+          </div>
+          <div className="text-[9px] text-[#5a6a99]">
+            <i className="fas fa-circle-info mr-1" />
+            All 70 possible 4-outcome combinations evaluated. Best subset selected by
+            highest sum of calibrated probabilities (mutually exclusive: P = P(A)+P(B)+P(C)+P(D)).
+          </div>
         </div>
 
         {/* Theoretical coverage bar */}
