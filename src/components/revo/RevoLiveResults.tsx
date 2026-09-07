@@ -67,10 +67,14 @@ export function RevoLiveResults() {
             latest?.data?.result?.outcome?.topSlot?.wheelSector ??
             "";
           if (sector) {
+            const sourceTimeMs = new Date(settledAt).getTime();
+            const appReceivedMs = Date.now();
             broadcastLiveResult({
               sector,
-              time: new Date(settledAt).getTime(),
+              time: sourceTimeMs,
               multiplier: latest?.data?.result?.outcome?.maxMultiplier,
+              sourceTime: sourceTimeMs,
+              appReceivedTime: appReceivedMs,
             });
           }
         }

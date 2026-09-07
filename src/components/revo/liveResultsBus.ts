@@ -11,6 +11,9 @@ export interface LiveResultEvent {
   sector: string; // e.g. "1", "2", "5", "10", "Pachinko", "CoinFlip", "CashHunt", "CrazyTime"
   time: number;
   multiplier?: number;
+  sourceTime?: number; // actual settledAt timestamp from the casino API (ms epoch)
+  apiResponseTime?: number; // when our API responded (ms epoch)
+  appReceivedTime?: number; // when the app received the event (ms epoch, via performance.now offset)
 }
 
 const listeners = new Set<(e: LiveResultEvent) => void>();

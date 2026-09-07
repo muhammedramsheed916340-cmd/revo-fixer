@@ -507,11 +507,19 @@ export function RevoGame() {
   // Latency tracking for debug performance panel
   const [latencyStats, setLatencyStats] = useState<{
     lastEventTime: number;
-    lastResultDisplayed: number;
-    lastPredictionGenerated: number;
-    sourceToUI: number;
-    sourceToPrediction: number;
+    sourceTime: number | null;       // actual settledAt from casino API
+    appReceivedTime: number | null;   // when app received the event
+    sourceToApp: number | null;       // sourceTime → appReceived (detection delay)
+    appToUI: number;                   // appReceived → UI displayed
+    appToPrediction: number;           // appReceived → new prediction generated
+    totalSourceToUI: number | null;    // sourceTime → UI displayed
+    totalSourceToPrediction: number | null; // sourceTime → new prediction
+    sector: string;
+    resultCount: number;
+    duplicateCount: number;
   } | null>(null);
+  const latencyHistoryRef = useRef<{ sourceToApp: number; totalToUI: number; totalToPred: number }[]>([]);
+  const [latencyAvg, setLatencyAvg] = useState<{ avgSrcToApp: number | null; minSrcToApp: number | null; maxSrcToApp: number | null }>({ avgSrcToApp: null, minSrcToApp: null, maxSrcToApp: null });
 
   useEffect(() => {
     const unsub = subscribeLiveResults((e: LiveResultEvent) => {
@@ -527,12 +535,41 @@ export function RevoGame() {
         selectActualResult(game);
         // Prediction generated after selectActualResult (synchronous)
         const predictionGeneratedAt = performance.now();
+
+        // Compute full source→app latency
+        const sourceMs = e.sourceTime ?? null;
+        const appMs = e.appReceivedTime ?? null;
+        const srcToApp = (sourceMs !== null && appMs !== null) ? appMs - sourceMs : null;
+        const appToUI = Math.round(resultDisplayedAt - eventReceivedAt);
+        const appToPred = Math.round(predictionGeneratedAt - eventReceivedAt);
+        const totalSrcToUI = srcToApp !== null ? srcToApp + appToUI : null;
+        const totalSrcToPred = srcToApp !== null ? srcToApp + appToPred : null;
+
+        // Track history for averages
+        if (srcToApp !== null && totalSrcToUI !== null && totalSrcToPred !== null) {
+          latencyHistoryRef.current.push({ sourceToApp: srcToApp, totalToUI: totalSrcToUI, totalToPred: totalSrcToPred });
+          if (latencyHistoryRef.current.length > 50) latencyHistoryRef.current.shift();
+          // Update averages via state (not ref during render)
+          const hist = latencyHistoryRef.current;
+          const avg = hist.reduce((s, h) => s + h.sourceToApp, 0) / hist.length;
+          const min = Math.min(...hist.map((h) => h.sourceToApp));
+          const max = Math.max(...hist.map((h) => h.sourceToApp));
+          setLatencyAvg({ avgSrcToApp: avg, minSrcToApp: min, maxSrcToApp: max });
+        }
+
+        const hist = latencyHistoryRef.current;
         setLatencyStats({
           lastEventTime: Date.now(),
-          lastResultDisplayed: Math.round(resultDisplayedAt - eventReceivedAt),
-          lastPredictionGenerated: Math.round(predictionGeneratedAt - eventReceivedAt),
-          sourceToUI: Math.round(resultDisplayedAt - eventReceivedAt),
-          sourceToPrediction: Math.round(predictionGeneratedAt - eventReceivedAt),
+          sourceTime: sourceMs,
+          appReceivedTime: appMs,
+          sourceToApp: srcToApp,
+          appToUI,
+          appToPrediction: appToPred,
+          totalSourceToUI: totalSrcToUI,
+          totalSourceToPrediction: totalSrcToPred,
+          sector: e.sector,
+          resultCount: hist.length,
+          duplicateCount: 0,
         });
       }
     });
@@ -638,42 +675,87 @@ export function RevoGame() {
           </div>
         </div>
 
-        {/* ===== DEBUG PERFORMANCE PANEL (latency tracking) ===== */}
+        {/* ===== DEBUG PERFORMANCE PANEL (full source→app latency tracking) ===== */}
         {latencyStats && (
           <div className="revo-card mt-2 overflow-hidden border border-[#00d4ff]/20">
             <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#00d4ff]/5 to-transparent px-4 py-2">
               <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#00d4ff]">
-                <i className="fas fa-stopwatch" /> Performance Debug
+                <i className="fas fa-stopwatch" /> Performance Debug — {latencyStats.sector}
               </span>
-              <span className="text-[9px] text-[#5a6a99]">
-                {new Date(latencyStats.lastEventTime).toLocaleTimeString()}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] text-[#5a6a99]">
+                  {new Date(latencyStats.lastEventTime).toLocaleTimeString()}
+                </span>
+                <span className="rounded-full bg-[#1e2240] px-1.5 py-0.5 text-[8px] font-bold text-[#5a6a99]">
+                  n={latencyStats.resultCount}
+                </span>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-6">
+              {/* SOURCE → APP */}
               <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
-                <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Result→UI</div>
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Source→App</div>
                 <div className="text-sm font-black" style={{
-                  color: latencyStats.sourceToUI < 50 ? "#2ed573" : latencyStats.sourceToUI < 300 ? "#448AFF" : "#ffa502",
+                  color: latencyStats.sourceToApp === null ? "#5a6a99" : latencyStats.sourceToApp < 3000 ? "#2ed573" : latencyStats.sourceToApp < 6000 ? "#448AFF" : "#ffa502",
                 }}>
-                  {latencyStats.sourceToUI}ms
+                  {latencyStats.sourceToApp !== null ? `${(latencyStats.sourceToApp / 1000).toFixed(1)}s` : "—"}
                 </div>
               </div>
+              {/* APP → UI */}
               <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
-                <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">→Prediction</div>
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">App→UI</div>
                 <div className="text-sm font-black" style={{
-                  color: latencyStats.sourceToPrediction < 50 ? "#2ed573" : latencyStats.sourceToPrediction < 500 ? "#448AFF" : "#ffa502",
+                  color: latencyStats.appToUI < 50 ? "#2ed573" : latencyStats.appToUI < 300 ? "#448AFF" : "#ffa502",
                 }}>
-                  {latencyStats.sourceToPrediction}ms
+                  {latencyStats.appToUI}ms
                 </div>
               </div>
+              {/* APP → PREDICTION */}
               <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
-                <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Target UI</div>
-                <div className="text-sm font-black text-[#5a6a99]">&lt;300ms</div>
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">App→Pred</div>
+                <div className="text-sm font-black" style={{
+                  color: latencyStats.appToPrediction < 50 ? "#2ed573" : latencyStats.appToPrediction < 500 ? "#448AFF" : "#ffa502",
+                }}>
+                  {latencyStats.appToPrediction}ms
+                </div>
               </div>
+              {/* TOTAL SOURCE → UI */}
+              <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5 text-center">
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Src→UI (total)</div>
+                <div className="text-sm font-black" style={{
+                  color: latencyStats.totalSourceToUI === null ? "#5a6a99" : latencyStats.totalSourceToUI < 3000 ? "#2ed573" : latencyStats.totalSourceToUI < 6000 ? "#448AFF" : "#ffa502",
+                }}>
+                  {latencyStats.totalSourceToUI !== null ? `${(latencyStats.totalSourceToUI / 1000).toFixed(1)}s` : "—"}
+                </div>
+              </div>
+              {/* TOTAL SOURCE → PREDICTION */}
+              <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5 text-center">
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Src→Pred (total)</div>
+                <div className="text-sm font-black" style={{
+                  color: latencyStats.totalSourceToPrediction === null ? "#5a6a99" : latencyStats.totalSourceToPrediction < 3000 ? "#2ed573" : latencyStats.totalSourceToPrediction < 6000 ? "#448AFF" : "#ffa502",
+                }}>
+                  {latencyStats.totalSourceToPrediction !== null ? `${(latencyStats.totalSourceToPrediction / 1000).toFixed(1)}s` : "—"}
+                </div>
+              </div>
+              {/* AVERAGES */}
               <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
-                <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Target Pred</div>
-                <div className="text-sm font-black text-[#5a6a99]">&lt;500ms</div>
+                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Avg Src→App</div>
+                <div className="text-sm font-black text-[#a78bfa]">
+                  {latencyAvg.avgSrcToApp !== null ? `${(latencyAvg.avgSrcToApp / 1000).toFixed(1)}s` : "—"}
+                </div>
+                {latencyAvg.minSrcToApp !== null && (
+                  <div className="text-[6px] text-[#5a6a99]">
+                    min {(latencyAvg.minSrcToApp / 1000).toFixed(1)}s · max {(latencyAvg.maxSrcToApp! / 1000).toFixed(1)}s
+                  </div>
+                )}
               </div>
+            </div>
+            {/* Latency note */}
+            <div className="border-t border-[#1e2240] px-4 py-1.5 text-[8px] text-[#5a6a99]">
+              <i className="fas fa-circle-info mr-1" />
+              Source→App = time from casino result (settledAt) to app detection. Polling=2s, cache=3s.
+              App→UI = internal pipeline (target &lt;300ms). App→Pred = prediction generation (target &lt;500ms).
+              Total = source→app + internal.
             </div>
           </div>
         )}
