@@ -1,0 +1,808 @@
+     1→<!DOCTYPE html>
+     2→<html lang="en">
+     3→<head>
+     4→    <meta charset="UTF-8">
+     5→<!-- This site is hosted on Netlify. Anyone can build and deploy a site
+     6→     like this one for free: https://netlify.new/?utm_campaign=ai-legible&utm_source=comment&utm_medium=referral&utm_id=4da2116b-3475-4929-bf53-614daf755110
+     7→     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
+     8→<meta name="hosting-provider" content="Netlify">
+     9→<meta name="netlify-deploy" content="https://netlify.new/?utm_campaign=ai-legible&amp;utm_source=meta&amp;utm_medium=referral&amp;utm_id=4da2116b-3475-4929-bf53-614daf755110">
+    10→    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    11→    <title>Revo Fixer | Login</title>
+    12→    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    13→    
+    14→    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    15→    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    16→    
+    17→    <style>
+    18→        :root {
+    19→            --bg: #0a0b14;
+    20→            --card: #141827;
+    21→            --border: #1e2240;
+    22→            --input: #0d1020;
+    23→            --blue: #448AFF;
+    24→            --text: #ffffff;
+    25→            --text2: #bcc6e0;
+    26→            --text3: #8899cc;
+    27→            --text4: #5a6a99;
+    28→            --green: #2ed573;
+    29→            --red: #ff4757;
+    30→            --orange: #ffa502;
+    31→            --gold: #FFD700;
+    32→        }
+    33→
+    34→        * { margin: 0; padding: 0; box-sizing: border-box; }
+    35→
+    36→        body {
+    37→            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+    38→            background: var(--bg);
+    39→            min-height: 100vh;
+    40→            display: flex;
+    41→            align-items: center;
+    42→            justify-content: center;
+    43→            padding: 20px;
+    44→            position: relative;
+    45→            overflow: hidden;
+    46→        }
+    47→
+    48→        /* Background Effects */
+    49→        .bg-effect {
+    50→            position: fixed;
+    51→            top: -50%;
+    52→            left: -50%;
+    53→            width: 200%;
+    54→            height: 200%;
+    55→            z-index: 0;
+    56→            pointer-events: none;
+    57→            background: radial-gradient(ellipse at 20% 50%, rgba(68,138,255,0.04), transparent 50%),
+    58→                        radial-gradient(ellipse at 80% 30%, rgba(255,215,0,0.03), transparent 40%),
+    59→                        radial-gradient(ellipse at 50% 80%, rgba(68,138,255,0.02), transparent 30%);
+    60→            animation: bgFloat 20s ease-in-out infinite;
+    61→        }
+    62→        @keyframes bgFloat {
+    63→            0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+    64→            33% { transform: translate(2%, -2%) rotate(2deg) scale(1.02); }
+    65→            66% { transform: translate(-1%, 1%) rotate(-1deg) scale(0.98); }
+    66→        }
+    67→
+    68→        .orb {
+    69→            position: fixed;
+    70→            border-radius: 50%;
+    71→            filter: blur(80px);
+    72→            z-index: 0;
+    73→            pointer-events: none;
+    74→            opacity: 0.15;
+    75→            animation: orbFloat 25s ease-in-out infinite;
+    76→        }
+    77→        .orb-1 { width: 400px; height: 400px; background: #448AFF; top: -100px; right: -100px; animation-delay: 0s; }
+    78→        .orb-2 { width: 300px; height: 300px; background: #FFD700; bottom: -80px; left: -80px; animation-delay: -8s; }
+    79→        @keyframes orbFloat {
+    80→            0%, 100% { transform: translate(0, 0) scale(1); }
+    81→            33% { transform: translate(40px, -30px) scale(1.1); }
+    82→            66% { transform: translate(-30px, 20px) scale(0.9); }
+    83→        }
+    84→
+    85→        .login-card {
+    86→            position: relative;
+    87→            z-index: 1;
+    88→            background: var(--card);
+    89→            border: 1px solid var(--border);
+    90→            border-radius: 24px;
+    91→            padding: 40px 35px;
+    92→            width: 100%;
+    93→            max-width: 450px;
+    94→            animation: fadeIn 0.5s ease;
+    95→        }
+    96→
+    97→        @keyframes fadeIn {
+    98→            from { opacity: 0; transform: translateY(20px); }
+    99→            to { opacity: 1; transform: translateY(0); }
+   100→        }
+   101→
+   102→        /* ===== UPDATE OVERLAY ===== */
+   103→        .update-overlay {
+   104→            position: fixed;
+   105→            top: 0;
+   106→            left: 0;
+   107→            width: 100%;
+   108→            height: 100%;
+   109→            background: rgba(0,0,0,0.85);
+   110→            backdrop-filter: blur(12px);
+   111→            z-index: 9999;
+   112→            display: none;
+   113→            align-items: center;
+   114→            justify-content: center;
+   115→            padding: 20px;
+   116→            animation: fadeIn 0.3s ease;
+   117→        }
+   118→        .update-overlay.show {
+   119→            display: flex;
+   120→        }
+   121→        .update-card {
+   122→            background: var(--card);
+   123→            border: 1px solid var(--border);
+   124→            border-radius: 30px;
+   125→            padding: 40px 30px;
+   126→            max-width: 420px;
+   127→            width: 100%;
+   128→            text-align: center;
+   129→            animation: scaleIn 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+   130→        }
+   131→        @keyframes scaleIn {
+   132→            from { opacity: 0; transform: scale(0.92); }
+   133→            to { opacity: 1; transform: scale(1); }
+   134→        }
+   135→        .update-icon {
+   136→            width: 80px;
+   137→            height: 80px;
+   138→            background: rgba(68,138,255,0.12);
+   139→            border-radius: 50%;
+   140→            display: flex;
+   141→            align-items: center;
+   142→            justify-content: center;
+   143→            margin: 0 auto 18px;
+   144→            border: 2px solid rgba(68,138,255,0.2);
+   145→        }
+   146→        .update-icon i {
+   147→            font-size: 36px;
+   148→            color: var(--blue);
+   149→            animation: pulse 2s infinite;
+   150→        }
+   151→        @keyframes pulse {
+   152→            0%, 100% { opacity: 1; transform: scale(1); }
+   153→            50% { opacity: 0.6; transform: scale(1.1); }
+   154→        }
+   155→        .update-title {
+   156→            font-size: 24px;
+   157→            font-weight: 800;
+   158→            color: var(--text);
+   159→            margin-bottom: 8px;
+   160→        }
+   161→        .update-title span {
+   162→            color: var(--blue);
+   163→        }
+   164→        .update-subtitle {
+   165→            font-size: 13px;
+   166→            color: var(--text3);
+   167→            margin-bottom: 6px;
+   168→            line-height: 1.5;
+   169→        }
+   170→        .update-version {
+   171→            font-size: 11px;
+   172→            color: var(--text4);
+   173→            margin-bottom: 24px;
+   174→            display: block;
+   175→        }
+   176→        .update-btn {
+   177→            width: 100%;
+   178→            padding: 16px;
+   179→            border: none;
+   180→            border-radius: 14px;
+   181→            font-size: 15px;
+   182→            font-weight: 700;
+   183→            cursor: pointer;
+   184→            text-transform: uppercase;
+   185→            letter-spacing: 1.5px;
+   186→            transition: all 0.3s;
+   187→            margin-bottom: 10px;
+   188→            display: flex;
+   189→            align-items: center;
+   190→            justify-content: center;
+   191→            gap: 10px;
+   192→        }
+   193→        .update-btn-primary {
+   194→            background: linear-gradient(135deg, var(--blue), #2962FF);
+   195→            color: #fff;
+   196→            box-shadow: 0 6px 20px rgba(68,138,255,0.3);
+   197→        }
+   198→        .update-btn-primary:hover {
+   199→            transform: translateY(-2px);
+   200→            box-shadow: 0 10px 28px rgba(68,138,255,0.45);
+   201→        }
+   202→        .update-btn-primary:active {
+   203→            transform: scale(0.97);
+   204→        }
+   205→        .update-btn-secondary {
+   206→            background: rgba(255,255,255,0.05);
+   207→            border: 1px solid var(--border);
+   208→            color: var(--text2);
+   209→        }
+   210→        .update-btn-secondary:hover {
+   211→            background: rgba(255,255,255,0.08);
+   212→            border-color: rgba(68,138,255,0.2);
+   213→        }
+   214→        .update-btn-secondary i {
+   215→            color: var(--blue);
+   216→        }
+   217→        .update-divider {
+   218→            display: flex;
+   219→            align-items: center;
+   220→            gap: 12px;
+   221→            margin: 14px 0;
+   222→            color: var(--text4);
+   223→            font-size: 10px;
+   224→            text-transform: uppercase;
+   225→            letter-spacing: 2px;
+   226→        }
+   227→        .update-divider::before,
+   228→        .update-divider::after {
+   229→            content: '';
+   230→            flex: 1;
+   231→            height: 1px;
+   232→            background: var(--border);
+   233→        }
+   234→
+   235→        /* ===== LOGIN CARD ===== */
+   236→        .logo-area {
+   237→            text-align: center;
+   238→            margin-bottom: 30px;
+   239→        }
+   240→        .logo-img {
+   241→            width: 80px;
+   242→            height: 80px;
+   243→            object-fit: contain;
+   244→            margin: 0 auto 15px;
+   245→            display: block;
+   246→        }
+   247→        .app-name {
+   248→            font-size: 24px;
+   249→            font-weight: 800;
+   250→            color: var(--text);
+   251→        }
+   252→        .app-name span {
+   253→            color: var(--blue);
+   254→        }
+   255→        .app-tagline {
+   256→            font-size: 12px;
+   257→            color: var(--blue);
+   258→            margin-top: 5px;
+   259→            font-weight: 500;
+   260→            letter-spacing: 1px;
+   261→        }
+   262→
+   263→        .info-box {
+   264→            background: rgba(68,138,255,0.08);
+   265→            border: 1px solid rgba(68,138,255,0.15);
+   266→            border-radius: 12px;
+   267→            padding: 12px 16px;
+   268→            margin-bottom: 25px;
+   269→            display: flex;
+   270→            align-items: center;
+   271→            gap: 10px;
+   272→        }
+   273→        .info-box i {
+   274→            color: var(--blue);
+   275→            font-size: 14px;
+   276→        }
+   277→        .info-box span {
+   278→            font-size: 12px;
+   279→            color: var(--text2);
+   280→        }
+   281→
+   282→        .input-group {
+   283→            margin-bottom: 25px;
+   284→        }
+   285→        .input-label {
+   286→            display: block;
+   287→            margin-bottom: 8px;
+   288→            font-size: 11px;
+   289→            font-weight: 600;
+   290→            color: var(--text3);
+   291→            letter-spacing: 1px;
+   292→            text-transform: uppercase;
+   293→        }
+   294→        .input-wrapper {
+   295→            display: flex;
+   296→            gap: 12px;
+   297→        }
+   298→        .input-wrapper input {
+   299→            flex: 1;
+   300→            padding: 14px 16px;
+   301→            background: var(--input);
+   302→            border: 2px solid var(--border);
+   303→            border-radius: 12px;
+   304→            color: var(--text);
+   305→            font-size: 14px;
+   306→            letter-spacing: 1px;
+   307→            transition: all 0.3s;
+   308→        }
+   309→        .input-wrapper input:focus {
+   310→            outline: none;
+   311→            border-color: var(--blue);
+   312→        }
+   313→        .input-wrapper input::placeholder {
+   314→            color: var(--text4);
+   315→        }
+   316→        .paste-btn {
+   317→            padding: 14px 20px;
+   318→            background: rgba(68,138,255,0.1);
+   319→            border: 1px solid rgba(68,138,255,0.2);
+   320→            border-radius: 12px;
+   321→            color: var(--blue);
+   322→            cursor: pointer;
+   323→            font-weight: 600;
+   324→            font-size: 13px;
+   325→            transition: all 0.3s;
+   326→        }
+   327→        .paste-btn:hover {
+   328→            background: rgba(68,138,255,0.2);
+   329→        }
+   330→
+   331→        .login-btn {
+   332→            width: 100%;
+   333→            padding: 14px;
+   334→            background: linear-gradient(135deg, var(--blue), #2962FF);
+   335→            border: none;
+   336→            border-radius: 12px;
+   337→            color: white;
+   338→            font-size: 14px;
+   339→            font-weight: 700;
+   340→            cursor: pointer;
+   341→            transition: all 0.3s;
+   342→            margin-bottom: 12px;
+   343→        }
+   344→        .login-btn:hover {
+   345→            transform: translateY(-2px);
+   346→            box-shadow: 0 5px 15px rgba(68,138,255,0.3);
+   347→        }
+   348→        .login-btn:active {
+   349→            transform: scale(0.97);
+   350→        }
+   351→
+   352→        .package-btn {
+   353→            width: 100%;
+   354→            padding: 14px;
+   355→            background: var(--input);
+   356→            border: 1px solid var(--border);
+   357→            border-radius: 12px;
+   358→            color: var(--text);
+   359→            font-size: 14px;
+   360→            font-weight: 600;
+   361→            cursor: pointer;
+   362→            transition: all 0.3s;
+   363→            margin-bottom: 12px;
+   364→        }
+   365→        .package-btn:hover {
+   366→            border-color: var(--blue);
+   367→            background: rgba(68,138,255,0.05);
+   368→        }
+   369→
+   370→        /* ===== CONTACT SUPPORT BUTTON ===== */
+   371→        .support-btn {
+   372→            width: 100%;
+   373→            padding: 14px;
+   374→            background: linear-gradient(135deg, #0088cc, #006699);
+   375→            border: none;
+   376→            border-radius: 12px;
+   377→            color: white;
+   378→            font-size: 14px;
+   379→            font-weight: 700;
+   380→            cursor: pointer;
+   381→            transition: all 0.3s;
+   382→            display: flex;
+   383→            align-items: center;
+   384→            justify-content: center;
+   385→            gap: 8px;
+   386→        }
+   387→        .support-btn:hover {
+   388→            transform: translateY(-2px);
+   389→            box-shadow: 0 5px 15px rgba(0,136,204,0.3);
+   390→        }
+   391→        .support-btn:active {
+   392→            transform: scale(0.97);
+   393→        }
+   394→
+   395→        .message {
+   396→            margin-top: 20px;
+   397→            padding: 12px;
+   398→            border-radius: 10px;
+   399→            display: none;
+   400→            text-align: center;
+   401→            font-size: 12px;
+   402→        }
+   403→        .message.error {
+   404→            background: rgba(255,71,87,0.1);
+   405→            border: 1px solid var(--red);
+   406→            color: var(--red);
+   407→        }
+   408→        .message.success {
+   409→            background: rgba(46,213,115,0.1);
+   410→            border: 1px solid var(--green);
+   411→            color: var(--green);
+   412→        }
+   413→
+   414→        .watermark {
+   415→            position: fixed;
+   416→            bottom: 15px;
+   417→            right: 15px;
+   418→            color: rgba(255,255,255,0.08);
+   419→            font-size: 10px;
+   420→            z-index: 100;
+   421→        }
+   422→        .watermark a {
+   423→            color: rgba(255,255,255,0.2);
+   424→            text-decoration: none;
+   425→        }
+   426→
+   427→        @media (max-width: 480px) {
+   428→            .login-card {
+   429→                padding: 30px 25px;
+   430→            }
+   431→            .paste-btn {
+   432→                padding: 14px 16px;
+   433→            }
+   434→            .update-card {
+   435→                padding: 30px 20px;
+   436→            }
+   437→            .update-title {
+   438→                font-size: 20px;
+   439→            }
+   440→        }
+   441→    </style>
+   442→</head>
+   443→<body>
+   444→
+   445→    <!-- ===== BACKGROUND EFFECTS ===== -->
+   446→    <div class="bg-effect"></div>
+   447→    <div class="orb orb-1"></div>
+   448→    <div class="orb orb-2"></div>
+   449→
+   450→    <!-- ===== UPDATE OVERLAY ===== -->
+   451→    <div class="update-overlay" id="updateOverlay">
+   452→        <div class="update-card">
+   453→            <div class="update-icon">
+   454→                <i class="fas fa-download"></i>
+   455→            </div>
+   456→            <div class="update-title"><span>UPDATE</span> REQUIRED</div>
+   457→            <div class="update-subtitle" id="updateMessage">New version available! Please update to continue using the app.</div>
+   458→            <span class="update-version" id="updateVersionText">Version 2.0.0 • Revo Fixer</span>
+   459→
+   460→            <button class="update-btn update-btn-primary" id="updateNowBtn" onclick="handleUpdateNow()">
+   461→                <i class="fas fa-arrow-down"></i> Update Now
+   462→            </button>
+   463→
+   464→            <div class="update-divider">or</div>
+   465→
+   466→            <button class="update-btn update-btn-secondary" onclick="joinTelegram()">
+   467→                <i class="fab fa-telegram"></i> Join Telegram Channel
+   468→            </button>
+   469→        </div>
+   470→    </div>
+   471→
+   472→    <!-- ===== LOGIN CARD ===== -->
+   473→    <div class="login-card" id="loginCard">
+   474→        <div class="logo-area">
+   475→            <img src="assets/images/logo.png" alt="Logo" class="logo-img" 
+   476→                 onerror="this.style.display='none'; this.outerHTML='<div style=\'width:80px;height:80px;background:linear-gradient(135deg,#448AFF,#2962FF);border-radius:20px;margin:0 auto 15px;display:flex;align-items:center;justify-content:center;\'><i style=\'font-size:40px;color:white;\' class=\'fas fa-crown\'></i></div>'">
+   477→            <div class="app-name"><span>REVO</span> FIXER</div>
+   478→            <div class="app-tagline">⚡ CRAZY TIME REVO FIXER ⚡</div>
+   479→        </div>
+   480→
+   481→        <div class="info-box">
+   482→            <i class="fas fa-info-circle"></i>
+   483→            <span>Enter your valid license key to continue</span>
+   484→        </div>
+   485→
+   486→        <div class="input-group">
+   487→            <label class="input-label">LICENSE KEY</label>
+   488→            <div class="input-wrapper">
+   489→                <input type="password" id="licenseKey" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="25" autocomplete="off">
+   490→                <button class="paste-btn" onclick="pasteFromClipboard()">
+   491→                    <i class="fas fa-paste"></i> Paste
+   492→                </button>
+   493→            </div>
+   494→        </div>
+   495→
+   496→        <button class="login-btn" onclick="login()">
+   497→            <i class="fas fa-key"></i> Activate License
+   498→        </button>
+   499→
+   500→        <button class="package-btn" onclick="window.location.href='packages.html'">
+   501→            <i class="fas fa-shopping-cart"></i> Buy License
+   502→        </button>
+   503→
+   504→        <!-- ===== CONTACT SUPPORT BUTTON ===== -->
+   505→        <button class="support-btn" id="supportBtn" onclick="openSupport()">
+   506→            <i class="fab fa-telegram"></i> Contact Support
+   507→        </button>
+   508→
+   509→        <div id="message" class="message"></div>
+   510→    </div>
+   511→
+   512→    <div class="watermark">
+   513→        Developer <a href="https://t.me/RevoAgent" target="_blank">@RevoAgent</a>
+   514→    </div>
+   515→
+   516→    <script>
+   517→        // ============================================================
+   518→        // 🔥 FIREBASE CONFIG
+   519→        // ============================================================
+   520→        const firebaseConfig = {
+   521→            apiKey: "AIzaSyCLz9LCMNsfb7tHJ2t-oocGjVD-nVox3GM",
+   522→            authDomain: "revo-fixer-45a26.firebaseapp.com",
+   523→            databaseURL: "https://revo-fixer-45a26-default-rtdb.asia-southeast1.firebasedatabase.app",
+   524→            projectId: "revo-fixer-45a26",
+   525→            storageBucket: "revo-fixer-45a26.firebasestorage.app",
+   526→            messagingSenderId: "496963115399",
+   527→            appId: "1:496963115399:web:d38ec404edff64dfecdb22"
+   528→        };
+   529→
+   530→        firebase.initializeApp(firebaseConfig);
+   531→        const db = firebase.database();
+   532→
+   533→        // ============================================================
+   534→        // 📱 APP VERSION & FORCE UPDATE
+   535→        // ============================================================
+   536→        const CURRENT_APP_VERSION = "1.0.0";
+   537→        let downloadLink = "";
+   538→        let telegramLink = "https://t.me/+CNJHfpdP1ck0NDA1";
+   539→
+   540→        // ============================================================
+   541→        // 📥 LOAD SETTINGS FROM FIREBASE
+   542→        // ============================================================
+   543→        function loadSettings() {
+   544→            // Load App Settings (Telegram Link, Force Update, etc.)
+   545→            db.ref('appSettings').on('value', (snapshot) => {
+   546→                const data = snapshot.val();
+   547→                if (data) {
+   548→                    // Telegram Link
+   549→                    if (data.telegramLink) {
+   550→                        telegramLink = data.telegramLink;
+   551→                    }
+   552→                    
+   553→                    // Force Update
+   554→                    const forceUpdate = data.forceUpdate || false;
+   555→                    const latestVersion = data.appVersion || "1.0.0";
+   556→                    downloadLink = data.downloadLink || "";
+   557→                    const updateMessage = data.updateMessage || "New version available! Please update to continue using the app.";
+   558→                    
+   559→                    document.getElementById('updateVersionText').textContent = `Version ${latestVersion} • Revo Fixer`;
+   560→                    document.getElementById('updateMessage').textContent = updateMessage;
+   561→                    
+   562→                    // Check if update is required
+   563→                    if (forceUpdate === true && latestVersion !== CURRENT_APP_VERSION) {
+   564→                        showUpdateOverlay();
+   565→                    } else {
+   566→                        hideUpdateOverlay();
+   567→                    }
+   568→                }
+   569→            }, (error) => {
+   570→                console.error('❌ Error loading settings:', error);
+   571→            });
+   572→
+   573→            // Load Telegram Link from separate node (backup)
+   574→            db.ref('appSettings/telegramLink').once('value', (snap) => {
+   575→                if (snap.exists() && snap.val()) {
+   576→                    telegramLink = snap.val();
+   577→                }
+   578→            });
+   579→        }
+   580→
+   581→        // ============================================================
+   582→        // 🔄 UPDATE OVERLAY
+   583→        // ============================================================
+   584→        function showUpdateOverlay() {
+   585→            document.getElementById('updateOverlay').classList.add('show');
+   586→            document.getElementById('loginCard').style.opacity = '0.5';
+   587→            document.getElementById('loginCard').style.pointerEvents = 'none';
+   588→        }
+   589→
+   590→        function hideUpdateOverlay() {
+   591→            document.getElementById('updateOverlay').classList.remove('show');
+   592→            document.getElementById('loginCard').style.opacity = '1';
+   593→            document.getElementById('loginCard').style.pointerEvents = 'auto';
+   594→        }
+   595→
+   596→        // ============================================================
+   597→        // 🔄 UPDATE NOW HANDLER
+   598→        // ============================================================
+   599→        function handleUpdateNow() {
+   600→            if (downloadLink) {
+   601→                window.open(downloadLink, '_blank');
+   602→            } else {
+   603→                showMessage('Download link not available. Please join Telegram channel.', 'error');
+   604→            }
+   605→        }
+   606→
+   607→        // ============================================================
+   608→        // 📱 JOIN TELEGRAM / CONTACT SUPPORT
+   609→        // ============================================================
+   610→        function openSupport() {
+   611→            window.open(telegramLink, '_blank');
+   612→        }
+   613→
+   614→        function joinTelegram() {
+   615→            window.open(telegramLink, '_blank');
+   616→        }
+   617→
+   618→        // ============================================================
+   619→        // 📋 PASTE FROM CLIPBOARD
+   620→        // ============================================================
+   621→        function pasteFromClipboard() {
+   622→            if (navigator.clipboard && navigator.clipboard.readText) {
+   623→                navigator.clipboard.readText().then(text => {
+   624→                    document.getElementById('licenseKey').value = text.trim().toUpperCase();
+   625→                    showMessage('✅ License key pasted!', 'success');
+   626→                }).catch(() => {
+   627→                    showMessage('Press Ctrl+V to paste', 'error');
+   628→                });
+   629→            } else {
+   630→                showMessage('Press Ctrl+V to paste', 'error');
+   631→            }
+   632→        }
+   633→
+   634→        // ============================================================
+   635→        // 💬 SHOW MESSAGE
+   636→        // ============================================================
+   637→        function showMessage(msg, type) {
+   638→            const msgDiv = document.getElementById('message');
+   639→            msgDiv.className = `message ${type}`;
+   640→            msgDiv.textContent = msg;
+   641→            msgDiv.style.display = 'block';
+   642→            setTimeout(() => {
+   643→                msgDiv.style.display = 'none';
+   644→            }, 4000);
+   645→        }
+   646→
+   647→        // ============================================================
+   648→        // 📱 DEVICE ID
+   649→        // ============================================================
+   650→        function getDeviceId() {
+   651→            let deviceId = localStorage.getItem('deviceId');
+   652→            if (!deviceId) {
+   653→                deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
+   654→                localStorage.setItem('deviceId', deviceId);
+   655→            }
+   656→            return deviceId;
+   657→        }
+   658→
+   659→        // ============================================================
+   660→        // 🔐 LOGIN
+   661→        // ============================================================
+   662→        function login() {
+   663→            const licenseKey = document.getElementById('licenseKey').value.trim().toUpperCase();
+   664→            const deviceId = getDeviceId();
+   665→
+   666→            if (!licenseKey) {
+   667→                showMessage('Please enter license key!', 'error');
+   668→                return;
+   669→            }
+   670→
+   671→            showMessage('Verifying...', 'success');
+   672→
+   673→            db.ref(`securityCodes/${licenseKey}`).once('value').then(snapshot => {
+   674→                if (!snapshot.exists()) {
+   675→                    showMessage('Invalid license key!', 'error');
+   676→                    return;
+   677→                }
+   678→
+   679→                const keyData = snapshot.val();
+   680→
+   681→                if (keyData.status === 'banned') {
+   682→                    showMessage('License key blocked. Contact support.', 'error');
+   683→                    return;
+   684→                }
+   685→
+   686→                if (keyData.status === 'reset_required') {
+   687→                    showMessage('Your key requires reset. Contact @RevoAgent to reset your key', 'error');
+   688→                    return;
+   689→                }
+   690→
+   691→                let deviceLogins = keyData.deviceLogins || {};
+   692→                let currentDeviceAttempts = deviceLogins[deviceId] || 0;
+   693→                let userId = keyData.usedBy;
+   694→                const now = Date.now();
+   695→
+   696→                if (currentDeviceAttempts >= 3) {
+   697→                    db.ref(`securityCodes/${licenseKey}`).update({
+   698→                        status: 'reset_required',
+   699→                        resetRequestedAt: now,
+   700→                        resetRequestedBy: deviceId
+   701→                    });
+   702→                    showMessage('Your key is used on another device. Contact @RevoAgent to reset your key', 'error');
+   703→                    return;
+   704→                }
+   705→
+   706→                if (!userId) {
+   707→                    userId = 'user_' + now + '_' + Math.random().toString(36).substring(2, 8);
+   708→                    
+   709→                    const packageInfo = keyData.package || { 
+   710→                        name: '1 Hour Package', 
+   711→                        price: 2000, 
+   712→                        hours: 1
+   713→                    };
+   714→                    
+   715→                    const endTime = now + (packageInfo.hours * 60 * 60 * 1000);
+   716→
+   717→                    const userData = {
+   718→                        username: 'User',
+   719→                        balance: 0,
+   720→                        createdAt: now,
+   721→                        package: {
+   722→                            name: packageInfo.name,
+   723→                            price: packageInfo.price,
+   724→                            hours: packageInfo.hours,
+   725→                            status: 'approved',
+   726→                            startTime: now,
+   727→                            endTime: endTime
+   728→                        },
+   729→                        usedKey: licenseKey,
+   730→                        deviceId: deviceId,
+   731→                        lastLogin: now,
+   732→                        activity: [{
+   733→                            text: '✅ Account created with license key',
+   734→                            time: now
+   735→                        }]
+   736→                    };
+   737→                    
+   738→                    db.ref(`users/${userId}`).set(userData);
+   739→
+   740→                    deviceLogins[deviceId] = 1;
+   741→                    db.ref(`securityCodes/${licenseKey}`).update({
+   742→                        status: 'used',
+   743→                        usedBy: userId,
+   744→                        usedAt: now,
+   745→                        deviceLogins: deviceLogins,
+   746→                        totalDevices: Object.keys(deviceLogins).length
+   747→                    });
+   748→                    
+   749→                    showMessage('✅ License activated! Welcome!', 'success');
+   750→                    
+   751→                } else {
+   752→                    if (deviceLogins[deviceId] === undefined) {
+   753→                        deviceLogins[deviceId] = 1;
+   754→                    } else {
+   755→                        deviceLogins[deviceId] = currentDeviceAttempts + 1;
+   756→                    }
+   757→                    
+   758→                    db.ref(`securityCodes/${licenseKey}`).update({
+   759→                        lastLogin: now,
+   760→                        deviceLogins: deviceLogins,
+   761→                        lastDeviceId: deviceId
+   762→                    });
+   763→
+   764→                    db.ref(`users/${userId}`).update({
+   765→                        lastLogin: now,
+   766→                        deviceId: deviceId
+   767→                    });
+   768→                    
+   769→                    db.ref(`users/${userId}/activity`).push({
+   770→                        text: `🔑 Login attempt #${deviceLogins[deviceId]} from this device`,
+   771→                        time: now
+   772→                    });
+   773→                    
+   774→                    showMessage('✅ Login successful!', 'success');
+   775→                }
+   776→
+   777→                localStorage.setItem('userId', userId);
+   778→                localStorage.setItem('licenseKey', licenseKey);
+   779→
+   780→                setTimeout(() => {
+   781→                    window.location.href = 'dashboard.html';
+   782→                }, 1500);
+   783→
+   784→            }).catch(error => {
+   785→                console.error('Login error:', error);
+   786→                showMessage('Error: ' + error.message, 'error');
+   787→            });
+   788→        }
+   789→
+   790→        // ============================================================
+   791→        // ⌨️ ENTER KEY SUPPORT
+   792→        // ============================================================
+   793→        document.getElementById('licenseKey').addEventListener('keypress', function(e) {
+   794→            if (e.key === 'Enter') login();
+   795→        });
+   796→
+   797→        // ============================================================
+   798→        // 🚀 INIT
+   799→        // ============================================================
+   800→        document.addEventListener('DOMContentLoaded', function() {
+   801→            console.log('🚀 Login page loaded!');
+   802→            console.log('📱 Current App Version:', CURRENT_APP_VERSION);
+   803→            
+   804→            loadSettings();
+   805→        });
+   806→    </script>
+   807→</body>
+   808→</html>
