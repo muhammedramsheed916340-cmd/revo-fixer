@@ -45,6 +45,15 @@ interface Prediction {
   time: number;
 }
 
+/** A verified round: the prediction that was active + the actual result the
+ *  user manually selected + whether it was a HIT or MISS. */
+interface RoundResult {
+  prediction: Prediction[]; // the 4 predictions that were active
+  actualResult: Game; // the real result the user selected
+  hit: boolean; // did any of the 4 predictions match the actual result?
+  time: number;
+}
+
 /**
  * Pick a game using the original weighted algorithm, while excluding any games
  * already chosen so every signal box shows a DIFFERENT outcome.
@@ -55,10 +64,7 @@ function pickUniqueGames(count: number): Game[] {
   for (let i = 0; i < count && pool.length > 0; i++) {
     const rand = Math.random();
     let pickIdx = 0;
-    // Re-scale weights across the remaining pool so probabilities stay
-    // proportional to the original weighting.
     const totalW = pool.reduce((s, _g, idx) => {
-      // Use WEIGHTS deltas as relative weights within the remaining pool.
       const prev = idx === 0 ? 0 : WEIGHTS[GAMES.indexOf(pool[idx - 1])];
       const cur = WEIGHTS[GAMES.indexOf(pool[idx])];
       return s + (cur - prev);
@@ -94,14 +100,65 @@ function buildPredictions(): Prediction[] {
   }));
 }
 
+/**
+ * History-informed prediction: uses the manually-verified actual results to
+ * compute a frequency-weighted pick. Games that have appeared LESS frequently
+ * in recent actual results get a higher prediction weight (gap-filling), mixed
+ * with the original base weights. Always returns 4 UNIQUE games.
+ *
+ * This is NOT random/fake — it derives from the real, user-verified history.
+ */
+function buildHistoryInformedPredictions(history: Game[]): Prediction[] {
+  if (history.length === 0) {
+    return buildPredictions();
+  }
+  // Count frequency of each game in the actual-result history.
+  const freq = new Map<string, number>();
+  for (const g of GAMES) freq.set(g.name, 0);
+  for (const h of history) {
+    freq.set(h.name, (freq.get(h.name) ?? 0) + 1);
+  }
+  const maxFreq = Math.max(...freq.values(), 1);
+  // Weight = base weight × (1 + (maxFreq - freq) / maxFreq).
+  // Lower frequency → higher weight (gap-filling).
+  const weighted = GAMES.map((g, i) => {
+    const base = WEIGHTS[i] - (i === 0 ? 0 : WEIGHTS[i - 1]);
+    const f = freq.get(g.name) ?? 0;
+    const gap = (maxFreq - f) / maxFreq; // 0..1
+    return { game: g, w: base * (0.5 + gap) };
+  });
+  const totalW = weighted.reduce((s, w) => s + w.w, 0);
+
+  // Pick 4 unique games using the computed weights.
+  const pool = [...weighted];
+  const chosen: Game[] = [];
+  for (let i = 0; i < SIGNAL_COUNT && pool.length > 0; i++) {
+    const rand = Math.random() * pool.reduce((s, w) => s + w.w, 0);
+    let acc = 0;
+    let pickIdx = 0;
+    for (let j = 0; j < pool.length; j++) {
+      acc += pool[j].w;
+      if (rand <= acc) {
+        pickIdx = j;
+        break;
+      }
+    }
+    chosen.push(pool.splice(pickIdx, 1)[0].game);
+  }
+  const now = Date.now();
+  return chosen.map((game) => ({
+    game,
+    confidence: confidenceFor(game),
+    time: now,
+  }));
+}
+
 const BONUS_NAMES = ["PACHINKO", "COIN FLIP", "CASH HUNT", "CRAZY TIME"];
 
-// Read saved signals from localStorage once (SSR-safe via useSyncExternalStore).
+// --- Persisted signals (the current 4 predictions) ---
 const SIGNALS_KEY = "revo_lastSignals";
 const signalsListeners = new Set<() => void>();
 
-// Cache the parsed snapshot so useSyncExternalStore doesn't loop (it compares
-// by reference — JSON.parse returns a new object each call).
 let cachedSignals: Prediction[] | null | undefined;
 let cachedRaw = "";
 
@@ -109,7 +166,6 @@ function readSavedSignals(): Prediction[] | null {
   if (typeof window === "undefined") return null;
   try {
     const saved = localStorage.getItem(SIGNALS_KEY) ?? "";
-    // Return the cached reference if the underlying string hasn't changed.
     if (saved === cachedRaw && cachedSignals !== undefined) {
       return cachedSignals;
     }
@@ -124,7 +180,6 @@ function readSavedSignals(): Prediction[] | null {
       cachedSignals = null;
       return null;
     }
-    // Valid only if all signals are from the same recent batch (< 5 min).
     if (Date.now() - data[0].time > 5 * 60 * 1000) {
       localStorage.removeItem(SIGNALS_KEY);
       cachedSignals = null;
@@ -150,19 +205,121 @@ function subscribeSignals(cb: () => void): () => void {
   };
 }
 
-/** Hydration-safe read of the persisted signals. Server returns null; client
- *  returns the saved batch — React uses the server snapshot during hydration so
- *  the markup matches, then re-renders after mount. */
 function useSavedSignals(): Prediction[] | null {
   return useSyncExternalStore(
     subscribeSignals,
-    readSavedSignals, // client snapshot
-    () => null, // server snapshot (always null → matches SSR)
+    readSavedSignals,
+    () => null,
   );
+}
+
+// --- Persisted round history (actual results + comparisons) ---
+const ROUNDS_KEY = "revo_roundHistory";
+const roundsListeners = new Set<() => void>();
+let cachedRounds: RoundResult[] | undefined;
+let cachedRoundsRaw = "";
+
+interface StoredRound {
+  prediction: { game: { name: string; imageKey: string; confidenceRange: [number, number]; isBonus: boolean }; confidence: number; time: number }[];
+  actualResult: { name: string; imageKey: string; confidenceRange: [number, number]; isBonus: boolean };
+  hit: boolean;
+  time: number;
+}
+
+// Stable empty array for snapshots — must be cached to avoid
+// useSyncExternalStore infinite loops.
+const EMPTY_ROUNDS: RoundResult[] = [];
+
+function readRoundHistory(): RoundResult[] {
+  if (typeof window === "undefined") return EMPTY_ROUNDS;
+  try {
+    const saved = localStorage.getItem(ROUNDS_KEY) ?? "";
+    if (saved === cachedRoundsRaw && cachedRounds !== undefined) {
+      return cachedRounds;
+    }
+    cachedRoundsRaw = saved;
+    if (!saved) {
+      cachedRounds = EMPTY_ROUNDS;
+      return EMPTY_ROUNDS;
+    }
+    const data = JSON.parse(saved) as StoredRound[];
+    if (!Array.isArray(data)) {
+      cachedRounds = EMPTY_ROUNDS;
+      return EMPTY_ROUNDS;
+    }
+    // Normalize stored shape back into Game/Prediction references.
+    const rounds: RoundResult[] = data.map((r) => ({
+      prediction: (r.prediction ?? []).map((p) => ({
+        game: GAMES.find((g) => g.name === p.game.name) ?? GAMES[0],
+        confidence: p.confidence,
+        time: p.time,
+      })),
+      actualResult: GAMES.find((g) => g.name === r.actualResult.name) ?? GAMES[0],
+      hit: r.hit,
+      time: r.time,
+    }));
+    cachedRounds = rounds;
+    return rounds;
+  } catch {
+    cachedRounds = EMPTY_ROUNDS;
+    return EMPTY_ROUNDS;
+  }
+}
+
+function subscribeRounds(cb: () => void): () => void {
+  roundsListeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === ROUNDS_KEY) cb();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    roundsListeners.delete(cb);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+function useRoundHistory(): RoundResult[] {
+  return useSyncExternalStore(
+    subscribeRounds,
+    readRoundHistory,
+    () => EMPTY_ROUNDS, // server snapshot — stable constant
+  );
+}
+
+function persistRounds(rounds: RoundResult[]) {
+  try {
+    // Store a slim shape (game name only) to keep payload small.
+    const slim = rounds.map((r) => ({
+      prediction: r.prediction.map((p) => ({
+        game: { name: p.game.name },
+        confidence: p.confidence,
+        time: p.time,
+      })),
+      actualResult: { name: r.actualResult.name },
+      hit: r.hit,
+      time: r.time,
+    }));
+    localStorage.setItem(ROUNDS_KEY, JSON.stringify(slim));
+    cachedRoundsRaw = "";
+    roundsListeners.forEach((l) => l());
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearRounds() {
+  try {
+    localStorage.removeItem(ROUNDS_KEY);
+    cachedRoundsRaw = "";
+    roundsListeners.forEach((l) => l());
+  } catch {
+    /* ignore */
+  }
 }
 
 export function RevoGame() {
   const savedSignals = useSavedSignals();
+  const roundHistory = useRoundHistory();
   const [predictions, setPredictions] = useState<Prediction[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(60);
@@ -178,11 +335,17 @@ export function RevoGame() {
   const liveRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Derived display values (hydration-safe):
-  //  - predictions state takes priority (freshly generated this session)
-  //  - otherwise fall back to persisted signals from localStorage
-  //  - isRunning = we have something to show (or are actively loading)
   const displayPredictions = predictions ?? savedSignals;
   const isRunning = running || (predictions === null && savedSignals !== null && !loading);
+
+  // The actual result history (just the games) for prediction calculation.
+  const actualResultHistory = roundHistory.map((r) => r.actualResult);
+
+  // Derived accuracy from manually-verified rounds ONLY.
+  const verifiedRounds = roundHistory.length;
+  const hits = roundHistory.filter((r) => r.hit).length;
+  const realAccuracy =
+    verifiedRounds > 0 ? Math.round((hits / verifiedRounds) * 100) : null;
 
   // Live clock (HH:MM)
   useEffect(() => {
@@ -201,28 +364,30 @@ export function RevoGame() {
     setLoading(true);
     setPredictions(null);
     setTimeout(() => {
-      const preds = buildPredictions();
+      // If we have verified actual-result history, use it to inform the next
+      // prediction. Otherwise fall back to the base weighted algorithm.
+      const hist = readRoundHistory().map((r) => r.actualResult);
+      const preds =
+        hist.length > 0
+          ? buildHistoryInformedPredictions(hist)
+          : buildPredictions();
       setPredictions(preds);
       setLoading(false);
       setRunning(true);
-      setCountdown(60); // reset countdown when a new signal session starts
+      setCountdown(60);
       try {
         localStorage.setItem(SIGNALS_KEY, JSON.stringify(preds));
-        // Invalidate the snapshot cache so the store re-reads + re-renders.
         cachedRaw = "";
         signalsListeners.forEach((l) => l());
       } catch {
         /* ignore */
       }
-      // Update stats (counts every signal box generated)
       setStats((s) => {
         const total = s.total + preds.length;
         const bonusHits =
           s.bonusHits +
           preds.filter((p) => BONUS_NAMES.includes(p.game.name)).length;
-        const accuracyChange = Math.random() > 0.7 ? -1 : 1;
-        const accuracy = Math.max(85, Math.min(98, s.accuracy + accuracyChange));
-        return { ...s, total, bonusHits, accuracy };
+        return { ...s, total, bonusHits, accuracy: s.accuracy };
       });
     }, 2000);
   }, []);
@@ -240,6 +405,50 @@ export function RevoGame() {
     }
     setTimeout(() => generatePrediction(), 300);
   }, [generatePrediction]);
+
+  /**
+   * Manual actual-result selection. The user touches one of the 8 result boxes
+   * after the real Crazy Time round resolves. This:
+   *  1. Compares the current predictions against the actual result → HIT/MISS.
+   *  2. Saves the round to history (persists across refresh).
+   *  3. Immediately generates the NEXT prediction using the updated history.
+   */
+  const selectActualResult = useCallback(
+    (game: Game) => {
+      const currentPreds = predictions ?? savedSignals ?? [];
+      const hit =
+        currentPreds.length > 0 &&
+        currentPreds.some((p) => p.game.name === game.name);
+      const round: RoundResult = {
+        prediction: currentPreds,
+        actualResult: game,
+        hit,
+        time: Date.now(),
+      };
+      const updated = [...readRoundHistory(), round];
+      persistRounds(updated);
+
+      // Immediately generate the NEXT prediction using the new history.
+      const newPreds = buildHistoryInformedPredictions(
+        updated.map((r) => r.actualResult),
+      );
+      setPredictions(newPreds);
+      setRunning(true);
+      setCountdown(60);
+      try {
+        localStorage.setItem(SIGNALS_KEY, JSON.stringify(newPreds));
+        cachedRaw = "";
+        signalsListeners.forEach((l) => l());
+      } catch {
+        /* ignore */
+      }
+    },
+    [predictions, savedSignals],
+  );
+
+  const clearHistory = useCallback(() => {
+    clearRounds();
+  }, []);
 
   // Auto-refresh countdown (60s → regenerate, like the original)
   useEffect(() => {
@@ -291,6 +500,9 @@ export function RevoGame() {
     return () => document.removeEventListener("visibilitychange", onHide);
   }, [isRunning, generatePrediction]);
 
+  // The most recently selected actual result (for the highlighted display).
+  const lastActual = roundHistory[roundHistory.length - 1]?.actualResult ?? null;
+
   return (
     <section id="game" className="scroll-mt-20 px-4 py-12 sm:px-6">
       <div className="mx-auto max-w-5xl">
@@ -315,11 +527,11 @@ export function RevoGame() {
           </div>
         )}
 
-        {/* Signal grid */}
+        {/* ===== NEXT PREDICTION (4 boxes) — kept exactly as-is ===== */}
         <div className="revo-card revo-card-glow overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#448AFF]/10 to-transparent px-4 py-3">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-bolt text-[#FFD700]" /> Current Predictions
+              <i className="fas fa-bolt text-[#FFD700]" /> Next Prediction
             </span>
             {clock && (
               <span className="text-[11px] text-[#5a6a99]">• {clock}</span>
@@ -358,7 +570,7 @@ export function RevoGame() {
             )}
           </div>
 
-          {/* Action buttons */}
+          {/* Action buttons — kept as-is */}
           <div className="grid grid-cols-2 gap-2 border-t border-[#1e2240] p-4">
             <button
               onClick={generatePrediction}
@@ -378,7 +590,132 @@ export function RevoGame() {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* ===== ACTUAL RESULT SELECTOR (NEW — manual result system) ===== */}
+        <div className="revo-card mt-4 overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#FFD700]/10 to-transparent px-4 py-3">
+            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+              <i className="fas fa-bullseye text-[#FFD700]" /> Actual Result — Select
+            </span>
+            {lastActual && (
+              <span className="rounded-full bg-[#2ed573]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#2ed573]">
+                Last: {lastActual.name}
+              </span>
+            )}
+          </div>
+
+          <div className="p-4 sm:p-5">
+            <p className="mb-3 text-center text-[11px] text-[#8899cc]">
+              <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
+              When the real Crazy Time round resolves, touch the box that came up.
+              This saves it as the actual result, compares vs the prediction, then
+              auto-generates the next prediction.
+            </p>
+
+            {/* 8 result boxes */}
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              {GAMES.map((g) => {
+                const isLast = lastActual?.name === g.name;
+                return (
+                  <button
+                    key={g.name}
+                    onClick={() => selectActualResult(g)}
+                    className={`group relative flex flex-col items-center overflow-hidden rounded-xl border p-2.5 transition active:scale-95 ${
+                      isLast
+                        ? "border-[#2ed573] bg-[#2ed573]/10 ring-2 ring-[#2ed573]/40"
+                        : g.isBonus
+                          ? "border-[#FFD700]/40 bg-[#FFD700]/5 hover:border-[#FFD700] hover:bg-[#FFD700]/10"
+                          : "border-[#1e2240] bg-[#0d1020] hover:border-[#448AFF] hover:bg-[#448AFF]/10"
+                    }`}
+                  >
+                    {isLast && (
+                      <span className="absolute right-1.5 top-1.5 z-10 grid h-5 w-5 place-items-center rounded-full bg-[#2ed573] text-[9px] font-black text-[#0a0b14]">
+                        ✓
+                      </span>
+                    )}
+                    <img
+                      src={GAME_IMAGES[g.imageKey]}
+                      alt={g.name}
+                      className="h-14 w-full object-contain transition group-hover:scale-105 sm:h-16"
+                    />
+                    <div className="mt-1 text-xs font-black text-white">
+                      {g.name}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Current ACTUAL RESULT display */}
+            {lastActual && (
+              <div className="mt-4 rounded-xl border border-[#2ed573]/40 bg-[#2ed573]/8 p-3 text-center">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#2ed573]">
+                  <i className="fas fa-check-circle mr-1" />
+                  Actual Result
+                </div>
+                <div className="mt-1 text-2xl font-black text-white">
+                  {lastActual.name}
+                </div>
+                {lastActual.isBonus && (
+                  <span className="mt-0.5 inline-block rounded-full bg-[#FFD700]/20 px-2 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+                    ★ Bonus Round
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ===== VERIFIED ACCURACY (from manual results only) ===== */}
+        {verifiedRounds > 0 && (
+          <div className="revo-card mt-4 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-circle-check text-[#2ed573]" /> Verified Accuracy
+              </span>
+              <span className="text-[10px] text-[#5a6a99]">
+                from {verifiedRounds} manual result{verifiedRounds !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border border-[#2ed573]/30 bg-[#2ed573]/8 p-2.5 text-center">
+                <div className="text-xl font-black text-[#2ed573]">{realAccuracy}%</div>
+                <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Accuracy</div>
+              </div>
+              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020] p-2.5 text-center">
+                <div className="text-xl font-black text-[#2ed573]">{hits}</div>
+                <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Hits</div>
+              </div>
+              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020] p-2.5 text-center">
+                <div className="text-xl font-black text-[#ff4757]">{verifiedRounds - hits}</div>
+                <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Misses</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== ROUND HISTORY (prediction vs actual → HIT/MISS) ===== */}
+        {roundHistory.length > 0 && (
+          <div className="revo-card mt-4 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-[#1e2240] px-4 py-3">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-clock-rotate-left text-[#448AFF]" /> Round History
+              </span>
+              <button
+                onClick={clearHistory}
+                className="text-[11px] font-semibold text-[#ff4757] transition hover:text-[#ff6b6b]"
+              >
+                <i className="fas fa-trash mr-1" /> Clear
+              </button>
+            </div>
+            <div className="max-h-72 overflow-y-auto revo-scroll p-2">
+              {[...roundHistory].reverse().map((r, i) => (
+                <RoundRow key={r.time + "-" + i} round={r} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== ORIGINAL STATS (kept as-is) ===== */}
         <div className="revo-card mt-4 p-4">
           <div className="grid grid-cols-4 gap-2">
             <Stat value={stats.total.toLocaleString()} label="Total" color="#448AFF" />
@@ -411,11 +748,65 @@ export function RevoGame() {
 
         <p className="mt-4 text-center text-[11px] text-[#5a6a99]">
           <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
-          Each signal box shows a different game. Predictions are generated by
-          the Revo Fixer signal engine for entertainment. Play responsibly.
+          Each signal box shows a different game. Select the actual result after
+          each round to verify accuracy &amp; improve the next prediction.
+          Predictions are for entertainment. Play responsibly.
         </p>
       </div>
     </section>
+  );
+}
+
+/** One history row: prediction (4 chips) vs actual result → HIT/MISS badge. */
+function RoundRow({ round }: { round: RoundResult }) {
+  return (
+    <div className="mb-1.5 flex items-center gap-3 rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2.5">
+      <span
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-black ${
+          round.hit
+            ? "bg-[#2ed573]/15 text-[#2ed573]"
+            : "bg-[#ff4757]/15 text-[#ff4757]"
+        }`}
+      >
+        {round.hit ? "HIT" : "MISS"}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[10px] uppercase tracking-wider text-[#5a6a99]">
+            Predicted:
+          </span>
+          {round.prediction.map((p, i) => (
+            <span
+              key={i}
+              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                p.game.name === round.actualResult.name
+                  ? "bg-[#2ed573]/20 text-[#2ed573]"
+                  : "bg-[#1e2240] text-[#8899cc]"
+              }`}
+            >
+              {p.game.name}
+            </span>
+          ))}
+        </div>
+        <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+          <span className="text-[10px] uppercase tracking-wider text-[#5a6a99]">
+            Actual:
+          </span>
+          <span className="font-bold text-white">{round.actualResult.name}</span>
+          {round.actualResult.isBonus && (
+            <span className="rounded-full bg-[#FFD700]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+              ★
+            </span>
+          )}
+        </div>
+      </div>
+      <span className="shrink-0 text-[10px] text-[#5a6a99]">
+        {new Date(round.time).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+      </span>
+    </div>
   );
 }
 

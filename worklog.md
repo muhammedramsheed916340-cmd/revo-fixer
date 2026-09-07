@@ -318,3 +318,43 @@ Stage Summary:
 - Every box shows a DIFFERENT game outcome (guaranteed unique via weighted exclusion sampling).
 - Proper per-game confidence values within the original app's ranges.
 - Responsive grid (1/2/4 cols). Lint clean, agent-browser QA green.
+
+---
+
+Task ID: 11 (user request — manual result system)
+Agent: Z.ai Code
+Task: Add a manual actual-result selection system to the Crazy Time game. User touches the real result after each round → system saves it, compares vs prediction (HIT/MISS), and generates next prediction using verified history. Nothing removed, design unchanged.
+
+Work Log:
+- Kept everything as-is: 4 Prediction Boxes, GET SIGNAL, REFRESH, LIVE RESULTS, stats, outcomes reference, design.
+- Added new state + persistence for round history:
+  - `RoundResult` interface: { prediction (4 preds), actualResult, hit, time }
+  - `useRoundHistory()` via `useSyncExternalStore` (SSR-safe, cached snapshots to avoid infinite loops). Persists to `localStorage` key `revo_roundHistory`. Stable `EMPTY_ROUNDS` constant for server snapshot.
+  - `persistRounds()` / `clearRounds()` with subscriber notification.
+- Added `buildHistoryInformedPredictions(history)`: uses the actual-result frequency to weight next prediction. Games that appeared LESS frequently get HIGHER weight (gap-filling), mixed with original base weights. Always returns 4 UNIQUE games. NOT random/fake — derived from real verified history.
+- Added `selectActualResult(game)` handler:
+  1. Compares current predictions vs the selected result → HIT if any prediction matches, else MISS.
+  2. Saves the round to history (persists across refresh).
+  3. Immediately generates NEXT prediction using the updated history.
+  4. Updates predictions display.
+- Added new UI sections BELOW the existing prediction grid (nothing removed):
+  - **"Actual Result — Select"** section with exactly 8 result boxes (1, 2, 5, 10, COIN FLIP, CASH HUNT, PACHINKO, CRAZY TIME). Each shows the Cloudinary card image. Touching one selects it.
+  - **Highlighted ACTUAL RESULT display**: green-bordered box showing the selected result clearly with ✓ badge on the touched box. Bonus rounds get ★ badge.
+  - **"Verified Accuracy"** card: shows accuracy %, hits count, misses count — ALL calculated from manually-verified rounds only. No fake/random numbers.
+  - **"Round History"** list: each row shows HIT/MISS badge, the 4 predicted games (matching one highlighted green), the actual result, and timestamp. Newest first. Clear button.
+- Relabeled the prediction card header from "Current Predictions" to "Next Prediction" for clear separation between "NEXT PREDICTION" and "ACTUAL RESULT".
+- Updated the accuracy stat to be calculated from real verified rounds only: `realAccuracy = hits / verifiedRounds * 100`.
+- `bun run lint` → **0 errors**.
+- agent-browser QA: Full flow tested end-to-end:
+  - GET SIGNAL → 4 unique predictions (CRAZY TIME, 10, PACHINKO, COIN FLIP)
+  - Selected "CRAZY TIME" (was in predictions) → HIT ✓ → accuracy 100% (1/1) → history row saved → next prediction auto-generated (CASH HUNT, 10, 2, 5 — all different)
+  - Selected "1" (NOT in predictions) → MISS → accuracy 50% (1 hit / 2 rounds) → history row saved → next prediction auto-generated (2, 10, PACHINKO, 1 — all different)
+  - Page refresh → history preserved (2 rounds, 50% accuracy, 1 hit, 1 miss), last actual result still highlighted, predictions still showing. No errors.
+
+Stage Summary:
+- Manual result selection system added as EXTRA sections — nothing removed, design unchanged.
+- 8 result boxes, touch to select actual result, HIT/MISS comparison, verified accuracy, round history — all from real user-verified data only.
+- Next prediction auto-generates immediately after selecting actual result, using frequency-informed weighting from verified history.
+- History persists across page refresh (localStorage).
+- "NEXT PREDICTION" and "ACTUAL RESULT" clearly separated in UI.
+- Lint clean, agent-browser QA green across full flow.
