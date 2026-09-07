@@ -427,6 +427,22 @@ body {
   }
 }
 
+/* Live result popup entrance animation */
+@keyframes revoPop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* Section reveal-on-scroll */
 .revo-reveal {
   opacity: 0;

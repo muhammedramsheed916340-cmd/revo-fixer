@@ -1097,10 +1097,17 @@ export function RevoGame() {
   // When a new live Crazy Time result arrives (broadcast by RevoLiveResults),
   // auto-select it as the actual result. This triggers HIT/MISS comparison
   // and AI recalibration — fully automatic, no manual interaction needed.
+  // Also shows a popup with the result.
+  const [popupResult, setPopupResult] = useState<Game | null>(null);
+
   useEffect(() => {
     const unsub = subscribeLiveResults((e: LiveResultEvent) => {
       const game = SECTOR_TO_GAME[e.sector];
       if (game) {
+        // Show popup immediately
+        setPopupResult(game);
+        // Auto-hide popup after 4 seconds
+        setTimeout(() => setPopupResult(null), 4000);
         // Auto-select the live result — same flow as manual touch
         selectActualResult(game);
       }
@@ -1228,67 +1235,121 @@ export function RevoGame() {
           </div>
         </div>
 
-        {/* ===== ACTUAL RESULT SELECTOR (NEW — manual result system) ===== */}
+        {/* ===== LIVE RESULT POPUP ===== */}
+        {popupResult && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center px-4" onClick={() => setPopupResult(null)}>
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-md" aria-hidden />
+            <div
+              className="relative w-full max-w-sm overflow-hidden rounded-3xl border-2 p-8 text-center"
+              style={{
+                borderColor: popupResult.isBonus ? "#FFD700" : "#2ed573",
+                background: "linear-gradient(180deg, #141827, #0a0b14)",
+                boxShadow: `0 0 60px -10px ${popupResult.isBonus ? "#FFD700" : "#2ed573"}80`,
+              }}
+            >
+              {/* LIVE badge */}
+              <div className="mb-4 flex items-center justify-center gap-2">
+                <span className="flex items-center gap-1.5 rounded-full bg-[#ff4757]/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#ff4757]">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-[#ff4757]" />
+                  LIVE RESULT
+                </span>
+              </div>
+
+              {/* Result image */}
+              <img
+                src={GAME_IMAGES[popupResult.imageKey]}
+                alt={popupResult.name}
+                className="mx-auto mb-3 h-28 w-28 object-contain"
+                style={{ animation: "revoPop 0.4s ease-out" }}
+              />
+
+              {/* Result name — large */}
+              <div
+                className="text-4xl font-black sm:text-5xl"
+                style={{
+                  color: popupResult.isBonus ? "#FFD700" : "#2ed573",
+                  textShadow: popupResult.isBonus
+                    ? "0 0 20px rgba(255,215,0,0.5)"
+                    : "0 0 20px rgba(46,213,115,0.5)",
+                }}
+              >
+                {popupResult.name}
+              </div>
+
+              {/* Bonus badge */}
+              {popupResult.isBonus && (
+                <span className="mt-2 inline-block rounded-full bg-[#FFD700]/20 px-3 py-1 text-[11px] font-bold uppercase text-[#FFD700]">
+                  ★ Bonus Round
+                </span>
+              )}
+
+              {/* Confirmed */}
+              <div className="mt-4 flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#2ed573]">
+                <i className="fas fa-check-circle" /> Result Confirmed
+              </div>
+
+              {/* Auto-dismiss hint */}
+              <div className="mt-3 text-[10px] text-[#5a6a99]">
+                Auto-dismiss in 4s · Tap to close
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== NOT IN PREDICTION (Missing 4 Outcomes) ===== */}
         <div className="revo-card mt-4 overflow-hidden">
-          <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#FFD700]/10 to-transparent px-4 py-3">
+          <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#ff4757]/10 to-transparent px-4 py-3">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-bullseye text-[#FFD700]" /> Actual Result — Select
+              <i className="fas fa-ban text-[#ff4757]" /> Not In Prediction
             </span>
-            {lastActual && (
-              <span className="rounded-full bg-[#2ed573]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#2ed573]">
-                Last: {lastActual.name}
-              </span>
-            )}
+            <span className="text-[10px] text-[#5a6a99]">
+              4 outcomes not covered
+            </span>
           </div>
 
-          <div className="p-4 sm:p-5">
+          <div className="p-4">
             <p className="mb-3 text-center text-[11px] text-[#8899cc]">
               <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
-              When the real Crazy Time round resolves, touch the box that came up.
-              This saves it as the actual result, compares vs the prediction, then
-              auto-generates the next prediction.
+              These 4 outcomes are NOT in the current prediction. If any of these
+              hit, the prediction will MISS.
             </p>
 
-            {/* 8 result boxes */}
+            {/* Missing 4 outcomes — display only */}
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              {GAMES.map((g) => {
-                const isLast = lastActual?.name === g.name;
-                return (
-                  <button
+              {(() => {
+                const predNames = (displayPredictions ?? []).map((p) => p.game.name);
+                const missing = GAMES.filter((g) => !predNames.includes(g.name));
+                return missing.map((g) => (
+                  <div
                     key={g.name}
-                    onClick={() => selectActualResult(g)}
-                    className={`group relative flex flex-col items-center overflow-hidden rounded-xl border p-2.5 transition active:scale-95 ${
-                      isLast
-                        ? "border-[#2ed573] bg-[#2ed573]/10 ring-2 ring-[#2ed573]/40"
-                        : g.isBonus
-                          ? "border-[#FFD700]/40 bg-[#FFD700]/5 hover:border-[#FFD700] hover:bg-[#FFD700]/10"
-                          : "border-[#1e2240] bg-[#0d1020] hover:border-[#448AFF] hover:bg-[#448AFF]/10"
+                    className={`flex flex-col items-center rounded-xl border p-2.5 ${
+                      g.isBonus
+                        ? "border-[#FFD700]/30 bg-[#FFD700]/5"
+                        : "border-[#ff4757]/30 bg-[#ff4757]/5"
                     }`}
                   >
-                    {isLast && (
-                      <span className="absolute right-1.5 top-1.5 z-10 grid h-5 w-5 place-items-center rounded-full bg-[#2ed573] text-[9px] font-black text-[#0a0b14]">
-                        ✓
-                      </span>
-                    )}
                     <img
                       src={GAME_IMAGES[g.imageKey]}
                       alt={g.name}
-                      className="h-14 w-full object-contain transition group-hover:scale-105 sm:h-16"
+                      className="h-12 w-full object-contain opacity-70"
                     />
-                    <div className="mt-1 text-xs font-black text-white">
+                    <div className="mt-1 text-xs font-bold text-[#8899cc]">
                       {g.name}
                     </div>
-                  </button>
-                );
-              })}
+                    {g.isBonus && (
+                      <span className="text-[8px] font-bold uppercase text-[#FFD700]">★</span>
+                    )}
+                  </div>
+                ));
+              })()}
             </div>
 
-            {/* Current ACTUAL RESULT display */}
+            {/* Last actual result (from live, display only) */}
             {lastActual && (
               <div className="mt-4 rounded-xl border border-[#2ed573]/40 bg-[#2ed573]/8 p-3 text-center">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-[#2ed573]">
                   <i className="fas fa-check-circle mr-1" />
-                  Actual Result
+                  Last Live Result
                 </div>
                 <div className="mt-1 text-2xl font-black text-white">
                   {lastActual.name}
