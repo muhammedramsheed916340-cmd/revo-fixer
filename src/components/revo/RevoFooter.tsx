@@ -87,6 +87,7 @@ export function RevoFooter({
                 { id: "stats", label: "Live Stats" },
                 { id: "activity", label: "Activity" },
                 { id: "faq", label: "FAQ" },
+                { id: "terms", label: "Terms" },
                 { id: "admin", label: "Admin" },
               ].map((l) => (
                 <li key={l.id}>

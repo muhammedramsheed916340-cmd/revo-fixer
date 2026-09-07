@@ -24,6 +24,12 @@ interface RevenueSummary {
   byMethod: { method: string; revenue: number; count: number }[];
   byPackage: { package: string; revenue: number; count: number }[];
   byDay: { day: string; revenue: number; count: number }[];
+  byPackageMethod: {
+    package: string;
+    methods: { method: string; revenue: number; count: number }[];
+    total: number;
+    count: number;
+  }[];
 }
 
 const METHOD_COLORS: Record<string, string> = {
@@ -322,7 +328,125 @@ export function RevoRevenue() {
             </div>
           )}
         </div>
+
+        {/* Per-package deep-dive (expandable) */}
+        {!loading && data?.byPackageMethod && data.byPackageMethod.length > 0 && (
+          <div className="revo-card mt-4 overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-[#1e2240] bg-gradient-to-r from-[#FFD700]/10 to-transparent px-4 py-3">
+              <i className="fas fa-magnifying-glass-chart text-[#FFD700]" />
+              <span className="text-sm font-bold text-white">
+                Per-package deep dive
+              </span>
+              <span className="ml-auto text-[11px] text-[#5a6a99]">
+                Tap a row to expand method breakdown
+              </span>
+            </div>
+            <DeepDive data={data.byPackageMethod} />
+          </div>
+        )}
       </div>
     </section>
+  );
+}
+
+function DeepDive({
+  data,
+}: {
+  data: RevenueSummary["byPackageMethod"];
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const grandTotal = data.reduce((s, p) => s + p.total, 0);
+
+  return (
+    <div>
+      {data.map((p) => {
+        const isOpen = open === p.package;
+        const sharePct = grandTotal > 0 ? (p.total / grandTotal) * 100 : 0;
+        return (
+          <div key={p.package} className="border-b border-[#1e2240]/60 last:border-0">
+            <button
+              onClick={() => setOpen(isOpen ? null : p.package)}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/[0.02]"
+            >
+              <span
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-xs text-[#FFD700]"
+                style={{ background: "rgba(255,215,0,0.12)" }}
+              >
+                <i className="fas fa-box" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-bold text-white">
+                    {p.package}
+                  </span>
+                  <span className="shrink-0 text-sm font-black text-[#FFD700]">
+                    {formatINR(p.total)}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#1e2240]">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-[#FFD700] to-[#ffa502] transition-all"
+                      style={{ width: `${sharePct}%` }}
+                    />
+                  </div>
+                  <span className="shrink-0 text-[10px] text-[#5a6a99]">
+                    {p.count} pay · {sharePct.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+              <span
+                className={`shrink-0 text-[#5a6a99] transition-transform duration-300 ${
+                  isOpen ? "rotate-180 text-[#FFD700]" : ""
+                }`}
+              >
+                <i className="fas fa-chevron-down text-xs" />
+              </span>
+            </button>
+            <div
+              className={`grid transition-all duration-300 ${
+                isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="grid grid-cols-1 gap-2 bg-[#0d1020]/40 px-4 py-3 sm:grid-cols-3">
+                  {p.methods.map((m) => {
+                    const color = METHOD_COLORS[m.method] ?? "#5a6a99";
+                    const mShare = p.total > 0 ? (m.revenue / p.total) * 100 : 0;
+                    return (
+                      <div
+                        key={m.method}
+                        className="rounded-lg border border-[#1e2240] bg-[#141827] p-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className="flex items-center gap-1.5 text-xs font-bold uppercase text-white"
+                          >
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ background: color }}
+                            />
+                            {m.method}
+                          </span>
+                          <span className="text-[10px] text-[#5a6a99]">
+                            {mShare.toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="mt-1 text-sm font-black text-white">
+                          {formatINR(m.revenue)}
+                        </div>
+                        <div className="text-[10px] text-[#5a6a99]">
+                          {m.count} payment{m.count !== 1 ? "s" : ""}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

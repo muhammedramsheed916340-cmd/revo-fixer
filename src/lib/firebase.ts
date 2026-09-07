@@ -183,6 +183,13 @@ export interface RevenueSummary {
   byMethod: { method: string; revenue: number; count: number }[];
   byPackage: { package: string; revenue: number; count: number }[];
   byDay: { day: string; revenue: number; count: number }[];
+  /** Cross-tab: per-package × per-method revenue & count (for deep-dive). */
+  byPackageMethod: {
+    package: string;
+    methods: { method: string; revenue: number; count: number }[];
+    total: number;
+    count: number;
+  }[];
 }
 
 /**
@@ -205,6 +212,7 @@ export function getRevenueSummary(): Promise<RevenueSummary> {
         byMethod: [],
         byPackage: [],
         byDay: [],
+        byPackageMethod: [],
       };
 
     const list = Object.values(map).filter((p) => p && p.amount != null);
@@ -215,6 +223,11 @@ export function getRevenueSummary(): Promise<RevenueSummary> {
     const methodMap = new Map<string, { revenue: number; count: number }>();
     const pkgMap = new Map<string, { revenue: number; count: number }>();
     const dayMap = new Map<string, { revenue: number; count: number }>();
+    // Cross-tab: pkg -> method -> {revenue, count}
+    const pkgMethodMap = new Map<
+      string,
+      Map<string, { revenue: number; count: number }>
+    >();
 
     for (const p of list) {
       const amt = Number(p.amount ?? 0);
@@ -245,6 +258,17 @@ export function getRevenueSummary(): Promise<RevenueSummary> {
       pg.count += 1;
       pkgMap.set(pkg, pg);
 
+      // cross-tab
+      let pm = pkgMethodMap.get(pkg);
+      if (!pm) {
+        pm = new Map();
+        pkgMethodMap.set(pkg, pm);
+      }
+      const pmv = pm.get(method) ?? { revenue: 0, count: 0 };
+      pmv.revenue += amt;
+      pmv.count += 1;
+      pm.set(method, pmv);
+
       if (p.createdAt) {
         const d = new Date(p.createdAt);
         const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -266,6 +290,17 @@ export function getRevenueSummary(): Promise<RevenueSummary> {
       .sort((a, b) => a.day.localeCompare(b.day))
       .slice(-14); // last 14 active days
 
+    const byPackageMethod = Array.from(pkgMethodMap.entries())
+      .map(([pkg, methodsMap]) => {
+        const methods = Array.from(methodsMap.entries())
+          .map(([method, v]) => ({ method, ...v }))
+          .sort((a, b) => b.revenue - a.revenue);
+        const total = methods.reduce((s, m) => s + m.revenue, 0);
+        const count = methods.reduce((s, m) => s + m.count, 0);
+        return { package: pkg, methods, total, count };
+      })
+      .sort((a, b) => b.total - a.total);
+
     return {
       totalRevenue,
       totalPayments: list.length,
@@ -276,6 +311,7 @@ export function getRevenueSummary(): Promise<RevenueSummary> {
       byMethod,
       byPackage,
       byDay,
+      byPackageMethod,
     };
   });
 }

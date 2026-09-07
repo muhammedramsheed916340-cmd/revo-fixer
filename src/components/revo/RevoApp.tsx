@@ -19,6 +19,7 @@ import { RevoAdminGate } from "./RevoAdminGate";
 import { RevoComparison } from "./RevoComparison";
 import { RevoDeposit } from "./RevoDeposit";
 import { RevoScrollTop, RevoDivider } from "./RevoScrollTop";
+import { RevoTerms } from "./RevoTerms";
 
 import type {
   AppSettings,
@@ -300,6 +301,8 @@ export function RevoApp() {
           <RevoDivider icon="fa-user-shield" color="#a78bfa" />
 
           <RevoAdminGate />
+
+          <RevoTerms settings={settings} />
         </main>
 
         <RevoFooter settings={settings} onGo={scrollTo} />

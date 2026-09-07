@@ -1,6 +1,7 @@
 "use client";
 
 import { formatINR } from "./lib";
+import { useCountUpWithRef } from "./useCountUp";
 import type { AppSettings } from "@/lib/types";
 
 interface Stats {
@@ -26,22 +27,31 @@ function Stat({
   value: string | number;
   color: string;
 }) {
+  // Animate numeric values on scroll-into-view.
+  const numeric = typeof value === "number" ? value : parseInt(String(value), 10);
+  const isNumeric = !isNaN(numeric) && String(value).match(/^\d+$/);
+  const [animated, ref] = useCountUpWithRef(isNumeric ? numeric : 0);
+  const display = isNumeric ? animated.toLocaleString("en-IN") : value;
+
   return (
-    <div className="revo-card group relative overflow-hidden p-4">
+    <div className="revo-card group relative overflow-hidden p-4 transition hover:-translate-y-0.5 hover:ring-1 hover:ring-[#448AFF]/30">
       <div
-        className="absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-20 blur-2xl transition group-hover:opacity-40"
+        className="absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-20 blur-2xl transition group-hover:opacity-50"
         style={{ background: color }}
       />
       <div className="flex items-center gap-3">
         <span
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg transition group-hover:scale-110"
           style={{ background: `${color}22`, color }}
         >
           <i className={`fas ${icon}`} />
         </span>
         <div className="min-w-0">
-          <div className="text-xl font-black text-white sm:text-2xl">
-            {value}
+          <div
+            ref={ref}
+            className="text-xl font-black tabular-nums text-white sm:text-2xl"
+          >
+            {display}
           </div>
           <div className="truncate text-[11px] font-medium uppercase tracking-wider text-[#5a6a99]">
             {label}

@@ -113,3 +113,32 @@ Stage Summary:
 - All data remains 100% real from live Firebase — zero mock.
 - Lint clean, dev log clean, all APIs healthy (verify-admin 405 on GET is correct = POST-only), agent-browser QA green across desktop + mobile.
 - Next phase candidates: T&C section, per-package revenue deep-dive modal, admin write operations (needs Firebase service-account), live notifications bell, dark/light theme toggle.
+
+---
+
+Task ID: 4 (cron round 4)
+Agent: Z.ai Code (webDevReview)
+Task: Round-4 review — QA current state, fix bugs, then add live Notifications Bell, T&C section, per-package revenue deep-dive, animated stat counters + styling polish. All real data only.
+
+Work Log:
+- Read worklog; confirmed rounds 1-3 stable (9 APIs, 11 sections, lint clean).
+- agent-browser QA: 11 sections render, no console/runtime errors, license verify (banned + used) passes, dashboard loads 42+ real entries, mobile responsive, sticky footer OK. No bugs found.
+- Built `RevoNotificationsBell.tsx`: navbar bell button with unread-count badge (red pill, pulse ring). Dropdown panel polls `/api/notifications` every 30s, shows real notifications with type-colored icons (payment_approved/package_activated/etc), title + message + time-ago. "Mark all read" persists read-ids to localStorage. Outside-click to close. Empty/loading states.
+- Built `RevoTerms.tsx`: 7-section Terms & Conditions with real platform values (min deposit ₹7,000, USDT rate ₹94.14, transfer min ₹7,000, support @RevoAgent/email). Sections: License Key Terms, Payments & Pricing, Wallet Transfers, Refund Policy, Limitation of Liability, Prohibited Use, Contact & Disputes. Sticky section-index sidebar (desktop) + accordion (all viewports). Acceptance bar CTA.
+- Added `byPackageMethod` cross-tabulation to `getRevenueSummary()` in firebase.ts — per-package × per-method revenue/count. Verified: 1 Day ₹136k (Bkash ₹72k/UPI ₹32k/USDT ₹32k), 1 Hour ₹33.9k (UPI ₹24.5k/Bkash ₹5.4k/USDT ₹4k).
+- Added per-package deep-dive to `RevoRevenue.tsx`: expandable rows below the chart card. Each package row shows total + share% progress bar + payment count. Expanding reveals per-method breakdown cards (colored, with % share). "Tap a row to expand" hint.
+- Built `useCountUp.ts` hook: animates numbers 0→target with IntersectionObserver + easeOutCubic on scroll-into-view. Applied to `RevoStats.tsx` — all 8 stat counters now animate smoothly with tabular-nums. Also added hover lift + ring + icon scale to stat cards.
+- Styling polish: navbar expanded 11→12 items (Terms added), footer nav 11→12. Stat cards get hover translate-y + ring + icon scale. Deep-dive rows have gradient progress bars.
+- Wired new sections into RevoApp: FAQ → Divider → Admin → Terms → Footer. Terms added to navbar + footer nav.
+- Fixed lint: removed setState-in-effect in useCountUp (derived zero-case instead).
+- `bun run lint` → **0 errors**.
+- agent-browser QA: 12 sections render, no console/runtime errors. Notifications bell shows unread badge "2", dropdown opens with 2 real items, mark-all-read clears badge. Terms: 7-section accordion + sticky index, first item expands. Revenue deep-dive: "Per-package deep dive" with 3 packages, expandable rows show per-method cards. Stats: 8 animated counters (51/49/23/25/25/2/2/12) with tabular-nums. License verify (banned) still passes. Dashboard regression: loads 70 real activity entries + timer. Mobile (375×812): 12 sections, bell visible, hamburger nav. All 8 GET APIs healthy.
+
+Stage Summary:
+- 3 new real-data features shipped: Live Notifications Bell (navbar dropdown), T&C section (7 sections + sticky index), Per-package Revenue Deep-Dive (expandable cross-tab).
+- 1 new firebase.ts field (`byPackageMethod` cross-tab), 1 new hook (`useCountUp`), 3 new components (`RevoNotificationsBell`, `RevoTerms`, deep-dive added to `RevoRevenue`).
+- Animated stat counters (8 stats count up on scroll-into-view).
+- Navbar expanded 11→12, footer nav 11→12.
+- All data remains 100% real from live Firebase — zero mock.
+- Lint clean, dev log clean, all 8 GET APIs healthy, agent-browser QA green across desktop + mobile.
+- Next phase candidates: dark/light theme toggle, admin write operations (Firebase service-account), live notifications WebSocket, export-to-PDF for transaction history, package recommendation engine.
