@@ -2691,3 +2691,52 @@ Stage Summary:
 - Feed outage resolved (~32 min); validation resumed cleanly with seamless ID continuity and clean rows.
 - 79 rounds banked; tab-reuse streak clean; engine untouched.
 - Standings frozen since round 67: raw base −1.3pp / verified exp +2.7pp / theo 75.9%. Next passes: continue probing toward 100+; watch for first flip since 67 to restart significance accumulation.
+
+---
+Task ID: 52 (cron monitor — Job ID 369099, pass 8 — 100-ROUND MILESTONE)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 8). 8-metric extraction + preliminary analysis at the PREFERRED sample size (100+). No code changes.
+
+Work Log:
+- Read worklog: pass 7 (Task 51) at n=79 post-recovery. Feed probe: alive (30 events). Tab reused, NO reload.
+- Ledger: n=102 (IDs 2-103), contiguous, 0 dupes, ts ascending, ~106 min elapsed. Zero console errors. Panel ↔ ledger reconciled (splits below).
+- ZERO new degraded rows (4th consecutive clean pass since tab-reuse adopted; degraded set frozen at 6/24/45/67).
+
+Validation snapshot at n=102:
+1. Paired rounds: 102 (PREFERRED THRESHOLD CROSSED)
+2. Baseline HIT: 70/102 = 68.6%
+3. Experimental HIT: 69/102 = 67.6%
+4. Delta: −1 hit (−1.0pp) raw
+5. MISS→HIT: 3 (#4, #8, #22)
+6. HIT→MISS: 4 (#12 verified; #24/#45/#67 degraded)
+7. Theoretical [1,2,5,10]: 79/102 = 77.5%
+8. MISS RCA: 7 entries (unchanged)
+- Verified-only (n=98): base 68.4% vs exp 70.4%, Δ +2 hits (+2.0pp)
+- Stretch 81-103 (23 rounds): both models agreed on EVERY round — 15 both-hit, 8 both-miss, 0 discordant. '1' hit 11 times in the stretch; both models caught both PACHINKO rounds and the COIN FLIPs; both excluded '10' and dodged its 2 landings.
+
+100-ROUND PRELIMINARY ANALYSIS (preferred sample):
+
+A. HEADLINE: NO significant difference between models — and the reason is unusual. McNemar: raw 3v4 discordant p=1.0; verified 3v1 p=0.625. The models have CONVERGED: 36 consecutive rounds in full agreement (rounds 68-103). Discordant rate collapsed from ~4.5% (rounds 2-67) to 0%. The reliability layer's differentiation only manifests when a rare-outcome displacement event occurs — and none has occurred since round 67.
+
+B. Degraded-row sensitivity still owns the sign: raw −1.0pp (baseline) vs verified +2.0pp (experimental). All 4 degraded rows are monitoring-reload artifacts predating tab-reuse; baseline's +1 normal-round edge (55 vs 54 of 79) equals the r67 artifact exactly — strip it and normal rounds are tied 54/78; bonus rounds tied 15/23 (65% each).
+
+C. The layer's story in three phases:
+   - Rounds 4-22 (active divergence): 3 displacement-correction saves, its designed mechanism, all verified.
+   - Round 12/24/45/67 (costs): 1 verified dampening loss + 3 unverifiable reload artifacts.
+   - Rounds 68-103 (convergence): zero divergence, zero saves needed, zero costs. In steady state the layer is indistinguishable from baseline.
+
+D. Benchmark reality (unchanged theme, now at n=102): theoretical number-floor 77.5% beats both models (68.6/67.6 raw; 70.4/68.4 verified; exp gap 7.1pp, base gap 9.1pp verified). In this number-dominant regime ('1' ≈ 45% of rounds, CRAZY TIME 0/102 lifetime), holding 2 bonus slots costs ~7-9pp and neither model escapes it. Both models DID catch every bonus that had prior evidence (PACHINKO ×2, COIN FLIP ×2 in the stretch) — their bonus misses are concentrated in unevidenced bonuses.
+
+E. Operational integrity at the milestone: 102 rounds banked with 4 reload-degraded rows (3.9% row corruption, all attributed, all flagged, none since the fix); ~13-18 outage-missing rounds (coverage gap, unbiased); engine frozen throughout (0 code diffs every pass). Data quality is now publication-clean going forward.
+
+F. Path to a decision: significance cannot accumulate while models agree. Options for the 150/200-round checkpoints:
+   1. Continue as-is (zero marginal cost) — a bonus-regime shift (e.g., CRAZY TIME's first landing) would likely restart divergence and give the layer its real test in the regime it was built to dampen.
+   2. Any future flip-burst should be analyzed with per-flip RCA as the primary evidence, McNemar as the secondary.
+   3. If 200 rounds pass with <10 discordant pairs, the honest conclusion is 'equivalent in this regime' — and the layer's value case rests entirely on the verified saves (3) vs verified loss (1) from the early window.
+
+VERDICT at preferred n=102: Baseline and experimental are statistically indistinguishable (p≥0.625) and currently behaviorally identical (36-round agreement streak). Experimental holds a small permanent verified edge (+2 hits, +2.0pp) from the early divergence window, with the raw leaderboard inverted only by 2 monitoring artifacts. The layer has paid its way 3-saves-to-1-loss but has been untested since round 67. Both models remain ~7pp behind the naive number floor in this regime.
+
+Stage Summary:
+- 100+ preferred threshold crossed (n=102); integrity clean; tab-reuse streak 4 passes; engine untouched.
+- Models converged (36-round agreement); standings frozen: raw −1.0pp / verified +2.0pp / theo 77.5%.
+- Next checkpoints: 150 and 200 rounds, or first divergence event (higher-value trigger). Feed probe + tab reuse continue.
