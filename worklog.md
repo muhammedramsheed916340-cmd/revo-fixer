@@ -2786,3 +2786,42 @@ Stage Summary:
 - 121 rounds banked; convergence broken by a textbook displacement save; verified experimental edge at its strongest (+3 hits, +2.5pp, p=0.375); raw leaderboard tied.
 - 5 consecutive zero-degradation passes; engine untouched; data pipeline clean.
 - Next passes: track whether divergence re-occurs (PACHINKO/CASH HUNT-heavy baseline Top-4s are the trigger pattern); checkpoints 150/200 stand.
+
+---
+Task ID: 54 (cron monitor — Job ID 369099, pass 10)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 10). 8-metric extraction + preliminary-analysis update. No code changes.
+
+Work Log:
+- Read worklog: pass 9 (Task 53) at n=121 (post-#116 flip, raw tied). Feed probe: alive. Tab reused, NO reload — 6th consecutive clean pass (degraded set frozen at 6/24/45/67).
+- Ledger: n=140 (IDs 2-141), contiguous, 0 dupes, ts ascending, ~136 min elapsed. 19 new rounds.
+
+HEADLINE: CRAZY TIME DEBUT — after 0/121 lifetime, CRAZY TIME landed TWICE in the stretch (#123, #137):
+- #123: BOTH models held CRAZY TIME as 4th pick (identical Top-4 [2, COIN FLIP, 1, CRAZY TIME]; layer's CRAZY TIME prob had converged to 14% = baseline's 14%) → both HIT.
+- #137: both models dropped it (same outcome SET for both, order differs) → both missed.
+- The long-feared asymmetry (layer's deeper CRAZY TIME dampening costing it bonuses) did NOT materialize — by the time CRAZY TIME landed, both engines' treatment had CONVERGED (reliability factor r=N/(N+10) converges as evidence accumulates). Question opened in Tasks 49/52 is now ANSWERED: no asymmetry cost.
+- '10' watch: 8 lifetime landings, both models 2/8 on it (symmetric; #47, #133). '10' remains the slot where theo's forced inclusion beats both models.
+
+Validation snapshot at n=140:
+1. Paired rounds: 140
+2. Baseline HIT: 92/140 = 65.7%
+3. Experimental HIT: 92/140 = 65.7%
+4. Delta: 0 hits (0.0pp) raw — tied (second consecutive pass)
+5. MISS→HIT: 4 (#4, #8, #22, #116 — unchanged)
+6. HIT→MISS: 4 (#12 verified; #24/#45/#67 degraded — unchanged)
+7. Theoretical [1,2,5,10]: 109/140 = 77.9%
+8. MISS RCA: 8 entries (unchanged)
+- Verified-only (n=136): base 65.4% vs exp 67.6%, Δ +3 hits (+2.2pp)
+- Agreement streak: 25 rounds (since #116); McNemar unchanged (raw 4v4 p=1.0; verified 4v1 p=0.375)
+- Stretch 123-141: base 11/19, exp 11/19, theo 15/19 — stretch was CRAZY TIME ×2, '10' ×3, '1' ×7 (number-storm continues)
+
+Preliminary-analysis UPDATE (n=140):
+- Standings structurally unchanged: raw tied (artifact-neutral), verified exp +2.2pp (stable band +2.0 to +2.5 across passes 8-10), theo floor ~78% leads all.
+- New intel: convergence extends to BONUS TREATMENT, not just numbers — both engines now select/drop CRAZY TIME identically, hold PACHINKO/COIN FLIP identically, and miss '10' identically. The layer has become behaviorally equivalent to baseline except when a fresh displacement event fires (last: #116).
+- Model-vs-floor gap widened slightly for both (65.7 vs 77.9): '10' ×3 in the stretch hurt models (excluded) and helped theo (included) — the floor's structural edge concentrates in low-evidence numbers (10, 2 early) that the reliability layer legitimately dampens but the naive floor blindly holds. This is the floor's known bias-variance trade: it wins in high-volatility windows by refusing to learn.
+- No change to verdict or checkpoints: continue to 150/200; first-divergence remains the high-value trigger; PACHINKO/CASH HUNT-heavy baseline Top-4s still the flip signature.
+
+Stage Summary:
+- 140 rounds banked; CRAZY TIME asymmetry question resolved (none — treatments converged); raw tie holds, verified exp +2.2pp, theo 77.9%.
+- 6 consecutive zero-degradation passes; engine untouched; pipeline clean.
+- Next: continue toward 150 checkpoint; watch for displacement-triggered divergence (the only state in which the two models differ).
