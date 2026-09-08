@@ -3055,3 +3055,39 @@ Stage Summary:
 - ONE real anomaly found and attributed: 25.2-min feed stall (04:21-04:46 +08), est. ~25-35 rounds unobserved, IDs contiguous so invisible to round counts. Class matches the documented pass-6/7 outage. Unbiased; no action possible or needed (observation-only). Escalation resolved.
 - Tooling hardening: analyzer now carries known_gaps memory (75→76 documented outage) — prevents repeat false escalation; anchor.json rolling state makes subsequent passes fully metrics-only turnkey.
 - Protocol: metrics-only resumes next pass; triggers unchanged (verified McNemar p<0.05, new degradation, NEW unattributed coverage gap, or 3+ same-direction flips in one regime window). Engine untouched.
+
+---
+Task ID: 61 (cron monitor — Job ID 369099, pass 17 — metrics-only + 1 new flip RCA (escalated-lite))
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 17, 05:01 +08). One new flip (#236) required RCA attribution; trigger (b) re-flag was transitional bookkeeping. No engine changes.
+
+Work Log:
+- Read worklog tail: pass 16 (Task 60) anchor = window 30-229, streak 29.
+- Feed probe: ALIVE and recovered — post-stall burst: 18 new rounds ingested (230-247), window slid to 48-247. Tab reused, NO reload — 13th consecutive clean pass (zero new degraded rows).
+- NEW FLIP #236 (H2M verified) — first since #200, broke the 29-round agreement streak:
+  * Row detail: actual=PACHINKO; baseline preds ['1','COIN FLIP','2','PACHINKO'] (PACHINKO in slot 4) vs exp preds ['1','2','COIN FLIP','5'] (layer displaced PACHINKO for retained '5'); coverage 0.606 vs 0.610.
+  * RCA class: PACHINKO inverse-save #2 — identical signature to #200 (baseline holds bonus-slot PACHINKO, layer swaps in a retained number, bonus lands). 5th lifetime verified loss.
+  * Regime context: first instance of the layer's documented weak side in the post-stall bonus-flavored cluster (#242 PACHINKO both-hit, #243 CRAZY TIME both-miss, #244 COIN FLIP both-miss). On #237 the layer immediately re-inserted PACHINKO (slot 2) — adaptive response intact, no hard-cutoff pathology.
+- Trigger (b) re-flag (227→228 gap): TRANSITIONAL — the gap is the documented pass-16 stall; known_gaps memory was manually seeded only with 75→76 before the analyzer's first patched run. Analyzer writeback has now persisted BOTH gaps ([[75,76],[227,228]]) into anchor memory. No unattributed anomaly exists.
+- Panel cross-check: initially showed base 125/124 vs ledger 126/125 — diagnosed as one-round timing skew (panel grabbed after row 248 landed). Verified by fresh extraction (window 49-248: base 125, exp 124, theo 159 — exact match). No real discrepancy.
+- Engine freeze: git verified — zero diffs to engine/app code.
+
+Metrics (FIFO window n=200, IDs 48-247 at snapshot; panel cross-check matched modulo 1-round slide):
+1. Paired rounds: 200 (clean 199; in-window degraded: #67 only — #45 aged out)
+2. Baseline HIT: 126/200 = 63.0% raw / 125/199 = 62.8% clean
+3. Experimental HIT: 125/200 = 62.5% (clean identical)
+4. Delta: raw −1 hit (−0.50pp, artifact-carried); clean 0.0pp (dead tie on clean rows)
+5. MISS→HIT (window): 4 (#116, #163, #164, #178) — lifetime 7
+6. HIT→MISS (window): 5 raw (#67 degraded + #161, #188, #200, #236 verified); verified-only 4 — lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 159/200 = 79.5% (clean 158/199 = 79.4%) — leads both models ~17pp
+8. MISS RCA: +1 entry — lifetime now 15 (7 displacement saves, 5 verified losses [#12 dampening, #161 selection-edge, #188 COIN FLIP inverse-save, #200 PACHINKO inverse-save, #236 PACHINKO inverse-save], 3 degraded)
+- Agreement streak: 11 (since #236)
+- Avg coverage: base 71.68% / exp 71.17%
+- McNemar: window verified 4v4 p=1.000; lifetime verified 7v5 p=0.774; lifetime raw 7v8 p=1.000 — significance drifting AWAY from crossing
+
+Stage Summary:
+- The layer's inverse mechanism has now fired a second time (PACHINKO inverse-save #236, mirroring #200): 5 verified losses vs 7 saves lifetime. Equivalence verdict intact (raw 7v8 p=1.0; verified 7v5 p=0.774).
+- Regime watch item: post-stall window shows the bonus-flavored mix that constitutes the layer's documented weak regime. The single #236 flip is 1 of 3 toward the '3+ same-direction flips in one regime window' escalation trigger — watch next passes.
+- Panel outcome table detail: retained-number edge persists ('2' exp rate 65% vs base 60%, +10pp; '5' 52% vs 48%, +8pp) — the structural trade continues to pay in number-storms and cost in bonus clusters, exactly per the Task 57 mechanism-symmetry analysis.
+- Tooling: analyzer gap-memory now self-maintaining via anchor writeback (both documented gaps excluded from future triggers).
+- Protocol: metrics-only resumes; triggers unchanged. Engine untouched.
