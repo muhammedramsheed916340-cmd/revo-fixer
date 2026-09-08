@@ -3490,3 +3490,23 @@ Stage Summary:
 - Validation metrics unchanged in character: equivalence intact (streak 115, McNemar n.s. everywhere), delta artifact stable at -1, floor compounding to consecutive records (84.0%).
 - The +2 normal / -3 bonus per-window signature (5 windows) remains the only persistent structural A/B difference; still noise-range (3-4 rounds); watch-only.
 - Protocol continues: metrics-only; triggers re-armed. Engine untouched.
+
+---
+Task ID: 71 (cron monitor — Job ID 369099, pass 26 — COLLECTION DOWN: page renderer hung; no metrics this pass)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 26, 07:31 +08). Collection failed — page unresponsive. Documented, no reload performed (protocol), owner decision surfaced.
+
+Work Log:
+- Read worklog tail: anchor = Task 70, window 152-351, outage #5 (20.8 min) documented.
+- Extraction attempt 1: agent-browser eval timed out at 30s (first extraction failure in ~21 consecutive clean passes).
+- Diagnostic: `tab list` SUCCEEDS (tab t1 alive, title unchanged — browser process healthy), but `Runtime.evaluate` times out even on trivial `1+1` probe -> page MAIN THREAD BLOCKED (renderer hang). This is a NEW failure mode: page freeze, NOT an upstream feed stall (outages #1-5 were upstream; ledger kept updating page-side then).
+- Timeline inference: last good extraction pass 25 at ~07:16 (row #351, age 16s); hang onset between 07:16 and 07:31. Rounds after #351 are unobserved by ledger AND monitor — will constitute an unobserved block if/when page recovers (same treatment as outages: no endpoint measurable until collection resumes).
+- NO reload performed: tab-reuse protocol preserved (21st consecutive pass without reload). Reload would likely recover collection (ledger persists in localStorage; engine code untouched) but is an infrastructure decision for the owner given the standing no-reload protocol.
+- No metrics extractable this pass; analyzer NOT run (no new snapshot); anchor unchanged (pass 25 state); triggers deferred.
+
+Metrics: UNAVAILABLE this pass (last known, window 152-351 @ pass 25: base 129/200 = 64.5%, exp 128/200 = 64.0%, delta -1, theo 168/200 = 84.0% record, streak 115).
+
+Stage Summary:
+- COLLECTION DOWN since between 07:16-07:31 +08: page renderer hung (CDP eval blocked). Monitoring infrastructure intact (scripts, anchor, worklog, git freeze verified at pass 25 with zero engine diffs).
+- OWNER ACTION RECOMMENDED: restart/reload the page (http://localhost:3000). Data-safe: ledger lives in localStorage and survives reload; no engine or code change involved. Alternative: hold and let next pass (07:46) re-probe — if still hung, reload becomes strongly recommended.
+- Watch: on recovery, expect a new >8min gap (#351 -> next ingested round) to document as outage #6 (page-side collection gap, distinct mechanism from upstream outages #1-5).
