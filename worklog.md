@@ -3424,3 +3424,36 @@ Stage Summary:
 - -0.50pp delta composition artifact persists (will clear when a new exp-saved round enters or the flipped block ages); monitored, not significant.
 - Floor at 83.0% again leads ~18.5pp; '5'-miss signature from Task 65 audit seen live twice this window.
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 69 (cron monitor — Job ID 369099, pass 24 — metrics-only steady state + 2 watch items)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 24, 07:01 +08). All triggers clear. No engine changes.
+
+Work Log:
+- Read worklog tail: anchor = Task 68, window 138-337, delta -1 artifact, streak 101.
+- Feed probe: 10 new rounds 338-347 (window 148-347), tab reused, NO reload — 18th consecutive clean pass (zero degraded rows). No >8min inter-row gaps.
+- WATCH ITEM 1: newest-row age 8.3 min at extraction (500s) — above normal ~40-60s cadence, below escalation threshold. Possible early stall (06:16 precedent became outage #4 at 25.5 min). Held per protocol; next pass will confirm recovery or measure gap. NOT counted as outage yet (no endpoint).
+- WATCH ITEM 2: new block 338-347 was a heavy miss cluster — both engines 3/10 while floor 10/10 (all-normal block). Misses: '5'x2 (#339, #346), '10'x1 (#340), '2'x3-of-4 (#341, #342, #344 miss; #345 hit); '1'x3 all hit. This is the Task 65 calibration audit signature LIVE: '5'/'10' exclusions + '2' partial exclusion cost both engines 7 rounds in 10; the floor's invariance converted the storm into +1 theo net. Both engines identical throughout (10/10 agree) — pure calibration exposure, zero layer differential.
+- Window: base 126/200 = 63.0%, exp 125/200 = 62.5% — delta HOLDS at -1 hit (-0.50pp), third consecutive window (eviction-symmetric: both -3 on the new block).
+- theo 167/200 = 83.5% — NEW RECORD HIGH (prev 83.0%, pass 21). Floor leads both models by 20.5pp.
+- Agreement streak 111 (extended from 101; last flip still #236).
+- Panel cross-check: exact match (200 paired, 63%/63% rounded, theo 167/200 = 84% rounded); normal/bonus base 104/167 vs exp 106/167 normal, base 22/33 vs exp 19/33 bonus — the +2 normal / -3 bonus 3-window signature CONTINUES (now 4 windows); pred changes 79/85; stale 26/25.
+- Engine freeze: git verified — zero engine diffs.
+
+Metrics (FIFO window n=200, IDs 148-347, clean 200):
+1. Paired rounds: 200 (fully clean; 5th consecutive clean window)
+2. Baseline HIT: 126/200 = 63.0%
+3. Experimental HIT: 125/200 = 62.5%
+4. Delta: -1 hit (-0.50pp), unchanged third window (FIFO composition artifact)
+5. MISS->HIT flips: window 3 (#163, #164, #178); lifetime 7
+6. HIT->MISS flips: window 4 verified (#161, #188, #200, #236); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 167/200 = 83.5% (record high)
+8. MISS RCA: lifetime 15, unchanged (zero new flips)
+- McNemar: window 3v4 p=1.000; lifetime verified 7v5 p=0.774; raw 7v8 p=1.000
+
+Stage Summary:
+- Metrics-only steady state; all triggers clear; no escalation. Two watch items logged (newest-age silence; miss-cluster regime) — neither meets escalation criteria.
+- The 338-347 block is the audit's thesis playing out in real time: 7/10 rounds lost to bonus-over-'5'/'10'/'2' calibration bias, identically for both engines. Equivalence intact (streak 111); floor dominance compounding (83.5% record).
+- Next pass MUST resolve watch item 1: if newest-age grows toward ~20 min, expect outage #5 documentation; if recovered, log cadence note only.
+- Protocol continues: metrics-only. Engine untouched.
