@@ -3163,3 +3163,110 @@ Stage Summary:
 - The clean tie also sharpens the regime framing: this window remains number-tilted (the floor at 80.0%), yet the layer fully offsets its retained-number edge against its bonus-slot costs round-for-round — symmetry holding under the cleanest possible measurement.
 - LIVE anomaly watch: upstream outage ongoing at pass end (onset 05:20:00 +08, confirmed [] at 05:34). Pass 20 must reconcile: if recovered, quantify gap and est. missed rounds (prevailing cadence ~42s → ~10-14 min of quiet so far would imply ~15-20 rounds if it ended at pass end; longer if ongoing); if still down, document continuation. No local pipeline action needed or possible (observation-only).
 - Protocol: metrics-only resumes; triggers unchanged (this outage is attributed live; re-flag next pass will be handled as known-class if still in-window). Engine untouched.
+
+---
+Task ID: 64 (diagnostic audit — RCA of dynamic-vs-theoretical gap; observation-only, no code changes)
+Agent: Z.ai Code (audit, observation-only)
+Task: Per user directive — audit the clean n=200 window to determine the dominant source of the gap between the dynamic Top-4 model (59.5%) and the theoretical [1,2,5,10] floor (80%+). NO retuning, NO weight/k changes, NO forcing [1,2,5,10]. Report complete RCA before any code proposal.
+
+WINDOW & DATA QUALITY:
+- The 119/119 tie window was IDs 72-271 (pass 19). 16 rows (72-87) aged out of localStorage FIFO before this audit could capture their probability vectors. Audited window = current clean n=200, IDs 88-287 (same regime, same frozen engine, fully clean, complete probability data). Headline: base 119/200=59.5%, exp 119/200=59.5%, theo 163/200=81.5%. Gap = 22.0pp (vs 20.5pp in tie window — 3 theo-hits difference from window slide; mechanism identical).
+- Outage separation: 0 degraded rows in window. Two inter-row time gaps (227->228 25min, 271->272 16min) = upstream outages where rounds never received IDs — ABSENT from ledger, NOT counted as misses. All 200 rows are valid prediction rounds. The current ongoing outage recovered (rounds 272-287 ingested).
+- Engine freeze: git verified — zero diffs. Audit scripts untracked only.
+
+══════════════════════════════════════════════════════════════════════
+GAP DECOMPOSITION (theo 163 vs base 119, net gap = 44 rounds = 22.0pp)
+══════════════════════════════════════════════════════════════════════
+  theo-HIT & base-MISS (gap-contributing misses): 67 rounds
+  theo-MISS & base-MISS (shared misses, bonus actuals — NOT gap): 14 rounds
+  base-HIT & theo-MISS (base hit a bonus, narrows gap): 23 rounds
+  => net gap = 67 - 23 = 44 rounds
+
+══════════════════════════════════════════════════════════════════════
+MISS CLASSIFICATION (81 baseline misses, by the 11-class scheme)
+══════════════════════════════════════════════════════════════════════
+  Class 1 (rare-outcome over-selection) + Class 6 (unnecessary bonus inclusion): 67/81
+    — CO-EXTENSIVE in this window: every gap-miss had a bonus in top-4 that displaced the number which then landed
+  Class 2 (2 exclusion):  24 of the 67 (the displaced number was '2')
+  Class 3 (5 exclusion):  11 of the 67
+  Class 4 (10 exclusion): 13 of the 67
+  Class 5 (1 exclusion):   19 of the 67
+    NOTE: classes 2-5 are SUB-LABELS (which number got displaced), not independent causes. The cause is the bonus inclusion.
+  Class 7 (probability calibration error) — ROOT CAUSE: 67/67 gap-misses had >=1 bonus rated ABOVE the excluded number (100%). The model's probability estimates over-rate bonuses and under-rate dominant numbers (see calibration table below).
+  Class 8 (optimizer selection error): 0 — the optimizer correctly selects top-4 by the (miscalibrated) probs; no rank-5/6 near-misses.
+  Class 9 (stale/persistence): 17 of 81 misses had preds identical to prior round (secondary tag; stale preds that include bonuses still displace numbers — stale amplifies but is not the root).
+  Class 10 (live/user data-blend distortion): 0 detectable from ledger.
+  Class 11 (other — bonus-actual shared misses): 14 (actual was PACHINKO×4 / COIN FLIP×6 / CASH HUNT×2 / CRAZY TIME×2; theoretical also missed these — NOT gap-contributing).
+
+══════════════════════════════════════════════════════════════════════
+CALCULATION 1: misses caused by excluding each normal outcome
+══════════════════════════════════════════════════════════════════════
+  actual='1'  excluded & landed: 19 misses  (costliest per-exclusion: lands 45% when excluded)
+  actual='2'  excluded & landed: 24 misses  (highest absolute count)
+  actual='5'  excluded & landed: 11 misses
+  actual='10' excluded & landed: 13 misses
+  subtotal: 67 (all gap-contributing)
+
+CALCULATION 2: misses caused by unnecessary bonus inclusion
+  67 of 81 baseline misses (83%) — a bonus in top-4 displaced the number that landed.
+
+══════════════════════════════════════════════════════════════════════
+CALCULATION 3: Top-4 inclusion rate for each outcome (baseline)
+══════════════════════════════════════════════════════════════════════
+  '1'          158/200 = 79.0%   (actual freq 38.0%  — UNDER-included)
+  '2'          107/200 = 53.5%   (actual freq 24.5%  — UNDER-included)
+  '5'           95/200 = 47.5%   (actual freq 11.5%  — proportionate)
+  '10'          75/200 = 37.5%   (actual freq  7.5%  — over-included 5x)
+  PACHINKO     151/200 = 75.5%   (actual freq  6.5%  — over-included 12x !!)
+  COIN FLIP    139/200 = 69.5%   (actual freq  9.0%  — over-included 8x !!)
+  CASH HUNT     35/200 = 17.5%   (actual freq  1.5%  — over-included 12x)
+  CRAZY TIME    40/200 = 20.0%   (actual freq  1.5%  — over-included 13x)
+
+══════════════════════════════════════════════════════════════════════
+CALCULATION 4: actual hit rate conditional on each outcome being EXCLUDED
+══════════════════════════════════════════════════════════════════════
+  '1'  excluded in 42 rounds;  actual='1' in 19 of those (45.2%) -> all misses
+  '2'  excluded in 93 rounds;  actual='2' in 24 of those (25.8%) -> all misses
+  '5'  excluded in 105 rounds; actual='5' in 11 of those (10.5%) -> all misses
+  '10' excluded in 125 rounds; actual='10' in 13 of those (10.4%) -> all misses
+  (conditional land-rate tracks actual frequency — the model excludes high-freq '1'/'2' often and pays dearly)
+
+══════════════════════════════════════════════════════════════════════
+CALCULATION 5-7: dynamic-vs-static divergence
+══════════════════════════════════════════════════════════════════════
+  Rounds where baseline top-4 == {1,2,5,10}: 4/200 = 2.0%
+    => baseline HIT 4/4 = 100.0%  | theoretical HIT 4/4 = 100.0%
+  Rounds where baseline top-4 != {1,2,5,10}: 196/200 = 98.0%
+    => baseline HIT 115/196 = 58.7%  | theoretical HIT 159/196 = 81.1%
+  => The dynamic model diverges from the static floor 98% of the time, and ALL of the gap lives in those divergent rounds. When it agrees with the floor, it hits 100%.
+  When diverging, bonuses included: PACHINKO 77.0%, COIN FLIP 70.9%, CRAZY TIME 20.4%, CASH HUNT 17.9%.
+  When diverging, numbers dropped: '10' 63.8%, '5' 53.6%, '2' 47.4%, '1' 21.4%.
+
+══════════════════════════════════════════════════════════════════════
+CALIBRATION ROOT-CAUSE TABLE (avg model prob vs actual frequency)
+══════════════════════════════════════════════════════════════════════
+  outcome      avg_p   actual%   ratio
+  '1'          0.149    0.380    0.4x  UNDER-rated (model gives '1' 15%, lands 38%)
+  '2'          0.126    0.245    0.5x  UNDER-rated
+  '5'          0.119    0.115    1.0x  well-calibrated
+  '10'         0.123    0.075    1.6x  over-rated
+  PACHINKO     0.146    0.065    2.2x  over-rated
+  COIN FLIP    0.140    0.090    1.6x  over-rated
+  CASH HUNT    0.094    0.015    6.2x  MASSIVELY over-rated
+  CRAZY TIME   0.102    0.015    6.8x  MASSIVELY over-rated
+  => The model's probability distribution is COMPRESSED toward uniformity: it under-weights the two dominant numbers ('1','2' at 0.4-0.5x) and over-weights rare bonuses (CASH HUNT/CRAZY TIME at 6-7x). Since the optimizer selects top-4 by these miscalibrated probs, over-rated bonuses crowd into the top-4 and displace under-rated numbers.
+
+══════════════════════════════════════════════════════════════════════
+DOMINANT SOURCE VERDICT
+══════════════════════════════════════════════════════════════════════
+  The 22.0pp gap is 100% attributable to ONE mechanism with TWO layers:
+    MANIFESTATION (class 1+6): unnecessary bonus inclusion / rare-outcome over-selection — 67/67 gap-misses.
+    ROOT (class 7): probability calibration compresses the distribution, over-rating bonuses (CASH HUNT/CRAZY TIME 6-7x, PACHINKO 2.2x) and under-rating dominant numbers ('1' 0.4x, '2' 0.5x).
+  The optimizer (class 8) is blameless — it faithfully selects top-4 by the calibrated probs. There are zero near-misses (rank 5/6). The problem is upstream of selection: the probability estimates themselves.
+  The static [1,2,5,10] floor wins because it is IMMUNE to calibration error — it holds all four numbers unconditionally and captures 81.5% of rounds (every round a normal number lands). It pays for this by missing 100% of bonus rounds, but bonuses are only 18.5% of this regime.
+
+  This is structurally identical to the Task 57 mechanism-symmetry finding: the model trades number slots for bonus slots. The audit confirms the trade is driven by miscalibrated bonus probability, not by the optimizer or by stale/data-blend artifacts.
+
+  Secondary factors (not dominant): stale persistence amplified 17/81 misses (21%) but never caused a miss the calibration issue wouldn't have; zero data-blend distortion detected.
+
+  NO CODE CHANGE PROPOSED OR MADE (per directive). The experimental reliability layer ties the baseline at 59.5% — it does NOT close the gap because it shares the same miscalibrated probability vector and the same optimizer; its reliability factor only re-ranks within the top-4, it does not re-calibrate the underlying probabilities. This explains why the layer ties rather than beats: it cannot fix the root cause (calibration) by construction.
