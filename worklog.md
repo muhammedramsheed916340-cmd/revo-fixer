@@ -2825,3 +2825,43 @@ Stage Summary:
 - 140 rounds banked; CRAZY TIME asymmetry question resolved (none — treatments converged); raw tie holds, verified exp +2.2pp, theo 77.9%.
 - 6 consecutive zero-degradation passes; engine untouched; pipeline clean.
 - Next: continue toward 150 checkpoint; watch for displacement-triggered divergence (the only state in which the two models differ).
+
+---
+Task ID: 55 (cron monitor — Job ID 369099, pass 11 — 150 CHECKPOINT)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 11). 8-metric extraction + 150-checkpoint analysis update. No code changes.
+
+Work Log:
+- Read worklog: pass 10 (Task 54) at n=140. Feed probe: alive. Tab reused, NO reload — 7th consecutive clean pass (degraded set frozen at 6/24/45/67).
+- Ledger: n=160 (IDs 2-161), contiguous, 0 dupes, ts ascending, ~151 min elapsed. 20 new rounds. 150 CHECKPOINT CROSSED.
+
+HEADLINE: NEW FLIP at the checkpoint boundary — round 161 (ledger's newest row) HIT→MISS:
+- Actual: '5' (number round)
+- Baseline Top-4: [COIN FLIP, 1, PACHINKO, 5] → HIT (held '5', prob 10.8%)
+- Experimental Top-4: [COIN FLIP, 1, PACHINKO, 2] → MISS (selected '2' over '5')
+- MECHANISM NOTE (distinct from #12): the layer rated '5' HIGHER than baseline (11.3% vs 10.8%) but its combination selector still chose '2' — this is a selection-edge case (two near-equal candidates, wrong pick), NOT probability dampening. The layer's chronic '+2pp tilt toward 2' finally cost it: '2' was picked, '5' landed.
+- Verified flip balance now 4 saves / 2 losses (was 4/1). McNemar verified: 4v2 → exact p=0.688 (moved away from significance with the balanced loss).
+
+Validation snapshot at n=160:
+1. Paired rounds: 160
+2. Baseline HIT: 103/160 = 64.4%
+3. Experimental HIT: 102/160 = 63.8%
+4. Delta: −1 hit (−0.6pp) raw (artifact-carried; raw tie broken by #161)
+5. MISS→HIT: 4 (#4, #8, #22, #116 — all displacement saves)
+6. HIT→MISS: 5 (#12 dampening, #161 selection-edge verified; #24/#45/#67 degraded)
+7. Theoretical [1,2,5,10]: 124/160 = 77.5%
+8. MISS RCA: 9 entries (4 displacement saves, 1 dampening loss, 1 selection-edge loss, 3 degraded)
+- Verified-only (n=156): base 64.1% vs exp 65.4%, Δ +2 hits (+1.3pp) — edge narrowed from +2.2pp
+- Agreement streak reset to 0 by #161; stretch 142-161: base 11/20, exp 10/20, theo 15/20 ('5' ×3, '2' ×5, '1' ×6 in stretch — 5s rebounded)
+
+150-CHECKPOINT ANALYSIS UPDATE (n=160):
+- Verified edge trajectory: +2.4 → +2.4 → +3.2 → +2.9 → +2.0 → +2.2 → +1.3pp. The layer's early saves (rounds 4-22) are being diluted as n grows and late flips split 1-1 (#116 save, #161 loss). If the true steady-state is 'equivalent', the verified edge will decay toward 0 — the current reading (+1.3pp) is consistent with equivalence plus early-window luck, OR a small real edge — indistinguishable at this n.
+- The two verified losses have DIFFERENT mechanisms (dampening vs selection-edge) — the layer's failure modes are not one systematic bug but two distinct edge cases, both rare (1 per ~80 and ~160 rounds).
+- Structural invariant continues: theo floor 77.5% leads both models by ~13pp raw. Both models' rates drift down together as the window diversifies ('5','2','10','CRAZY TIME' all landing — the number-storm monofocus is easing, but both engines handle it identically).
+- Data quality at checkpoint: 160 rounds, 4 degraded rows (2.5%, all pre-tab-reuse, all attributed), ~13-18 outage-missing rounds — pipeline publication-clean for 7 consecutive passes.
+- VERDICT UNCHANGED in substance: statistically indistinguishable (p≥0.625 throughout), verified edge small and shrinking toward noise, layer's value case now rests on the early-window save pattern (4 displacement corrections — mechanism repeatedly validated) against 2 distinct rare failure modes.
+
+Stage Summary:
+- 160 rounds banked; 150 checkpoint delivered; new #161 selection-edge loss narrows verified edge to +1.3pp; raw −0.6pp (artifact-carried).
+- 7 consecutive zero-degradation passes; engine untouched; pipeline clean.
+- Next: 200-round final-planned checkpoint; watch whether verified edge decays to zero (equivalence) or re-diverges on the next displacement event; PACHINKO-heavy baseline Top-4s remain the M2H signature ('2'-tilt exclusion is the H2M signature per #161).
