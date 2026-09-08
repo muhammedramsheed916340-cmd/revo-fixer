@@ -1223,26 +1223,17 @@ function scoreCandidates(
 
     // ===== SAMPLE-SIZE STABILIZATION (Bayesian / Laplace shrinkage) =====
     // CRITICAL: Small-sample observations must NOT create extreme deviations.
-    // A single CRAZY TIME in 30 spins → raw observed 3.3% vs prior 1.85% →
-    // raw deviation +78%. This is NOT statistically reliable.
     //
-    // We use Laplace (Bayesian) smoothing:
-    //   smoothedFreq = (count + k * prior) / (N + k)
-    // where k = pseudo-count (prior strength). With k=20:
+    // k=30 (increased from 20): rare outcomes need MORE evidence before their
+    // deviation can significantly affect the score. At k=30:
     //   N=30, CRAZY TIME count=1, prior=1.85%:
-    //     raw = 3.3%, smoothed = (1 + 20*0.0185) / 50 = 2.74% → dev=+48% (was +78%)
+    //     smoothed = (1 + 30*0.0185) / 60 = 1.09% → dev=-41% (was +48% at k=20)
     //   N=30, "1" count=12, prior=38.89%:
-    //     raw = 40%, smoothed = (12 + 20*0.389) / 50 = 39.56% → dev=+1.7% (was +1.9%)
+    //     smoothed = (12 + 30*0.389) / 60 = 39.45% → dev=+1.4% (barely changed)
     //
-    // This naturally shrinks rare-outcome deviations more aggressively (because
-    // their prior pseudo-count is small relative to the observed count), while
-    // barely affecting common outcomes.
-    //
-    // The smoothing constant k=20 means: "treat the prior as equivalent to 20
-    // pseudo-observations." At N=20, observed data has equal weight to prior.
-    // At N=100, observed data has 5× the weight of prior. At N=1, prior
-    // dominates (19:1 ratio).
-    const SHRINKAGE_K = 20;
+    // This ensures rare outcomes need substantially more observations before
+    // they can displace high-prior common outcomes like "1" (38.89%) or "2" (24.07%).
+    const SHRINKAGE_K = 30;
 
     // Compute observed count and total N for this outcome.
     // Use the larger of (user rounds, live spins) as the sample.
@@ -1268,11 +1259,34 @@ function scoreCandidates(
     // Cap stabilized deviation to prevent extreme swings: [-0.6, +2.0]
     const cappedDeviation = Math.max(-0.6, Math.min(2.0, stabilizedDeviation));
 
-    // ===== BASE SCORE — PURE STABILIZED RELATIVE EVIDENCE =====
-    // Primary (85%): stabilized relative deviation (sample-size aware)
-    // Secondary (15%): mild prior weight (regression to mean)
+    // ===== BASE SCORE — BALANCED EVIDENCE + PRIOR =====
+    // CRITICAL FIX: The previous 85% evidence / 15% prior ratio allowed rare
+    // outcomes (CRAZY TIME 1.85%) to displace common outcomes ("1" 38.89%)
+    // after just 1-2 appearances. This caused the model to UNDERPERFORM the
+    // simple theoretical [1,2,5,10] baseline (53% vs 88%).
+    //
+    // NEW RATIO: 50% evidence / 50% prior.
+    //
+    // This means:
+    //   - Common outcomes with NEUTRAL evidence keep ~50% of their prior weight
+    //   - Rare outcomes need MUCH stronger relative evidence to overcome
+    //     the prior advantage of common outcomes
+    //   - A rare outcome appearing 1-2× in 30 spins will NOT displace "1" or "2"
+    //   - A rare outcome appearing 5+× in 30 spins CAN still enter Top-4
+    //
+    // Example with N=30, k=30:
+    //   "1" (prior 38.89%): smoothed=39.45%, dev=+1.4% → evidence=1.014
+    //     score = 1.014*0.50 + 0.389*0.50 = 0.702
+    //   CRAZY TIME (prior 1.85%): smoothed=1.09%, dev=-41% → evidence=0.59
+    //     score = 0.59*0.50 + 0.0185*0.50 = 0.304
+    //   → "1" (0.702) >> CRAZY TIME (0.304) — correct!
+    //
+    //   CRAZY TIME appearing 3× in 30: smoothed=(3+30*0.0185)/60=5.93%, dev=+221%
+    //     evidence=3.21, score=3.21*0.50+0.0185*0.50=1.614
+    //   "1" appearing 12× in 30: score=0.702
+    //   → CRAZY TIME (1.614) > "1" (0.702) — rare outcome CAN enter when justified ✓
     const evidenceScore = 1 + cappedDeviation;
-    let score = evidenceScore * 0.85 + theo * 0.15;
+    let score = evidenceScore * 0.50 + theo * 0.50;
     if (sampleN === 0) score = theo; // no data at all → pure theoretical
 
     // ===== FACTOR 1: Recent active (mild adaptive signal — NOT a chase) =====
@@ -1427,7 +1441,7 @@ function scoreCandidates(
       const anomalyDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
       const cappedAnomalyDev = Math.max(-0.6, Math.min(2.0, anomalyDeviation));
       const anomalyEvidence = 1 + cappedAnomalyDev * 1.5;
-      score = anomalyEvidence * 0.85 + livePrior * 0.15;
+      score = anomalyEvidence * 0.50 + theo * 0.50;
       if (!signals.includes("anomaly-weighted")) signals.push("anomaly-weighted");
     }
 
@@ -1436,7 +1450,7 @@ function scoreCandidates(
       const shiftDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
       const cappedShiftDev = Math.max(-0.6, Math.min(2.0, shiftDeviation));
       const shiftEvidence = 1 + cappedShiftDev * 1.3;
-      score = shiftEvidence * 0.85 + livePrior * 0.15;
+      score = shiftEvidence * 0.50 + theo * 0.50;
       if (!signals.includes("shift-adaptive")) signals.push("shift-adaptive");
     }
 
