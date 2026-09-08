@@ -2532,3 +2532,54 @@ Stage Summary:
 - Validation LIVE at 45/50; integrity clean except 3 reload-degraded rows (6/24/45) — all attributable to monitoring reloads, all flagged, engine untouched.
 - Headline: race TIED at 62.2% each (+0.0pp), but verified-only experimental edge persists (+2.4pp); theoretical [1,2,5,10] still leads outright (75.6%).
 - Next pass (≈01:46 cron) should cross 50+ — PRELIMINARY ANALYSIS (baseline vs experimental, incl. degraded-row sensitivity) is due then per task mandate.
+
+---
+Task ID: 48 (cron monitor — Job ID 369099, pass 4 — 50+ THRESHOLD CROSSED)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 4). 8-metric extraction + PRELIMINARY ANALYSIS (mandated at 50+ rounds). No code changes.
+
+Work Log:
+- Read worklog: pass 3 (Task 47) ended at n=45 (tied 28/28). Reload time captured BEFORE page open (1788889601445 ≈ 01:46:41 +08) for degraded-row attribution per Task 47 methodology note.
+- Opened http://localhost:3000 — no console/runtime errors. Ledger: 65 rows on open → 67 by extraction (IDs 2-68, ~46 min elapsed, ~42s/round cadence).
+- Integrity: contiguous, 0 dupes, ts ascending. Engine freeze git-verified: 0 diffs on decisionEngine.ts.
+- Panel ↔ ledger cross-check: reconciled exactly at n=67.
+- Degraded-row attribution test POSITIVE again: row 67 settled ts=1788889613236 — 12 seconds AFTER this pass's reload — 4th degraded row (empty preds, baseHit=true/expHit=false, actual="1"). Pattern now 4/4 consistent with reload-timing cause; 3 of 4 degraded rows gift baseline an unverifiable hit.
+
+Validation snapshot at n=67:
+1. Paired rounds: 67
+2. Baseline HIT: 47/67 = 70.1%
+3. Experimental HIT: 46/67 = 68.7%
+4. Delta: −1 hit (−1.5pp) — raw lead flipped to baseline (pass 3: tied; pass 2: exp +1)
+5. MISS→HIT: 3 (#4, #8, #22 — all verified displacement-correction saves)
+6. HIT→MISS: 4 (#12 verified dampening loss; #24/#45/#67 DEGRADED — unverifiable)
+7. Theoretical [1,2,5,10]: 53/67 = 79.1% (note: theo hit ≡ actual-is-a-number; 53 = exact number-round count)
+8. MISS RCA: 7 entries (3× displacement correction, 1× reliability dampening, 3× degraded 'combination changed')
+
+PRELIMINARY ANALYSIS (n=67 — mandated; treat as directional, not conclusive):
+
+A. Statistical separation: NONE. McNemar exact on paired outcomes: all-rows 3 vs 4 discordant → p=1.0; verified-only 3 vs 1 → p=0.625. At n=67 the ±pp differences are pure noise. Need ~10x the current discordant volume for significance.
+
+B. Degraded-row sensitivity DOMINATES the headline: raw delta flipped sign (exp +1 → base −1... reported as −1.5pp) solely because rows 24 and 67 (both monitoring-reload artifacts, both actual="1", both unverifiably crediting baseline a hit) landed between passes. Verified-only leaderboard: baseline 44/63 = 69.8% vs EXPERIMENTAL 46/63 = 73.0% → Δ +2 hits (+3.2pp). The experimental layer has never trailed on verified rows at any checkpoint (passes 2-4).
+
+C. Mechanism performance (verified flips): 3 saves / 1 loss. All 3 saves are the layer's designed mechanism — restoring a number (1, 1, COIN FLIP-adjacent number restoration) that baseline displaced with a bonus outcome (PACHINKO, CASH HUNT, CRAZY TIME+PACHINKO). The single verified loss (#12) is the inverse cost — dampening CASH HUNT below threshold right before CASH HUNT landed. Net: +2 verified hits for the layer.
+
+D. Structural behavior (n=67 inclusions): experimental tilts hard into numbers — '1' 93% vs 85% inclusion, '2' 58% vs 55%, while cutting CASH HUNT (33% vs 37%) and CRAZY TIME (21% vs 25%). In the current number-storm window this is exactly right: '1' has landed 32/67 times (48% of ALL rounds; numbers overall 79%), CRAZY TIME 0/67.
+
+E. The sobering benchmark: theoretical [1,2,5,10] = 79.1% beats BOTH models (70.1% / 68.7% raw; 69.8% / 73.0% verified). Framing: theo is not a model — it is the number-outcome base rate (fixed 4-number set). Both engines spend 2 of 4 slots on bonus outcomes and pay for it in this regime (baseline bonus-slot hit rate: 8/14 rounds where bonus landed vs slots it held). Experimental's number-deeper Top-4 gets it closer to the floor (73.0% verified, gap to theo 6.1pp vs baseline's 9.3pp) but does not beat it.
+
+F. Regime dependence caveat: R21-40 was a more mixed window (theo only 60%) where both models matched theo at 70%. If bonus outcomes normalize, the layer's bonus-retention (COIN FLIP +1) could matter more. One window ≠ a verdict.
+
+G. Trajectory by segment (raw): R2-20 base 52.6% / exp 57.9% / theo 84.2% (bonus-chasing phase, exp ahead); R21-40 all 70% / 70% / 60%; R41-68 base 82.1% / exp 75.0% / theo 89.3% (number-storm, theo runaway). Both models converge toward theo as '1' frequency exploded.
+
+VERDICT (preliminary, n=67): Experimental reliability layer holds a small VERIFIED edge (+3.2pp, +2 hits) that is directionally consistent with its design intent, with zero verified regressions beyond #12 vs 3 verified saves. No statistical significance whatsoever (p=0.625). Raw leaderboard is corrupted by 3 monitoring-reload rows favoring baseline — degraded-row sensitivity analysis is REQUIRED in all future reads. The layer does not beat the naive number-floor benchmark in this number-heavy window (nobody does, except the floor itself).
+
+RECOMMENDATIONS (logged, NOT executed — observation-only):
+1. Continue validation to 100+ rounds; significance needs ~50+ discordant pairs at current effect size.
+2. Monitoring methodology change for future cron passes: REUSE the open browser tab (agent-browser session persists) instead of re-opening the URL — each reload risks one degraded settlement. If reload unavoidable, exclude rows with ts < reload+90s from flip counts.
+3. Post-freeze fix (queued): persist LockedEngineData to localStorage alongside the ledger so settlements survive reloads; optionally re-derive/re-pair degraded rows at settlement time.
+4. Keep degraded-row sensitivity (raw vs verified) in every future report.
+
+Stage Summary:
+- 50+ threshold crossed at pass 4 (n=67). Preliminary analysis delivered above: verified experimental edge +3.2pp (p=0.625, n.s.), raw edge baseline −1.5pp (artifact-driven), theo floor 79.1% leads all.
+- Data quality: 4/67 rows degraded, ALL attributable to monitoring reloads (6/24/45/67); engine untouched (git-verified this pass).
+- Validation continues; next passes monitor toward 100+ and should adopt tab-reuse methodology.
