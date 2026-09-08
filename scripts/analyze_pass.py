@@ -99,7 +99,7 @@ def main():
     print('H2M raw window (%d): %s | verified %s' % (len(h2m_raw), h2m_raw, h2m_v))
     print('theoretical: raw %d/%d = %.1f%% | clean %d/%d = %.1f%%' % (theo_raw, n, 100 * theo_raw / n, th, cn, 100 * th / cn))
     print('agreement streak: %d (last flip: %s)' % (streak, last_flip))
-    print('avg coverage: base %.2f%% exp %.2f%%' % (cb, ce))
+    print('avg coverage: base %s exp %s' % (('%0.2f%%' % cb) if cb is not None else 'n/a (not extracted)', ('%0.2f%%' % ce) if ce is not None else 'n/a'))
     print()
     print('=== DIFF vs PASS %d ANCHOR (IDs %d-%d) ===' % (A['pass'], A['min_id'], A['max_id']))
     print('evicted (inferred): %s' % (evicted_ids if evicted_ids else 'none'))

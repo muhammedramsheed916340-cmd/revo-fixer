@@ -3270,3 +3270,60 @@ DOMINANT SOURCE VERDICT
   Secondary factors (not dominant): stale persistence amplified 17/81 misses (21%) but never caused a miss the calibration issue wouldn't have; zero data-blend distortion detected.
 
   NO CODE CHANGE PROPOSED OR MADE (per directive). The experimental reliability layer ties the baseline at 59.5% — it does NOT close the gap because it shares the same miscalibrated probability vector and the same optimizer; its reliability factor only re-ranks within the top-4, it does not re-calibrate the underlying probabilities. This explains why the layer ties rather than beats: it cannot fix the root cause (calibration) by construction.
+
+---
+Task ID: 64 (cron monitor — Job ID 369099, pass 20 — outage reconciled; metrics-only + user-directed diagnostic audit follows in Task 65)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 20, 05:46 +08). Reconcile the pass-19 live-observed outage; then execute user-directed diagnostic audit of the clean n=200 window (Task 65). No engine changes, no tuning.
+
+Work Log:
+- Outage reconciled: gap 271→272 = 16.0 min (05:20:00 → 05:36 +08), upstream API [] throughout, page polling healthy. Est. ~20-23 rounds unobserved at prevailing ~42s cadence. Third lifetime outage (after 31.6 min @ 75→76 and 25.2 min @ 227→228). Recovery clean: 19 rounds (272-290) ingested, all agreements; latest ts age 11s.
+- Gap memory auto-persisted: analyzer writeback added [271,272] to known_gaps (now 3 documented outages, all excluded from triggers).
+- Window 91-290: base 121/200 = 60.5%, exp 121/200 = 60.5% — THIRD consecutive perfect dead tie (119/119 → 119/119 → 121/121). theo 163/200 = 81.5%. Streak 54. Flips unchanged 4v4. Zero new flips/degraded. 19/19 new rounds agreed.
+- Full-probs extraction performed for audit (extract_full.js — includes baselineProbs/expProbs projections; bc/ec omitted in this mode).
+- Panel cross-check deferred to audit response (audit is the pass's analytical centerpiece).
+- Engine freeze: git verified — zero diffs to engine/app code.
+
+Metrics (FIFO window n=200, IDs 91-290):
+1. Paired rounds: 200 (clean 200 — second consecutive fully-clean window)
+2. Baseline HIT: 121/200 = 60.5%
+3. Experimental HIT: 121/200 = 60.5%
+4. Delta: 0.0pp raw = clean (perfect tie)
+5. MISS→HIT (window): 4 (#116, #163, #164, #178) — lifetime 7
+6. HIT→MISS (window): 4 verified (#161, #188, #200, #236) — lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 163/200 = 81.5%
+8. MISS RCA: lifetime 15, unchanged
+- Agreement streak: 54 (last flip #236)
+- McNemar: window 4v4 p=1.000; lifetime verified 7v5 p=0.774; raw 7v8 p=1.000
+
+Stage Summary:
+- Three consecutive dead-tie passes across two fully-clean windows; equivalence verdict robust.
+- Outage #3 reconciled and auto-memorized; total lifetime unobserved est. ~58-76 rounds across 3 outages — coverage documentation (post-freeze queue) increasingly material.
+- Diagnostic audit (Task 65) executed on user directive: clean window 72-271 audited against theoretical floor. Results in next entry. NO tuning performed.
+
+---
+Task ID: 65 (user-directed diagnostic audit — clean n=200 window vs theoretical [1,2,5,10]; OBSERVATION-ONLY, no retuning)
+Agent: Z.ai Code (analysis run on ledger telemetry; engine untouched, no weights/k changes, no forced floor)
+Task: Explain the 20.5pp gap (dynamic Top-4 59.5% vs [1,2,5,10] 80.0%) on the clean window (IDs 72-271); classify every miss per the user's 11-category taxonomy; compute all requested statistics; separate outage rounds from valid prediction rounds.
+
+Work Log:
+- Data assembly: rows 72-90 from pass-19 snapshot (no probs — evicted before full extraction), rows 91-271 from full-probs extraction. Calibration-vs-selection split computed on 181-row probs subset; representative-check vs the 6 no-probs rows documented.
+- Audit script: scripts/diag_audit.py (persisted, rerunnable). All requested calculations computed for BOTH models.
+- FINDINGS (baseline / experimental where they differ):
+  * Deviation frequency: model Top-4 ≠ {1,2,5,10} in 196/200 rounds (98.0%); equal-set only 4/200 (hit 4/4 trivially — equal-set hit rate ≡ theo rate by construction).
+  * On the 196 differing rounds: model hit 115 (58.7%) vs floor 156 (79.6%). Floor-beating rounds (model hit, floor missed — bonus landed with bonus selected): 25 base / 22 exp. Deviation-cost rounds (floor hit, model missed): 66 base / 63 exp. NET = 41 lost rounds = the entire 20.5pp gap. Gap is EXACTLY deviation cost minus floor-beating gain.
+  * Miss taxonomy (primary, base/exp): 2-exclusion 23/20; 1-exclusion 20/20; 10-exclusion 13/12; 5-exclusion 10/11; rare-over-selection 15/18; other 0/0. Sums = 81/81 ✓.
+  * Co-attribution: unnecessary-bonus-inclusion present in 81/81 misses (100%, BOTH models); wasted bonus slots on miss rounds 155 base / 146 exp (~1.9-1.8 per miss); rare-over-selection co-flag 66/63 (all theo-hit misses); stale-run(≥3) co-flag 31/29 (~38%/36% of misses).
+  * Exclusion cost (X landed while excluded, base): '1' 37.0% (20/54), '2' 26.7% (23/86), '10' 10.3% (13/126), '5' 9.9% (10/101). '1' is the most expensive per-round exclusion; '2' the largest absolute contributor among normals.
+  * Top-4 inclusion rates (base): '1' 73%, '2' 57%, '5' 50%, '10' 37% — vs floor's 100%. Exp: 73%/62%/54%/39%.
+  * Round-hit rate when X excluded (base): '1' excluded → 46.3%; '2' → 51.2%; '5' → 64.4%; '10' → 61.9%.
+  * CALIBRATION-vs-SELECTION (181-row probs subset): optimizer-selection-error = 0 base / 1 exp (of 75/75 prob-covered misses); calibration-error = 75 base / 74 exp. The optimizer virtually never violates its own probability ranking — the probs themselves rank bonuses above '5'/'10'. The 20.5pp gap is a BELIEF/CALIBRATION problem, not a selection bug.
+  * live/user data-blend distortion (cat 10): NOT measurable from ledger telemetry; unattributed residual — hypothesis: blend inflates bonus priors (candidate mechanism for the calibration errors) but requires engine-internal telemetry to confirm; NOT inspected in this pass (scope kept to ledger data).
+  * Outage separation: 2 gaps inside window (75→76: 31.6 min; 227→228: 25.2 min) — unobserved rounds NOT counted as misses (~38-53 est.). Sensitivity excluding outage-adjacent rows 75/76/227/228 (n=196): base 59.2%, exp 59.2%, theo 80.1% — conclusions stable. #228/#229 post-outage rows are valid prediction rounds and remain counted.
+  * A/B symmetry confirmed at miss level: identical miss counts (81), identical taxonomic shape; the 8 discordant rounds are exactly the layer's ± (4 saves on '2'/'10' re-inclusion, 4 losses on bonus-slot displacement/'5'-rebound).
+- NO tuning, NO weight change, NO k change, NO floor forcing. Audit is report-only.
+
+Stage Summary:
+- DOMINANT SOURCE of the 20.5pp gap: structural bonus-slot displacement of normals, driven by CALIBRATION (model's own probs rank bonus outcomes into the Top-4 over '5'/'10'), amplified by persistence (stale runs re-miss the same excluded number). The optimizer is faithful (0-1 violations); the floor's advantage is that it cannot over-select bonuses and cannot exclude anything.
+- The model's edge (25/22 floor-beating bonus rounds) is real but covers only 38% of its deviation cost (66/63).
+- Candidates for the OWNER's future consideration (NOT executed, NOT recommended for immediate action): coverage-aware slot budgeting (cap bonus slots as function of their calibrated mass vs normals'), '1'/'2' inclusion floors, stale-run eviction. Any such change would be a NEW experimental shadow arm — never a direct engine edit.
