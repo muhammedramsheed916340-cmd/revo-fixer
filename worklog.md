@@ -2959,3 +2959,30 @@ FINAL STAGE SUMMARY:
 - 200-round validation COMPLETE at the final planned checkpoint: raw tie 63.0%/63.0%, verified +1.5pp experimental, p=0.549 — the rare-outcome reliability layer is statistically equivalent to the frozen k=30 baseline over this window, with a real, repeatable, and fully offset regime-dependent edge.
 - All 13 passes observation-only: engine untouched (git-verified each pass), no tuning, no leakage, no dupes; 9-clean-pass collection streak after the tab-reuse fix; every anomaly attributed and documented.
 - The validation's own instrumentation findings (reload-degradation class, FIFO cap, outage gap) are logged as the post-freeze engineering queue.
+
+---
+Task ID: 58 (cron monitor — Job ID 369099, pass 14 — metrics-only per Task 57 protocol)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 14). Metrics-only unless significance crosses p<0.05 or anomaly. No code changes.
+
+Work Log:
+- Feed probe: alive. Tab reused, NO reload — 10th consecutive clean pass (no new degraded rows).
+- Ledger: n=200 (FIFO window slid: IDs 22-221; rounds 4-21 evicted — includes flip rows #4/#8 (M2H) and #12 (H2M). Window-limited flip counts now understate lifetime: lifetime flips remain 7 M2H / 7 H2M per worklog history; lifetime hit counts shift only by evicted rounds' hits (4-21 contained verified rows whose counts are embedded in prior-pass totals — lifetime accounting henceforth = last-pass lifetime + window deltas).
+- No new flips this pass (19 new rounds, all agreed). No significance crossing (window McNemar 5v3 p=0.727; lifetime 7v4 p=0.549). No anomaly. → METRICS-ONLY per protocol.
+
+Metrics (FIFO window n=200, IDs 22-221, ~196 min elapsed):
+1. Paired rounds: 200 (window)
+2. Baseline HIT: 127/200 = 63.5%
+3. Experimental HIT: 126/200 = 63.0%
+4. Delta: −1 hit (−0.5pp) raw (window includes 2 degraded baseline-gift rows: #24, #67 — #45's gift also in window via ids 24/45/67)
+5. MISS→HIT (window): 5 (#22, #116, #163, #164, #178) — lifetime 7
+6. HIT→MISS (window): 6 (#24, #45, #67, #161, #188, #200) — lifetime 7
+7. Theoretical [1,2,5,10]: 156/200 = 78.0%
+8. MISS RCA: unchanged lifetime (7 displacement saves, 4 verified losses, 3 degraded); window display now omits aged-out rows #4/#8/#12
+- Verified-only (window, n=197): exp +2 hits
+- Agreement streak: 21 rounds (all 19 new rounds agreed; last flip remains #200)
+
+Stage Summary:
+- Steady state: raw window −0.5pp (artifact-carried), lifetime tie standing per Task 57 final analysis; nothing analytically new.
+- FIFO cap now actively aging out flip history — lifetime flip tracking MUST use worklog cross-reference (lifetime M2H: 4,8,22,116,163,164,178; lifetime verified H2M: 12,161,188,200; degraded: 24,45,67 + evicted 6).
+- Protocol continues: metrics-only passes unless p<0.05 either direction or new anomaly. Engine untouched.
