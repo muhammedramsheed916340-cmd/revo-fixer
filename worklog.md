@@ -3125,3 +3125,41 @@ Stage Summary:
 - The Task 57 mechanism-symmetry thesis got live confirmation this pass: layer took 1 loss in the bonus cluster (#236), then rebuilt a 29-round streak by re-including PACHINKO adaptively (#261/#262 both-hits) — regime-dependent variance, not systematic bias.
 - Data quality milestone next pass: #67 (last in-window degraded artifact) ages out → window becomes 100% clean for the first time in the validation's history; raw and clean metrics will converge.
 - Protocol continues: metrics-only; triggers unchanged. Engine untouched.
+
+---
+Task ID: 63 (cron monitor — Job ID 369099, pass 19 — MILESTONE: first fully-clean window + live-observed outage onset)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 19, 05:31 +08). Milestone metrics + developing upstream outage documented live. No engine changes.
+
+Work Log:
+- Read worklog tail: pass 18 (Task 62) anchor = window 66-265, streak 29, watch = #67 aging out.
+- Feed probe: POLLING HEALTHY (page polling /api/crazy-time every ~1.5s, all HTTP 200) — but UPSTREAM RETURNING [] since ~05:20. Live-observed outage onset, same signature as the documented pass-6/7 outage.
+- OUTAGE FORENSICS (live, first time observed at onset rather than retroactively):
+  * Last pre-outage row: #271, ts 05:20:00 +08 (actual '1', both-hit).
+  * API probe [] at 05:32; re-probe [] at 05:34 after 90s wait. Ledger unchanged (maxId 271, age 855s at pass end).
+  * Page polling uninterrupted (200s) — pipeline will auto-ingest on upstream recovery; no local data loss risk.
+  * Classification: known class (upstream unavailability), direction-unbiased, affects future coverage only. Recovery/gap quantification deferred to pass 20 (cron 05:46).
+- MILESTONE: #67 aged out with evicted block 66-71 → FIRST FULLY-CLEAN WINDOW in validation history (clean n=200, zero degraded rows in window). Raw and clean metrics CONVERGED.
+- DEAD-EVEN TIE at the clean milestone: baseline 119/200 = 59.5%, experimental 119/200 = 59.5%, Δ = 0.00pp raw AND clean. Window flips 4v4 (M2H {116,163,164,178} vs H2M {161,188,200,236}) — McNemar p=1.000, perfect symmetry. Panel matched ledger EXACTLY this pass (119/119/160) — no timing skew.
+- New rounds 266-271: 6/6 agreements ('2' miss-miss, '5' hit-hit, COIN FLIP miss-miss, '1' miss-miss/hit/hit). Streak 35 (since #236). ZERO new flips, ZERO new degraded.
+- theo: 160/200 = 80.0% (+3 from window slide) — floor leads both models by 20.5pp.
+- Engine freeze: git verified — zero diffs to engine/app code.
+
+Metrics (FIFO window n=200, IDs 72-271 — fully clean):
+1. Paired rounds: 200 (clean 200 — milestone)
+2. Baseline HIT: 119/200 = 59.5% (raw == clean)
+3. Experimental HIT: 119/200 = 59.5% (raw == clean)
+4. Delta: 0.0pp — PERFECT DEAD TIE, raw and clean identical
+5. MISS→HIT (window): 4 (#116, #163, #164, #178) — lifetime 7
+6. HIT→MISS (window): 4, all verified (#161, #188, #200, #236) — lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 160/200 = 80.0% — leads both models 20.5pp
+8. MISS RCA: lifetime 15, unchanged (7 displacement saves, 5 verified losses, 3 degraded); window display now artifact-free (4v4 all verified)
+- Agreement streak: 35
+- Avg coverage: base 71.84% / exp 71.29%
+- McNemar: window 4v4 p=1.000; lifetime verified 7v5 p=0.774; lifetime raw 7v8 p=1.000
+
+Stage Summary:
+- The 200-round clean-window milestone lands on a perfect dead tie: with every degraded artifact aged out and zero observability caveats remaining in-window, the frozen baseline and the reliability layer are exactly even (119/119, 4v4 flips, p=1.0). The lifetime verdict (equivalence) is now corroborated by a pristine window.
+- The clean tie also sharpens the regime framing: this window remains number-tilted (the floor at 80.0%), yet the layer fully offsets its retained-number edge against its bonus-slot costs round-for-round — symmetry holding under the cleanest possible measurement.
+- LIVE anomaly watch: upstream outage ongoing at pass end (onset 05:20:00 +08, confirmed [] at 05:34). Pass 20 must reconcile: if recovered, quantify gap and est. missed rounds (prevailing cadence ~42s → ~10-14 min of quiet so far would imply ~15-20 rounds if it ended at pass end; longer if ongoing); if still down, document continuation. No local pipeline action needed or possible (observation-only).
+- Protocol: metrics-only resumes; triggers unchanged (this outage is attributed live; re-flag next pass will be handled as known-class if still in-window). Engine untouched.
