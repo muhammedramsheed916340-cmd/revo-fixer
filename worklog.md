@@ -2865,3 +2865,46 @@ Stage Summary:
 - 160 rounds banked; 150 checkpoint delivered; new #161 selection-edge loss narrows verified edge to +1.3pp; raw −0.6pp (artifact-carried).
 - 7 consecutive zero-degradation passes; engine untouched; pipeline clean.
 - Next: 200-round final-planned checkpoint; watch whether verified edge decays to zero (equivalence) or re-diverges on the next displacement event; PACHINKO-heavy baseline Top-4s remain the M2H signature ('2'-tilt exclusion is the H2M signature per #161).
+
+---
+Task ID: 56 (cron monitor — Job ID 369099, pass 12 — SAVE BURST, RAW LEAD FLIPS TO EXPERIMENTAL)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 12). 8-metric extraction + preliminary-analysis update. No code changes.
+
+Work Log:
+- Read worklog: pass 11 (Task 55) at n=160 (#161 loss, verified +1.3pp). Feed probe: alive. Tab reused, NO reload — 8th consecutive clean pass.
+- Ledger: n=183 (IDs 2-184), contiguous, 0 dupes, ts ascending, ~166 min elapsed. 23 new rounds.
+
+HEADLINE EVENTS — THREE NEW SAVES (#163, #164, #178):
+- #163: actual '2' — base [COIN FLIP,1,PACHINKO,5] held PACHINKO → MISS; exp [COIN FLIP,1,5,2] → HIT (PACHINKO→'2' swap)
+- #164: actual '2' AGAIN — baseline repeated the EXACT same Top-4 (stale run, did not adapt after missing #163) → MISS again; exp adapted ('2' promoted) → HIT
+- #178: actual '10' — base [1,COIN FLIP,PACHINKO,2] held PACHINKO → MISS; exp [1,COIN FLIP,2,10] retained '10' → HIT
+- ALL 7 LIFETIME SAVES SHARE ONE SIGNATURE: baseline holding PACHINKO displaces a number the layer retained; number lands; layer saves. The layer's structural edge is precisely its 4th-slot preference for numbers over PACHINKO.
+- Context: the 23-round stretch was 100% NUMBERS ('2' ×9, '1' ×9, '10' ×4, '5' ×1; zero bonus) — a pure-number storm that maximally punished baseline's bonus slots (stretch: base 12/23 = 52% vs exp 15/23 = 65% vs theo 23/23 = 100%).
+
+Validation snapshot at n=183:
+1. Paired rounds: 183
+2. Baseline HIT: 115/183 = 62.8%
+3. Experimental HIT: 117/183 = 63.9%
+4. Delta: +2 hits (+1.1pp) — RAW LEADERBOARD NOW EXPERIMENTAL (first time since pass 2, and this time NOT artifact-driven: both artifact hits remain on baseline's side; the +2 is fully organic)
+5. MISS→HIT: 7 (#4, #8, #22, #116, #163, #164, #178)
+6. HIT→MISS: 5 (#12, #161 verified; #24/#45/#67 degraded)
+7. Theoretical [1,2,5,10]: 147/183 = 80.3%
+8. MISS RCA: 12 entries (7 PACHINKO-displacement saves, 1 dampening loss, 1 selection-edge loss, 3 degraded)
+- Verified-only (n=179): base 62.6% vs exp 65.4% → +5 hits (+2.8pp) — strongest verified edge since pass 9
+- McNemar verified: 7v2 discordant → exact p = 0.180 (from 0.688) — approaching significance; next save → p≈0.11, then 0.065, then 0.038 (significance at the 10v2 mark)
+- Agreement streak: 6 rounds (since #178)
+
+Preliminary-analysis UPDATE (n=183):
+- The save burst materially shifts the evidence picture. The layer's claimed mechanism (retaining evidence-supported numbers that baseline displaces with PACHINKO) has now produced 7 saves across THREE separate windows (4-22, 116, 163-178) against 2 verified losses with distinct mechanisms. This is no longer 'early-window luck' — it is a repeatable, regime-triggered pattern: it fires exactly when PACHINKO pressure meets a number streak.
+- The #163→#164 pair is the cleanest single demonstration of the entire validation: baseline's stale Top-4 missed the same '2' twice; the layer corrected once and got paid twice.
+- Asymmetry note: '10' — the layer retains it at the margin (theo's blind inclusion made '10' the floor's edge in Task 54; the layer now holds a slice of that edge: #178 was a '10' save).
+- Floor: 80.3% — the number-storm again favors the naive benchmark; models' gap to floor ~16-17pp raw. Both models' absolute rates fell this stretch (bonus-slot cost), the layer's fell less.
+- Standing caveats unchanged: p=0.180 still n.s.; 3 degraded rows + 2 artifact-gifted baseline hits remain in raw numbers; ~13-18 outage rounds missing.
+- Significance watch is now LIVE: one more save burst (2+ saves without offsetting losses) likely crosses p<0.05 at the 10v2 mark. The trigger to watch remains identical: PACHINKO-heavy baseline Top-4s during number streaks.
+
+Stage Summary:
+- 183 rounds banked; raw lead flipped to experimental (+1.1pp, organic); verified edge +2.8pp at its 2nd-strongest; p=0.180 and falling.
+- The layer's mechanism has now demonstrated: repeatable across 3 windows, correct signature (PACHINKO displacement), adaptive (#164 correction after #163), and regime-triggered (fires in number storms).
+- 8 consecutive zero-degradation passes; engine untouched; pipeline clean.
+- Next: 200-round final checkpoint likely next pass; significance watch (p<0.05 at 10v2) is now the primary analytical thread.
