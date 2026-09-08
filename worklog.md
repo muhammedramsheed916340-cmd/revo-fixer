@@ -2740,3 +2740,49 @@ Stage Summary:
 - 100+ preferred threshold crossed (n=102); integrity clean; tab-reuse streak 4 passes; engine untouched.
 - Models converged (36-round agreement); standings frozen: raw −1.0pp / verified +2.0pp / theo 77.5%.
 - Next checkpoints: 150 and 200 rounds, or first divergence event (higher-value trigger). Feed probe + tab reuse continue.
+
+---
+Task ID: 53 (cron monitor — Job ID 369099, pass 9 — CONVERGENCE BROKEN, NEW FLIP)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 9). 8-metric extraction + preliminary-analysis update. No code changes.
+
+Work Log:
+- Read worklog: pass 8 (Task 52) at n=102; flagged 'first divergence event' as the higher-value trigger. Feed probe: alive. Tab reused, NO reload (5th consecutive clean pass — zero new degraded rows, degIds frozen at 6/24/45/67).
+- Ledger: n=121 (IDs 2-122), contiguous, 0 dupes, ts ascending, ~121 min elapsed. 19 new rounds since pass 8.
+
+HEADLINE EVENTS:
+1. CONVERGENCE BROKEN at round 116 — first discordant pair in 49 rounds (since #67). NEW MISS→HIT flip: m2h now [4, 8, 22, 116].
+2. RAW LEADERBOARD TIED: both models 81/121 = 66.9% (Δ 0.0pp). The #116 save erased the last raw gap (which was artifact-carried anyway).
+3. VERIFIED EDGE GREW: exp 81/117 = 69.2% vs base 78/117 = 66.7% → +3 hits (+2.5pp), up from +2 (+2.0pp) at pass 8.
+
+ROUND 116 RCA (the new flip):
+- Actual: '2' (number round)
+- Baseline Top-4: [COIN FLIP, PACHINKO, 1, 5] — PACHINKO held, '2' displaced → MISS (coverage 64.8%)
+- Experimental Top-4: [COIN FLIP, 1, 5, 2] — '2' restored → HIT (coverage 62.6%)
+- This is the 4th instance of the layer's DESIGNED mechanism: rare/bonus-outcome displacement correction ('1' at #4, '1' at #8, COIN FLIP-adjacent at #22, now '2' at #116). The layer's core thesis (bonus slots displace higher-prior numbers that then land) keeps validating in exactly the regime it was built for.
+
+SIDE FINDING: round 112 CASH HUNT (only 2nd CASH HUNT landing in 121 rounds) — BOTH models had CASH HUNT in Top-4 and both HIT. Their synchronized bonus-retention paid off identically.
+
+Validation snapshot at n=121:
+1. Paired rounds: 121
+2. Baseline HIT: 81/121 = 66.9%
+3. Experimental HIT: 81/121 = 66.9%
+4. Delta: 0 hits (0.0pp) raw — TIED
+5. MISS→HIT: 4 (+ #116, all displacement corrections, all verified)
+6. HIT→MISS: 4 (#12 verified; #24/#45/#67 degraded — unchanged)
+7. Theoretical [1,2,5,10]: 94/121 = 77.7%
+8. MISS RCA: 8 entries (4 displacement saves, 1 dampening loss, 3 degraded)
+- Verified-only McNemar update: 4 vs 1 discordant → exact p = 0.375 (improved from 0.625; still n.s.)
+- Post-flip agreement streak reset: 6 rounds (117-122 agree)
+- Stretch 104-122: base 11/19, exp 12/19, theo 16/19 — stretch included CASH HUNT + 2 COIN FLIPs + PACHINKO (4 bonus in 19; '2' surged: 7 landings)
+
+Preliminary-analysis UPDATE (n=121):
+- The #116 flip materially strengthens the layer's evidence base: verified flip balance now 4 saves / 1 loss — the mechanism has now delivered in TWO separate windows (rounds 4-22 and round 116), against a single verified regression. p=0.375 and falling as saves accumulate; at 6v1 it would reach ~0.125, at 8v2 ~0.11.
+- Raw tie at 0.0pp is now nearly artifact-free in interpretation: even WITH the two artifact hits gifted to baseline (r24, r67 — r45's beneficiary is also baseline), experimental matched it. Strip artifacts: exp leads by 3.
+- Theo floor: 77.7% still leads both by ~11pp raw — number-storm persists ('2' now co-dominant with '1' in the stretch).
+- Watch item: the models diverged exactly once in 55 rounds when PACHINKO rose in baseline's Top-4 (r116) — PACHINKO-adjacent divergence is the pattern to watch for future flips.
+
+Stage Summary:
+- 121 rounds banked; convergence broken by a textbook displacement save; verified experimental edge at its strongest (+3 hits, +2.5pp, p=0.375); raw leaderboard tied.
+- 5 consecutive zero-degradation passes; engine untouched; data pipeline clean.
+- Next passes: track whether divergence re-occurs (PACHINKO/CASH HUNT-heavy baseline Top-4s are the trigger pattern); checkpoints 150/200 stand.
