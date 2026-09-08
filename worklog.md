@@ -3018,3 +3018,40 @@ Stage Summary:
 - Flip history is now aging out of the FIFO window faster than new flips arrive (0 new in 6 rounds) — lifetime flip accounting is permanently worklog-anchored: M2H {4,8,22,116,163,164,178}, verified H2M {12,161,188,200}, degraded {6,24,45,67}.
 - 27-round agreement streak + persistent number-storm regime ('1'/'2' dominance) means the displacement mechanisms that produced all 14 lifetime flips are dormant; McNemar significance is drifting AWAY, not toward, crossing.
 - Protocol continues: metrics-only passes; escalation triggers unchanged (verified McNemar p<0.05 either direction, or new degraded/coverage anomaly, or 3+ same-direction flips in one regime window). Engine untouched.
+
+---
+Task ID: 60 (cron monitor — Job ID 369099, pass 16 — ESCALATED: trigger (b) fired, new feed stall)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 16, 04:46 +08). Trigger (b) fired mid-analysis (new inter-row gap) → escalated to stall forensics per protocol. No code changes to engine.
+
+Work Log:
+- Read worklog tail: pass 15 (Task 59) anchor = window 28-227, streak 27.
+- Feed probe: ALIVE (ID progression 227→229). Tab reused, NO reload — 12th consecutive clean collection pass (zero new degraded rows).
+- Methodology now file-based: persisted extract_ledger.js / panel_text.js / analyze_pass.py + rolling anchor.json (pass-state memory). Future passes fully turnkey.
+- TRIGGER (b) FIRED: analyzer flagged two >8min inter-row gaps → escalated.
+- STALL FORENSICS:
+  * Gap 75→76 (31.6 min, 01:54:08→02:25:44 +08): re-detection of the DOCUMENTED pass-6/7 outage (01:53–02:25) — analyzer had no memory of it. NOT new. Fix: known_gaps memory added to anchor.json; analyzer patched to exclude documented gaps from triggers.
+  * Gap 227→228 (25.2 min, 04:20:53→04:46:05 +08): NEW stall — first since the tab-reuse fix era began (passes 5-16 otherwise clean). IDs contiguous (227→228, no skip): gap invisible in round counts, real in coverage. Prevailing cadence median 42-43s/round → est. ~25-35 rounds unobserved. Both models equally blind during the stall → direction-unbiased, zero metric distortion, flip accounting unaffected. Feed confirmed live post-stall (rows 228/229 landed 04:46:05/04:46:33, normal 28s spacing).
+  * Coverage accounting update: lifetime unobserved rounds now = documented outage (est. 13-18, era-appropriate cadence) + new stall (est. ~25-35) — post-freeze engineering queue item 'record outage gaps' grows more material.
+- Post-stall observation: rounds 228/229 both landed '5' — the only back-to-back '5' pair in the 200-row window ('5' overall 23/200 = 11.5%, near theoretical). Both double-miss AGREEMENTS (identical misses), zero flips, no regime signal yet. Noted only because '5'-rebound was the #161 selection-edge loss mechanism.
+- Panel cross-check: matched ledger exactly (200 paired, base 127/200, exp 126/200, theo 159/200, M2H 4 / H2M 5 raw, Δ 0% displayed).
+- Engine freeze: git verified — zero diffs to engine/app code.
+
+Metrics (FIFO window n=200, IDs 30-229; panel cross-check matched):
+1. Paired rounds: 200 (clean 198; in-window degraded: #45, #67)
+2. Baseline HIT: 127/200 = 63.5% raw (panel) / 125/198 = 63.1% clean
+3. Experimental HIT: 126/200 = 63.0% (clean identical; degraded rows never hit exp)
+4. Delta: raw −1 hit (−0.50pp, artifact-carried); clean +1 hit (+0.51pp) experimental
+5. MISS→HIT (window): 4 (#116, #163, #164, #178) — lifetime 7
+6. HIT→MISS (window): 5 raw (#45, #67 degraded + #161, #188, #200 verified); verified-only 3 — lifetime 7
+7. Theoretical [1,2,5,10]: 159/200 = 79.5% (clean 157/198 = 79.3%) — leads both models ~16pp
+8. MISS RCA: lifetime unchanged (7 displacement saves, 4 verified losses, 3 degraded); window display omits aged-out #22/#24
+- Agreement streak: 29 (last flip remains #200)
+- Avg coverage: base 72.05% / exp 71.49%
+- McNemar: window verified 4v3 p=1.000; lifetime verified 7v4 p=0.549; lifetime raw 7v7 p=1.000 — unchanged, no crossing
+
+Stage Summary:
+- Headline metrics UNCHANGED and unaffected by the stall: raw −0.5pp artifact-carried; clean/verified +1 hit experimental; lifetime verdict standing (equivalence, p=0.549).
+- ONE real anomaly found and attributed: 25.2-min feed stall (04:21-04:46 +08), est. ~25-35 rounds unobserved, IDs contiguous so invisible to round counts. Class matches the documented pass-6/7 outage. Unbiased; no action possible or needed (observation-only). Escalation resolved.
+- Tooling hardening: analyzer now carries known_gaps memory (75→76 documented outage) — prevents repeat false escalation; anchor.json rolling state makes subsequent passes fully metrics-only turnkey.
+- Protocol: metrics-only resumes next pass; triggers unchanged (verified McNemar p<0.05, new degradation, NEW unattributed coverage gap, or 3+ same-direction flips in one regime window). Engine untouched.
