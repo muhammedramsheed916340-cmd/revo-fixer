@@ -2488,3 +2488,47 @@ Stage Summary:
 - Naive theoretical benchmark outperforming both models in this window — key context for the 50-round preliminary analysis.
 - 1 minor instrumentation weakness found (reload-degraded rows 6/24) — documented for post-freeze fix, untouched per observation-only mandate.
 - Next monitor pass should fire near 40 rounds; preliminary analysis due at 50+.
+
+---
+Task ID: 47 (cron monitor — Job ID 369099, pass 3)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation progress (pass 3, 15 min after pass 2). Same 8-metric extraction. No code changes.
+
+Work Log:
+- Read worklog: pass 2 (Task 46) ended at n=27, exp led by +1 hit.
+- Opened http://localhost:3000 via agent-browser — no console/runtime errors. Ledger: 45 rounds (IDs 2-46), grew live during check.
+- Integrity: contiguous, 0 dupes, timestamps ascending. Engine freeze git-verified: 0 diffs on decisionEngine.ts.
+- Panel ↔ localStorage cross-check: reconciled exactly at n=45.
+
+Validation snapshot at n=45 (round IDs 2-46, ~31 min elapsed):
+1. Total paired rounds: 45 (45/50 — 5 short of analysis threshold)
+2. Baseline HIT: 28/45 = 62.2%
+3. Experimental HIT: 28/45 = 62.2%
+4. Delta: 0 hits (0.0pp) — RACE TIED (pass 2 had exp +1)
+5. MISS→HIT flips: 3 (unchanged: #4, #8, #22)
+6. HIT→MISS flips: 3 (+ NEW #45 — degraded row, see below)
+7. Theoretical [1,2,5,10]: 34/45 = 75.6% (still leads both models)
+8. MISS RCA: 6 entries — 3× displacement correction (M2H), 1× dampening (#12), 2× degraded 'combination changed' (#24, #45, empty preds)
+
+Supporting metrics (panel, n=45):
+- Normal: base 22/34 (65%) = exp 22/34 (65%); Bonus: base 6/11 (55%) = exp 6/11 (55%) — dead even on both splits
+- Avg coverage: base 69.06% vs exp 67.41%; pred changes base 25 vs exp 22; stale runs base 4 vs exp 5
+- Per-outcome inclusion: '1' 80%→91% (+5 net), '2' 40%→44% (+2), '5' 56%→56%, '10' 33%→31% (−1); CASH HUNT 33%→27% (−3), CRAZY TIME 36%→29% (−3)
+- Live window composition: '1' has landed 20/45 times (44% of ALL rounds); CRAZY TIME has landed 0/45. Extremely number-heavy regime.
+
+CRITICAL monitoring-methodology finding:
+- Round 45 is a THIRD degraded row (empty preds, baseHit=true/expHit=false, unverifiable flip). Its settlement ts = 1788888710201 ≈ 17 seconds AFTER this pass's agent-browser page reload (01:31:35 +08).
+- Conclusion: the page reload at the start of a monitoring pass lands inside the generation→settlement window (~30-60s rounds) and wipes module-level LockedEngineData, degrading that round's row. Rows 6, 24, 45 are all consistent with reload timing. Monitoring passes are plausibly CAUSING ~1 degraded row per pass.
+- Verified-only stats (excluding degraded rows 6/24/45): n=42, base 27/42 = 64.3%, exp 28/42 = 66.7%, Δ +1 hit (+2.4pp) — exp still narrowly ahead once unverifiable rows are dropped.
+- Mitigation NOTE for future passes (methodology, not code): reuse an already-open tab without reload when possible; if reload unavoidable, flag any row whose ts falls within ~90s after the reload as monitoring-degraded. Real fix (persist locked data to localStorage) remains POST-FREEZE work — NOT applied per observation-only mandate.
+
+Early trend (NOT analysis — n=45 of 50):
+- The tie at 0.0pp overstates baseline recovery: 1 of baseline's 28 hits is the unverifiable r45 artifact; verified-only exp lead is +1 hit (+2.4pp).
+- Stretch since pass 2 (rounds 28-46): base 14/19 (73.7%), exp 13/19 (68.4%), theo 15/19 (78.9%) — baseline slightly better in this number-heavy stretch, but both closed on the theoretical benchmark.
+- The '1'-heavy regime (44% of rounds) flatters BOTH models (high '1' inclusion); experimental's deeper '1' inclusion (91% vs 80%) is its main structural edge, offset by deeper CRAZY TIME/CASH HUNT exclusion that cost it #12.
+- Binomial reality: 28/45 vs 28/45 is a dead heat; nothing separable at this n. Decision threshold unchanged: preliminary analysis at 50+, prefer 100+.
+
+Stage Summary:
+- Validation LIVE at 45/50; integrity clean except 3 reload-degraded rows (6/24/45) — all attributable to monitoring reloads, all flagged, engine untouched.
+- Headline: race TIED at 62.2% each (+0.0pp), but verified-only experimental edge persists (+2.4pp); theoretical [1,2,5,10] still leads outright (75.6%).
+- Next pass (≈01:46 cron) should cross 50+ — PRELIMINARY ANALYSIS (baseline vs experimental, incl. degraded-row sensitivity) is due then per task mandate.
