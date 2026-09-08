@@ -3390,3 +3390,37 @@ Stage Summary:
 - OUTAGE #4 (25.5 min) documented and memorized — 4 lifetime outages now: 75->76 (31.6m), 227->228 (25.2m), 271->272 (16.0m), 306->307 (25.5m). Coverage documentation (post-freeze queue) grows: lifetime unobserved est. ~60-78 rounds.
 - Floor at 82.0% still leads both models by ~20pp in a regime that keeps rewarding its refusal-to-learn (Task 65 calibration audit remains the operative explanation).
 - Protocol continues: metrics-only; all triggers re-armed. Engine untouched.
+
+---
+Task ID: 68 (cron monitor — Job ID 369099, pass 23 — metrics-only steady state)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 23, 06:46 +08). All triggers clear. No engine changes.
+
+Work Log:
+- Read worklog tail: anchor = Task 67, window 119-318, delta -1 artifact, outage #4 documented.
+- Feed probe: ALIVE (19 new rounds 319-337; newest age 0.2 min; window 138-337). Tab reused, NO reload — 17th consecutive clean pass (zero new degraded rows). Zero >8min gaps — outage #4 fully behind.
+- Outage #4 gap [306,307] correctly recognized as KNOWN by analyzer (auto-memory working).
+- Window: base 129/200 = 64.5%, exp 128/200 = 64.0% — delta HOLDS at -1 hit (-0.50pp): new 19 rounds were eviction-symmetric (both engines +4 hits), so the pass-22 composition artifact persists unchanged.
+- Agreement streak 101 (extended from 82; last flip still #236). 19/19 new rounds agreed, identical hit patterns.
+- Panel cross-check: exact match this pass (200 paired, 65%/64%, theo 166/200 = 83%, delta displays 0% rounding); normal/bonus split base 107/166 vs exp 109/166 normal, base 22/34 vs exp 19/34 bonus; pred changes 81/85; stale 26/26; coverage 70.46%/69.90%.
+- Engine freeze: git verified — zero engine diffs (only scripts/data/anchor.json rolling state updated, monitoring infrastructure as designed).
+- Regime: '2'-storm ('2'x7, '1'x7); '5' x2 BOTH MISSED by both engines (#323, #333 — the calibration audit's '5'-exclusion signature observed live); bonus COIN FLIP hit (#328), PACHINKO hit (#335), CASH HUNT miss (#330).
+- Structural note (3-window pattern, still noise-range): exp normal advantage +2 per window (104->106, 106->109, 107->109) vs exp bonus deficit -3 per window (16->18->19 vs 19->21->22) = the persistent -1 net. Dampening cost/gain ratio stable; flag for watch only, no trigger.
+
+Metrics (FIFO window n=200, IDs 138-337, clean 200):
+1. Paired rounds: 200 (fully clean; 4th consecutive clean window)
+2. Baseline HIT: 129/200 = 64.5%
+3. Experimental HIT: 128/200 = 64.0%
+4. Delta: -1 hit (-0.50pp), unchanged (FIFO composition artifact from #116 eviction)
+5. MISS->HIT flips: window 3 (#163, #164, #178); lifetime 7
+6. HIT->MISS flips: window 4 verified (#161, #188, #200, #236); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 166/200 = 83.0%
+8. MISS RCA: lifetime 15, unchanged (zero new flips)
+- McNemar: window 3v4 p=1.000; lifetime verified 7v5 p=0.774; raw 7v8 p=1.000
+
+Stage Summary:
+- Metrics-only steady state; all triggers clear; no escalation.
+- Equivalence continues to hold at every significance test while the live agreement streak reaches 101 consecutive rounds — the layer remains behaviorally indistinguishable from baseline in current regime.
+- -0.50pp delta composition artifact persists (will clear when a new exp-saved round enters or the flipped block ages); monitored, not significant.
+- Floor at 83.0% again leads ~18.5pp; '5'-miss signature from Task 65 audit seen live twice this window.
+- Protocol continues: metrics-only. Engine untouched.
