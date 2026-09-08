@@ -2442,3 +2442,49 @@ Stage Summary:
 - Engine freeze confirmed: decisionEngine.ts unmodified (git-verified); no parameter/tuning changes during test.
 - Instrumentation code (RevoGame.tsx) intentionally left uncommitted during the freeze; commit after validation completes.
 - Next monitoring runs should report progress at ~25 and ~50 rounds; preliminary analysis only at 50+.
+
+---
+Task ID: 46 (cron monitor — Job ID 369099, continuation pass)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation progress (pass 2). Extract paired rounds, baseline/exp HIT rates, delta, flips, theoretical benchmark, MISS RCA. No code changes.
+
+Work Log:
+- Read worklog: prior pass (Task 45) captured 9 rounds; validation started 1788886858749 (2026-09-09 01:00:58 +08), experimental flag ON.
+- Opened http://localhost:3000 via agent-browser — no console/runtime errors. Ledger live-growing during the check: 22 → 24 → 25 → 26 → 27 rounds observed across reads (~40-60s/round cadence).
+- Verified engine freeze via git: decisionEngine.ts shows NO diff (frozen baseline intact). Only untracked scripts/ + tool-results/ present.
+- Cross-validated on-screen 'Shadow A/B — Rare-Outcome Reliability Layer' panel against localStorage ledger — numbers reconcile exactly (panel read at n=26 matched ledger arithmetic after round 26 landed: both models hit).
+
+Validation snapshot at n=27 (round IDs 2-28, ~17 min elapsed):
+1. Total paired rounds: 27 (contiguous, 0 duplicates, timestamps ascending)
+2. Baseline HIT rate: 15/27 = 55.6%
+3. Experimental HIT rate: 16/27 = 59.3%
+4. Delta (exp − base): +1 hit (+3.7pp)
+5. MISS→HIT flips: 3 (rounds 4, 8, 22 — all 'rare-outcome displacement correction': baseline held bonus outcomes [PACHINKO/CASH HUNT/CRAZY TIME+PACHINKO] that displaced the number that then landed)
+6. HIT→MISS flips: 2 (round 12 — reliability layer dampened CASH HUNT below threshold, actual was CASH HUNT; round 24 — see data-quality note)
+7. Theoretical [1,2,5,10] HIT rate: 20/27 = 74.1%
+8. MISS RCA entries: 5 total — 3× rare-outcome displacement correction (MISS→HIT), 1× reliability dampening below threshold (HIT→MISS #12), 1× combination change (HIT→MISS #24, degraded row)
+
+Supporting metrics (panel, n=26 read):
+- Normal rounds: baseline 11/19 (58%) vs exp 12/19 (63%); Bonus rounds: both 3/7 (43%)
+- Theoretical benchmark still LEADS both models (73-74% vs 52-59%)
+- Avg expected coverage: baseline 64.8% vs exp 62.4% (exp trades ~2.4pp coverage for number-restoration)
+- Pred changes: base 16 vs exp 13 (exp more stable); stale runs (3+ same Top-4): base 2, exp 3
+- Per-outcome inclusion: '1' 69%→88% inclusion (+5), '2' 27%→35% (+2), '5' 73%→73% (0), '10' 8%→4% (−1); CASH HUNT 58%→46% (−3), CRAZY TIME 62%→50% (−3), PACHINKO 38%→35% (−1), COIN FLIP 35%→38% (+1)
+
+Data-quality finding (observation-only, no fix applied):
+- Rounds 6 and 24 have EMPTY prediction arrays + 0 coverage in the ledger (2 of 27 rows). Cause: module-level LockedEngineData stores do not survive page reloads — a reload between prediction generation and settlement (e.g., monitoring browser opens) settled those rounds against empty locked data.
+- Impact: r6 both models MISS (no effect on hit counts). r24 recorded baseHit=true/expHit=false — UNVERIFIABLE, and it gifts baseline +1 hit. Verified-only stats (excluding r24): baseline 14/26 (53.8%) vs exp 16/26 (61.5%), Δ +2 hits (+7.7pp) — the anomaly currently UNDERSTATES the experimental lead.
+- Recommendation logged for post-validation: persist locked data to localStorage (not module scope) so reloads cannot degrade settlements. NOT applied now — freeze period, observation-only mandate.
+
+Early trend (NOT analysis — n=27 of 50, far below significance):
+- Experimental leads by +1 raw hit (+3.7pp); +2 hits (+7.7pp) on verified rows only.
+- Both models still trail the naive [1,2,5,10] benchmark by a wide margin (~15-20pp) — the live window has been number-heavy (18 normal vs 7 bonus rounds... 19 normal at n=26) while both engines retain bonus outcomes in Top-4.
+- All 3 experimental saves are the same mechanism the reliability layer was built for: rare/bonus outcomes displacing higher-prior numbers. The 1 verified regression (#12) is the inverse cost: dampening a bonus that actually landed.
+- Binomial context: at n=27, a +1 hit difference is well within noise (p ≈ 0.5 for a single paired comparison of this size). No conclusion possible until 50+; prefer 100+.
+
+Stage Summary:
+- Validation LIVE and healthy at 27/50 fresh rounds; integrity clean (contiguous IDs, no dupes, no leakage), engine freeze verified via git.
+- Experimental holds a narrow lead (59.3% vs 55.6%; 61.5% vs 53.8% verified-only), driven entirely by number-restoration saves; 1 verified regression.
+- Naive theoretical benchmark outperforming both models in this window — key context for the 50-round preliminary analysis.
+- 1 minor instrumentation weakness found (reload-degraded rows 6/24) — documented for post-freeze fix, untouched per observation-only mandate.
+- Next monitor pass should fire near 40 rounds; preliminary analysis due at 50+.
