@@ -2655,3 +2655,39 @@ Stage Summary:
 - First zero-defect diagnosis pass: tab-reuse (no reload) + upstream-vs-app fault isolation confirmed the outage is external.
 - Standing analysis unchanged: verified exp +2.9pp, raw −1.4pp (artifact), theo floor 75.7%; significance still pending (discordant pairs frozen at 7 raw / 4 verified).
 - Next pass: feed-recovery probe first; expect ID gap at recovery boundary; resume analysis updates only when new rounds land.
+
+---
+Task ID: 51 (cron monitor — Job ID 369099, pass 7 — FEED RECOVERED)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 7). Feed-recovery probe first per Task 50 guidance. No code changes.
+
+Work Log:
+- Read worklog: pass 6 (Task 50) diagnosed external feed outage at n=74; guidance: probe API first, expect ID gap at recovery.
+- Feed probe (curl, no browser): /api/crazy-time returning REAL events again — transmissionId timestamp 1788892139985 ≈ 02:29 +08. RECOVERY CONFIRMED.
+- Tab reuse (no reload). Ledger: n=79 — 5 new rounds (76-80) landed since recovery.
+
+KEY FINDINGS:
+1. NO ROUND-ID GAP: feed numbering resumed exactly at 76 (contiguous 2-80). The outage boundary is seamless — better than the anticipated jump. Contiguity invariant survived intact.
+2. ZERO new degraded rows (degIds unchanged: 6/24/45/67). Tab-reuse methodology: 2 consecutive clean passes.
+3. OUTAGE ANNOTATION: ~01:53 → ~02:25 +08 (≈32 min). Estimated 13-18 live rounds permanently missing from sample — coverage gap, not bias (outage orthogonal to outcome types). To be noted in final analysis.
+4. Recovery stretch (rounds 76-80): actuals 5, 1, 2, PACHINKO, 5 — BOTH models went 5/5, including round 79 PACHINKO where both engines held PACHINKO in Top-4 (experimental's dampening did not fully suppress it, and it paid off). First symmetric 5/5 stretch — relative standings unchanged.
+
+Validation snapshot at n=79 (IDs 2-80, ~91 min elapsed):
+1. Paired rounds: 79
+2. Baseline HIT: 55/79 = 69.6%
+3. Experimental HIT: 54/79 = 68.4%
+4. Delta: −1 hit (−1.3pp) raw
+5. MISS→HIT: 3 (#4, #8, #22 — unchanged)
+6. HIT→MISS: 4 (#12 verified; #24/#45/#67 degraded — unchanged)
+7. Theoretical [1,2,5,10]: 60/79 = 75.9%
+8. MISS RCA: 7 entries (unchanged)
+- Verified-only (n=75): base 69.3% vs exp 72.0%, Δ +2 hits (+2.7pp)
+- Flip freeze continues: no discordant pairs since round 67 (13 rounds) — significance still pending.
+- Panel in sync (5464s elapsed matches ledger arithmetic).
+
+Preliminary-analysis status (n=79): STANDING — no relative movement this pass. All Task 48 conclusions hold verbatim: verified exp edge +2.7pp (was +2.9 — denominator effect of the symmetric 5/5 stretch), raw −1.3pp artifact-inflated, theo floor 75.9% leads, no statistical separation (discordant 7 raw / 4 verified). Regime watch from Task 49 continues: recovery stretch re-number-heavy (4 numbers + PACHINKO); CRAZY TIME still 0/79 lifetime.
+
+Stage Summary:
+- Feed outage resolved (~32 min); validation resumed cleanly with seamless ID continuity and clean rows.
+- 79 rounds banked; tab-reuse streak clean; engine untouched.
+- Standings frozen since round 67: raw base −1.3pp / verified exp +2.7pp / theo 75.9%. Next passes: continue probing toward 100+; watch for first flip since 67 to restart significance accumulation.
