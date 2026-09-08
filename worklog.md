@@ -3358,3 +3358,35 @@ Stage Summary:
 - Floor at 83.0% (record) — the audit's structural explanation (Task 65: bonus-slot displacement via calibration beliefs) grows MORE relevant as the number-storm deepens: every bonus slot costs more expected hits in this regime. The layer still offsets exactly (0.0pp), confirming mechanism symmetry under stress.
 - Post-audit watch: the audit's candidate items (slot budgeting, '1'/'2' floors, stale eviction) remain OWNER-DECISION-ONLY; no shadow arm exists for them; nothing to monitor on that front.
 - Protocol continues: metrics-only; triggers unchanged. Engine untouched.
+
+---
+Task ID: 67 (cron monitor — Job ID 369099, pass 22 — consolidated 06:16 + 06:31 firings; OUTAGE #4 documented)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 22). Two cron firings consolidated: 06:16 run detected an in-progress feed stall; 06:31 run confirmed recovery. Full analysis executed per trigger (b).
+
+Work Log:
+- 06:16 firing: worklog tail read (anchor = Task 66, window 107-306). Extraction showed window UNCHANGED (107-306) with newest row #306 age 18.4 min vs normal ~40-60s cadence — stall suspected. Panel probe confirmed page JS alive (validation-started clock ticking, 19004s), metrics matched ledger at 200 paired / 119/119 / theo 166 — i.e. silence was upstream (no new rounds ingested), NOT a frozen page. Held escalation for recovery evidence rather than reloading (tab-reuse protocol preserved — 16th consecutive clean pass, zero degraded rows).
+- 06:31 firing: recovery confirmed — 12 new rounds 307-318 ingested, newest row age 0.4 min. OUTAGE #4 measured: #306 (05:58:38 +08) -> #307 (06:24:09 +08) = 25.5 min — LONGEST documented gap (prev: outage #3, 25.2 min). IDs contiguous; zero data loss; rounds resumed normally. Gap auto-memorized in anchor known_gaps as [306,307]; repeat escalation suppressed.
+- Data-quality footnote: #310/#311 timestamps 1s apart (22:26:17/22:26:18 +08) — rapid double-entry from feed; both rows carry valid predictions and are counted (consistent with prior cadence-anomaly handling).
+- Panel cross-check: 200 paired, 63%/62% (125/200, 124/200), delta displays 0% (rounds -0.5pp), normal/bonus split base 104/165 vs exp 106/165 normal + base 21/35 vs exp 18/35 bonus — all match ledger. THEO discrepancy resolved: panel showed 165/200 vs analyzer 164/200; ledger ground truth = 164 (all actual-in-{1,2,5,10} rows flagged th) — panel count reflects <=1-round FIFO slide between the two evals while feed was live; within documented tolerance.
+- Engine freeze: git verified — zero tracked diffs (only untracked monitoring snapshots).
+
+Metrics (FIFO window n=200, IDs 119-318, clean 200):
+1. Paired rounds: 200 (fully clean; 3rd consecutive clean window)
+2. Baseline HIT: 125/200 = 62.5%
+3. Experimental HIT: 124/200 = 62.0%
+4. Delta: -1 hit (-0.50pp) — FIRST non-zero delta in 5 windows; tie-break is a FIFO eviction ARTIFACT (exp's M2H save at #116 aged out with evicted block 107-118), NOT a flip event
+5. MISS->HIT flips: window 3 (#163, #164, #178 — #116 now evicted); lifetime 7
+6. HIT->MISS flips: window 4 verified (#161, #188, #200, #236); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 164/200 = 82.0% (floor 100% on applicable rounds, as constructed)
+8. MISS RCA: lifetime 15, unchanged (zero new flips -> zero new RCAs)
+- Agreement streak: 82 (EXTENDED; last flip still #236). 12/12 new rounds agreed.
+- McNemar: window 3v4 p=1.000; lifetime verified 7v5 p=0.774; raw 7v8 p=1.000
+- Regime: number-storm deepens — new 12: '1'x7, '2'x2, COIN FLIP x3, PACHINKO x1. Engines 4/4 on bonus rounds (floor 0/4, not covered); exp still +2 on normals vs base (+106/-104) but -3 on bonus (18/35 vs 21/35) = the -1 net.
+- Coverage: base 71.04% / exp 70.50%; stale runs 27/27; pred changes 86/90.
+
+Stage Summary:
+- FIFTH consecutive perfect tie ENDED at window level (-0.50pp) — but the mechanism is window composition (eviction of #116), while the live agreement streak extended to 82. Equivalence conclusion unchanged: lifetime verified still exp-favoring 7v5, p=0.774; no significance anywhere.
+- OUTAGE #4 (25.5 min) documented and memorized — 4 lifetime outages now: 75->76 (31.6m), 227->228 (25.2m), 271->272 (16.0m), 306->307 (25.5m). Coverage documentation (post-freeze queue) grows: lifetime unobserved est. ~60-78 rounds.
+- Floor at 82.0% still leads both models by ~20pp in a regime that keeps rewarding its refusal-to-learn (Task 65 calibration audit remains the operative explanation).
+- Protocol continues: metrics-only; all triggers re-armed. Engine untouched.
