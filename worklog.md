@@ -3091,3 +3091,37 @@ Stage Summary:
 - Panel outcome table detail: retained-number edge persists ('2' exp rate 65% vs base 60%, +10pp; '5' 52% vs 48%, +8pp) — the structural trade continues to pay in number-storms and cost in bonus clusters, exactly per the Task 57 mechanism-symmetry analysis.
 - Tooling: analyzer gap-memory now self-maintaining via anchor writeback (both documented gaps excluded from future triggers).
 - Protocol: metrics-only resumes; triggers unchanged. Engine untouched.
+
+---
+Task ID: 62 (cron monitor — Job ID 369099, pass 18 — metrics-only steady state)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 18, 05:16 +08). All escalation triggers clear. No engine changes.
+
+Work Log:
+- Read worklog tail: pass 17 (Task 61) anchor = window 48-247, streak 11, watch item = bonus-cluster flips (1 of 3 toward trigger).
+- Feed probe: ALIVE (18 new rounds 248-265; window 66-265). Tab reused, NO reload — 14th consecutive clean pass (zero new degraded rows).
+- Gap memory verified working: both documented gaps (75→76, 227→228) auto-excluded by analyzer writeback — no false escalation.
+- BONUS-CLUSTER WATCH RESOLVED: 18/18 new rounds were agreements, ZERO new flips. The post-#236 bonus-flavored cluster did NOT accumulate same-direction flips (0 of 3 toward trigger); streak rebuilt 11 → 29. Notably #261/#262: back-to-back PACHINKO landings with BOTH models hitting — the layer visibly re-included PACHINKO after #236/#258 observations (adaptive response confirmed again).
+- Hit-rate slide explained: evicted block 48-65 carried more hits than new block 248-265 added (base 126→120, exp 125→119, theo 159→157). Regime cooled from storm peaks; raw rates 60.0%/59.5% are the lowest since early validation; theo still +18pp over both. Slide hits BOTH models equally — equivalence unaffected.
+- Panel cross-check: matched modulo expected 1-2 round slide (base 119, exp 118, theo 158, M2H 4, H2M 5 — exact flip-count match).
+- Engine freeze: git verified — zero diffs to engine/app code.
+
+Metrics (FIFO window n=200, IDs 66-265 at snapshot):
+1. Paired rounds: 200 (clean 199; in-window degraded: #67 only — last remaining artifact, ages out within ~2 passes)
+2. Baseline HIT: 120/200 = 60.0% raw / 119/199 = 59.8% clean
+3. Experimental HIT: 119/200 = 59.5% (clean identical)
+4. Delta: raw −1 hit (−0.50pp, artifact-carried by #67); clean 0.0pp (dead tie)
+5. MISS→HIT (window): 4 (#116, #163, #164, #178) — lifetime 7
+6. HIT→MISS (window): 5 raw (#67 degraded + #161, #188, #200, #236 verified) — lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 157/200 = 78.5% (clean 156/199 = 78.4%) — leads both models ~18pp
+8. MISS RCA: lifetime 15, unchanged (7 displacement saves, 5 verified losses, 3 degraded)
+- Agreement streak: 29 (last flip remains #236)
+- Avg coverage: base 71.99% / exp 71.46%
+- McNemar: window verified 4v4 p=1.000; lifetime verified 7v5 p=0.774; lifetime raw 7v8 p=1.000 — unchanged
+- New-round regime (248-265): '1'×7, '2'×4, '5'×4, PACHINKO×3, '10'×1 — number-tilted mix with bonus seasoning
+
+Stage Summary:
+- Steady state fully restored: clean-row dead tie, raw delta artifact-carried, lifetime verdict unchanged (equivalence, p=0.774 verified / p=1.0 raw).
+- The Task 57 mechanism-symmetry thesis got live confirmation this pass: layer took 1 loss in the bonus cluster (#236), then rebuilt a 29-round streak by re-including PACHINKO adaptively (#261/#262 both-hits) — regime-dependent variance, not systematic bias.
+- Data quality milestone next pass: #67 (last in-window degraded artifact) ages out → window becomes 100% clean for the first time in the validation's history; raw and clean metrics will converge.
+- Protocol continues: metrics-only; triggers unchanged. Engine untouched.
