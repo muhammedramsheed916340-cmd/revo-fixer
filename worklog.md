@@ -2583,3 +2583,39 @@ Stage Summary:
 - 50+ threshold crossed at pass 4 (n=67). Preliminary analysis delivered above: verified experimental edge +3.2pp (p=0.625, n.s.), raw edge baseline −1.5pp (artifact-driven), theo floor 79.1% leads all.
 - Data quality: 4/67 rows degraded, ALL attributable to monitoring reloads (6/24/45/67); engine untouched (git-verified this pass).
 - Validation continues; next passes monitor toward 100+ and should adopt tab-reuse methodology.
+
+---
+Task ID: 49 (cron monitor — Job ID 369099, pass 5)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 5). 8-metric extraction + preliminary-analysis update (n>50 mandate). No code changes.
+
+Work Log:
+- Read worklog: pass 4 (Task 48) delivered preliminary analysis at n=67; recommended TAB-REUSE methodology to stop monitoring-induced degraded rows.
+- METHODOLOGY CHANGE APPLIED: did NOT reload the page — reused the still-open tab from pass 4 (agent-browser session persists; page keeps polling live data). Zero reload risk this pass.
+- RESULT: methodology WORKED — zero new degraded rows (degraded set unchanged: 6/24/45/67). First pass with clean data collection since validation started.
+- Integrity: n=74 (IDs 2-75), contiguous, 0 dupes, ts ascending, ~61 min elapsed. No console errors. Panel ↔ ledger reconciled exactly.
+
+Validation snapshot at n=74:
+1. Paired rounds: 74
+2. Baseline HIT: 50/74 = 67.6%
+3. Experimental HIT: 49/74 = 66.2%
+4. Delta: −1 hit (−1.4pp) raw — unchanged from pass 4 (race frozen: no new discordant pairs in rounds 68-75)
+5. MISS→HIT: 3 (#4, #8, #22 — unchanged)
+6. HIT→MISS: 4 (#12 verified; #24/#45/#67 degraded — unchanged)
+7. Theoretical [1,2,5,10]: 56/74 = 75.7% (floor dropping as number-storm cools)
+8. MISS RCA: 7 entries (unchanged composition: 3 displacement saves, 1 dampening loss, 3 degraded)
+
+Verified-only sensitivity (degraded rows excluded, n=70): baseline 47/70 = 67.1% vs EXPERIMENTAL 49/70 = 70.0% → Δ +2 hits (+2.9pp). Experimental edge stable across passes 2-5 (+2.4 / +2.4 / +3.2 / +2.9pp).
+
+Preliminary-analysis UPDATE (n=74 — incremental to Task 48):
+- REGIME SHIFT IN PROGRESS: rounds 69-75 landed 4 bonuses in 7 rounds (COIN FLIP ×2, PACHINKO, CASH HUNT) after a window that was 79% numbers. '1' share fell 48% → 43%; number share 79% → 76%; CRAZY TIME still 0/74.
+- Both models went 3/7 in the new stretch (hit all 3 number rounds, missed all 4 bonus rounds) — the layer's deeper bonus retention (COIN FLIP 48% vs 46% inclusion) has not yet converted into a save; its missed-bonus exposure is SYMMETRIC with baseline so far (bonus split tied 10/18 = 56% each).
+- Raw rates fell for both (67.6%/66.2% from 70.1%/68.7%) — pure denominator effect from the cooler stretch; no model moved relative to the other.
+- Baseline's +1 normal-round edge (40 vs 39 of 56) = exactly the r67 degraded-row artifact; strip it and normal rounds are tied 39/56.
+- Significance: still none (discordant pairs unchanged at 7 raw / 4 verified since pass 4 — no new separation signal possible until flips resume).
+- Key open question for the 100-round read: if the bonus regime normalizes further, does the layer's number-tilt (its source of +2 verified saves) become a liability, or does its CRAZY TIME/CASH HUNT dampening (−3pp inclusion each) keep costing it? Window R21-40 (mixed regime) is the template to watch — both models matched each other at 70% there.
+
+Stage Summary:
+- 74 rounds banked (~61 min); data pipeline CLEAN for the first time (tab-reuse: 0 new degraded rows); engine untouched (no code diffs; no reload performed).
+- Leaderboard frozen since pass 4: raw base −1.4pp (artifact-inflated), verified exp +2.9pp (stable), theo floor 75.7% still leads as window rebalances toward bonuses.
+- Validation continues toward 100+; next pass should also reuse the tab (reload ONLY if tab lost) and keep degraded-row sensitivity in the report.
