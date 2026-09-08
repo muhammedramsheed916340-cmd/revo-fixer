@@ -1,0 +1,2002 @@
+     1→"use client";
+     2→
+     3→import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+     4→import { subscribeLiveResults, isResultProcessed, type LiveResultEvent } from "./liveResultsBus";
+     5→import { getLiveSpins, subscribeLiveSpins } from "./liveSpinStore";
+     6→import {
+     7→  GAMES as ENGINE_GAMES,
+     8→  type GameModel,
+     9→  type RoundResult,
+    10→  type EngineOutput,
+    11→  type CandidateScore,
+    12→  type PerformanceDashboard,
+    13→  type EngineMode,
+    14→  WHEEL_SEGMENTS,
+    15→  WHEEL_TOTAL_SEGMENTS,
+    16→  THEORETICAL,
+    17→  EXPERIMENTAL_CONFIG,
+    18→  buildInitial,
+    19→  recalibrate,
+    20→  runRetrospectiveDiagnostic,
+    21→  type RetroDiagnostic,
+    22→} from "./decisionEngine";
+    23→
+    24→// Real game outcomes + Cloudinary card images (from the original Revo Fixer app)
+    25→const GAME_IMAGES: Record<string, string> = {
+    26→  "1": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539269/one-card_r0ffuy.png",
+    27→  "2": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539364/two-card_ayl9lu.png",
+    28→  "5": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539403/five-card_msp0cr.png",
+    29→  "10": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539416/ten-card_cx3cvj.png",
+    30→  PACHINKO: "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539441/pachiko-card_zxiw7r.png",
+    31→  "COIN FLIP": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539429/coin-flip-card_kbbg7m.png",
+    32→  "CASH HUNT": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539519/cash-hunt-card_jp8hr3.png",
+    33→  "CRAZY TIME": "https://res.cloudinary.com/dw72p48ir/image/upload/v1773539531/crazy-time-card_dftfw3.png",
+    34→};
+    35→
+    36→// Re-export GameModel as Game for local convenience.
+    37→type Game = GameModel;
+    38→const GAMES: Game[] = ENGINE_GAMES;
+    39→
+    40→// Map live API sector names → our Game objects (for auto-result detection)
+    41→const SECTOR_TO_GAME: Record<string, Game> = {
+    42→  "1": GAMES[0],
+    43→  "2": GAMES[1],
+    44→  "5": GAMES[2],
+    45→  "10": GAMES[3],
+    46→  Pachinko: GAMES[4],
+    47→  CoinFlip: GAMES[5],
+    48→  CashHunt: GAMES[6],
+    49→  CrazyTime: GAMES[7],
+    50→  CrazyBonus: GAMES[7],
+    51→};
+    52→
+    53→const SIGNAL_COUNT = 4;
+    54→const BONUS_NAMES = ["PACHINKO", "COIN FLIP", "CASH HUNT", "CRAZY TIME"];
+    55→
+    56→/** A prediction chip — derived from the unified engine output. */
+    57→interface Prediction {
+    58→  game: Game;
+    59→  confidence: number;
+    60→  time: number;
+    61→  rank?: number;
+    62→  label?: string;
+    63→  signals?: string[];
+    64→}
+    65→
+    66→// ============================================================
+    67→// PERSISTENCE — round history + last active signals
+    68→// ============================================================
+    69→const SIGNALS_KEY = "revo_lastSignals";
+    70→const ROUNDS_KEY = "revo_roundHistory";
+    71→const signalsListeners = new Set<() => void>();
+    72→const roundsListeners = new Set<() => void>();
+    73→
+    74→let cachedSignals: Prediction[] | null | undefined;
+    75→let cachedRaw = "";
+    76→
+    77→function readSavedSignals(): Prediction[] | null {
+    78→  if (typeof window === "undefined") return null;
+    79→  try {
+    80→    const saved = localStorage.getItem(SIGNALS_KEY) ?? "";
+    81→    if (saved === cachedRaw && cachedSignals !== undefined) {
+    82→      return cachedSignals;
+    83→    }
+    84→    cachedRaw = saved;
+    85→    if (!saved) {
+    86→      cachedSignals = null;
+    87→      return null;
+    88→    }
+    89→    const data = JSON.parse(saved) as Prediction[];
+    90→    if (!Array.isArray(data) || data.length === 0) {
+    91→      localStorage.removeItem(SIGNALS_KEY);
+    92→      cachedSignals = null;
+    93→      return null;
+    94→    }
+    95→    if (Date.now() - data[0].time > 5 * 60 * 1000) {
+    96→      localStorage.removeItem(SIGNALS_KEY);
+    97→      cachedSignals = null;
+    98→      return null;
+    99→    }
+   100→    cachedSignals = data;
+   101→    return data;
+   102→  } catch {
+   103→    cachedSignals = null;
+   104→    return null;
+   105→  }
+   106→}
+   107→
+   108→function subscribeSignals(cb: () => void): () => void {
+   109→  signalsListeners.add(cb);
+   110→  const onStorage = (e: StorageEvent) => {
+   111→    if (e.key === SIGNALS_KEY) cb();
+   112→  };
+   113→  window.addEventListener("storage", onStorage);
+   114→  return () => {
+   115→    signalsListeners.delete(cb);
+   116→    window.removeEventListener("storage", onStorage);
+   117→  };
+   118→}
+   119→
+   120→function useSavedSignals(): Prediction[] | null {
+   121→  return useSyncExternalStore(
+   122→    subscribeSignals,
+   123→    readSavedSignals,
+   124→    () => null,
+   125→  );
+   126→}
+   127→
+   128→function saveSignals(preds: Prediction[]) {
+   129→  try {
+   130→    localStorage.setItem(SIGNALS_KEY, JSON.stringify(preds));
+   131→    cachedRaw = "";
+   132→    signalsListeners.forEach((l) => l());
+   133→  } catch {
+   134→    /* ignore */
+   135→  }
+   136→}
+   137→
+   138→function clearSignals() {
+   139→  try {
+   140→    localStorage.removeItem(SIGNALS_KEY);
+   141→    cachedRaw = "";
+   142→    signalsListeners.forEach((l) => l());
+   143→  } catch {
+   144→    /* ignore */
+   145→  }
+   146→}
+   147→
+   148→// --- Round history ---
+   149→interface StoredRound {
+   150→  prediction: { game: { name: string }; confidence: number; time: number }[];
+   151→  actualResult: { name: string };
+   152→  hit: boolean;
+   153→  time: number;
+   154→  confidence?: number;
+   155→  recalibrated?: boolean;
+   156→  calibrationNote?: string;
+   157→}
+   158→
+   159→const EMPTY_ROUNDS: RoundResult[] = [];
+   160→const EMPTY_SPINS: import("./aiStats").SpinData[] = [];
+   161→let cachedRounds: RoundResult[] | undefined;
+   162→let cachedRoundsRaw = "";
+   163→
+   164→// Module-level store for the experimental engine's currently-LOCKED prediction
+   165→// names (the shadow A/B mirror of the baseline locked prediction). Written by
+   166→// generatePrediction + selectActualResult, read at settlement time. Not reactive.
+   167→let expLockedNames: string[] = [];
+   168→
+   169→function readRoundHistory(): RoundResult[] {
+   170→  if (typeof window === "undefined") return EMPTY_ROUNDS;
+   171→  try {
+   172→    const saved = localStorage.getItem(ROUNDS_KEY) ?? "";
+   173→    if (saved === cachedRoundsRaw && cachedRounds !== undefined) {
+   174→      return cachedRounds;
+   175→    }
+   176→    cachedRoundsRaw = saved;
+   177→    if (!saved) {
+   178→      cachedRounds = EMPTY_ROUNDS;
+   179→      return EMPTY_ROUNDS;
+   180→    }
+   181→    const data = JSON.parse(saved) as StoredRound[];
+   182→    if (!Array.isArray(data)) {
+   183→      cachedRounds = EMPTY_ROUNDS;
+   184→      return EMPTY_ROUNDS;
+   185→    }
+   186→    const rounds: RoundResult[] = data.map((r) => ({
+   187→      prediction: (r.prediction ?? []).map((p) => ({
+   188→        game: GAMES.find((g) => g.name === p.game.name) ?? GAMES[0],
+   189→        confidence: p.confidence,
+   190→        time: p.time,
+   191→      })),
+   192→      actualResult: GAMES.find((g) => g.name === r.actualResult.name) ?? GAMES[0],
+   193→      hit: r.hit,
+   194→      time: r.time,
+   195→      confidence: r.confidence ?? 0,
+   196→      recalibrated: r.recalibrated ?? false,
+   197→      calibrationNote: r.calibrationNote,
+   198→    }));
+   199→    cachedRounds = rounds;
+   200→    return rounds;
+   201→  } catch {
+   202→    cachedRounds = EMPTY_ROUNDS;
+   203→    return EMPTY_ROUNDS;
+   204→  }
+   205→}
+   206→
+   207→function subscribeRounds(cb: () => void): () => void {
+   208→  roundsListeners.add(cb);
+   209→  const onStorage = (e: StorageEvent) => {
+   210→    if (e.key === ROUNDS_KEY) cb();
+   211→  };
+   212→  window.addEventListener("storage", onStorage);
+   213→  return () => {
+   214→    roundsListeners.delete(cb);
+   215→    window.removeEventListener("storage", onStorage);
+   216→  };
+   217→}
+   218→
+   219→function useRoundHistory(): RoundResult[] {
+   220→  return useSyncExternalStore(
+   221→    subscribeRounds,
+   222→    readRoundHistory,
+   223→    () => EMPTY_ROUNDS,
+   224→  );
+   225→}
+   226→
+   227→function persistRounds(rounds: RoundResult[]) {
+   228→  try {
+   229→    const slim = rounds.map((r) => ({
+   230→      prediction: r.prediction.map((p) => ({
+   231→        game: { name: p.game.name },
+   232→        confidence: p.confidence,
+   233→        time: p.time,
+   234→      })),
+   235→      actualResult: { name: r.actualResult.name },
+   236→      hit: r.hit,
+   237→      time: r.time,
+   238→      confidence: r.confidence,
+   239→      recalibrated: r.recalibrated,
+   240→      calibrationNote: r.calibrationNote,
+   241→    }));
+   242→    localStorage.setItem(ROUNDS_KEY, JSON.stringify(slim));
+   243→    cachedRoundsRaw = "";
+   244→    roundsListeners.forEach((l) => l());
+   245→  } catch {
+   246→    /* ignore */
+   247→  }
+   248→}
+   249→
+   250→function clearRounds() {
+   251→  try {
+   252→    localStorage.removeItem(ROUNDS_KEY);
+   253→    cachedRoundsRaw = "";
+   254→    roundsListeners.forEach((l) => l());
+   255→  } catch {
+   256→    /* ignore */
+   257→  }
+   258→}
+   259→
+   260→// ============================================================
+   261→// SHADOW A/B LEDGER — baseline vs experimental on the SAME rounds
+   262→// ============================================================
+   263→// Each live round is settled TWICE in parallel:
+   264→//   - baseline prediction (frozen k=30, the active displayed prediction)
+   265→//   - experimental prediction (k=30 + rare-outcome reliability layer)
+   266→// Both are computed from the SAME pre-result history → no data leakage.
+   267→// The ledger persists across reloads so a 50-round A/B accumulates live.
+   268→const SHADOW_KEY = "revo_shadowLedger";
+   269→const EXP_FLAG_KEY = "revo_experimentalFlag";
+   270→
+   271→interface ShadowRow {
+   272→  ts: number;
+   273→  actual: string;
+   274→  baselinePreds: string[];
+   275→  baselineHit: boolean;
+   276→  expPreds: string[];
+   277→  expHit: boolean;
+   278→}
+   279→
+   280→const EMPTY_SHADOW: ShadowRow[] = [];
+   281→let cachedShadow: ShadowRow[] | undefined;
+   282→let cachedShadowRaw = "";
+   283→
+   284→function readShadowLedger(): ShadowRow[] {
+   285→  if (typeof window === "undefined") return EMPTY_SHADOW;
+   286→  try {
+   287→    const raw = localStorage.getItem(SHADOW_KEY) ?? "";
+   288→    if (raw === cachedShadowRaw && cachedShadow !== undefined) {
+   289→      return cachedShadow;
+   290→    }
+   291→    cachedShadowRaw = raw;
+   292→    if (!raw) {
+   293→      cachedShadow = EMPTY_SHADOW;
+   294→      return EMPTY_SHADOW;
+   295→    }
+   296→    const data = JSON.parse(raw);
+   297→    cachedShadow = Array.isArray(data) ? (data as ShadowRow[]) : EMPTY_SHADOW;
+   298→    return cachedShadow;
+   299→  } catch {
+   300→    cachedShadow = EMPTY_SHADOW;
+   301→    return EMPTY_SHADOW;
+   302→  }
+   303→}
+   304→
+   305→function writeShadowLedger(rows: ShadowRow[]) {
+   306→  try {
+   307→    localStorage.setItem(SHADOW_KEY, JSON.stringify(rows.slice(-200)));
+   308→  } catch {
+   309→    /* ignore */
+   310→  }
+   311→  cachedShadowRaw = ""; // invalidate cache
+   312→  notifyShadowListeners();
+   313→}
+   314→
+   315→function clearShadowLedger() {
+   316→  try {
+   317→    localStorage.removeItem(SHADOW_KEY);
+   318→    cachedShadowRaw = ""; // invalidate cache
+   319→    notifyShadowListeners();
+   320→  } catch {
+   321→    /* ignore */
+   322→  }
+   323→}
+   324→
+   325→function readExpFlag(): boolean {
+   326→  if (typeof window === "undefined") return false;
+   327→  try {
+   328→    return localStorage.getItem(EXP_FLAG_KEY) === "1";
+   329→  } catch {
+   330→    return false;
+   331→  }
+   332→}
+   333→
+   334→function writeExpFlag(on: boolean) {
+   335→  try {
+   336→    localStorage.setItem(EXP_FLAG_KEY, on ? "1" : "0");
+   337→  } catch {
+   338→    /* ignore */
+   339→  }
+   340→}
+   341→
+   342→// Subscribers for the feature flag (useSyncExternalStore pattern).
+   343→const expFlagListeners = new Set<() => void>();
+   344→function subscribeExpFlag(cb: () => void): () => void {
+   345→  expFlagListeners.add(cb);
+   346→  const onStorage = (e: StorageEvent) => {
+   347→    if (e.key === EXP_FLAG_KEY) cb();
+   348→  };
+   349→  window.addEventListener("storage", onStorage);
+   350→  return () => {
+   351→    expFlagListeners.delete(cb);
+   352→    window.removeEventListener("storage", onStorage);
+   353→  };
+   354→}
+   355→
+   356→// Subscribers for the shadow ledger.
+   357→const shadowListeners = new Set<() => void>();
+   358→function subscribeShadow(cb: () => void): () => void {
+   359→  shadowListeners.add(cb);
+   360→  const onStorage = (e: StorageEvent) => {
+   361→    if (e.key === SHADOW_KEY) cb();
+   362→  };
+   363→  window.addEventListener("storage", onStorage);
+   364→  return () => {
+   365→    shadowListeners.delete(cb);
+   366→    window.removeEventListener("storage", onStorage);
+   367→  };
+   368→}
+   369→
+   370→function notifyShadowListeners() {
+   371→  shadowListeners.forEach((l) => l());
+   372→}
+   373→
+   374→// Representative synthetic 50-round sequence matching the reported fresh
+   375→// k=30 validation marginals (PACHINKO=3, ~78% theoretical coverage).
+   376→// Used ONLY by the retrospective diagnostic to estimate direction when
+   377→// live accumulated rounds are sparse. Clearly labeled as SIMULATION.
+   378→const SYNTHETIC_50: string[] = [
+   379→  "1", "2", "1", "5", "2", "1", "10", "2", "1", "COIN FLIP",
+   380→  "1", "2", "5", "1", "2", "1", "PACHINKO", "2", "1", "5",
+   381→  "10", "1", "2", "1", "COIN FLIP", "5", "2", "1", "1", "2",
+   382→  "1", "5", "10", "2", "1", "CASH HUNT", "2", "1", "5", "1",
+   383→  "2", "1", "PACHINKO", "5", "2", "1", "10", "2", "1", "PACHINKO",
+   384→];
+   385→
+   386→// ============================================================
+   387→// ENGINE → PREDICTIONS adapter
+   388→// ============================================================
+   389→/** Convert an EngineOutput's predictions into the local Prediction shape. */
+   390→function engineToPredictions(engine: EngineOutput): Prediction[] {
+   391→  return engine.predictions.map((p) => ({
+   392→    game: p.game,
+   393→    confidence: p.confidence,
+   394→    time: p.time,
+   395→    rank: p.rank,
+   396→    label: p.label,
+   397→    signals: p.signals,
+   398→  }));
+   399→}
+   400→
+   401→// ============================================================
+   402→// MAIN COMPONENT
+   403→// ============================================================
+   404→export function RevoGame() {
+   405→  const savedSignals = useSavedSignals();
+   406→  const roundHistory = useRoundHistory();
+   407→  const [predictions, setPredictions] = useState<Prediction[] | null>(null);
+   408→  const [loading, setLoading] = useState(false);
+   409→  const [running, setRunning] = useState(false);
+   410→  const [lastRecalibration, setLastRecalibration] = useState<{ triggered: boolean; reason: string } | null>(null);
+   411→  // NOTE: NO countdown, NO auto-refresh. Prediction is LOCKED until the next
+   412→  // live result arrives (per user spec — LIVE AUTO mode, no manual intervention).
+   413→  // Hydration guard — `savedSignals`/`roundHistory` come from localStorage which
+   414→  // is null on the server but non-null on the client after mount. Rendering
+   415→  // prediction-derived UI before mount causes hydration mismatches.
+   416→  // Uses useSyncExternalStore (server snapshot = false, client = true after subscribe)
+   417→  // which is the lint-safe pattern for mount detection.
+   418→  const mounted = useSyncExternalStore(
+   419→    () => () => {},
+   420→    () => true,
+   421→    () => false,
+   422→  );
+   423→  const [stats, setStats] = useState({
+   424→    total: 1249,
+   425→    accuracy: 94,
+   426→    bonusHits: 128,
+   427→    liveUsers: 1247,
+   428→  });
+   429→  const [clock, setClock] = useState("");
+   430→  const liveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+   431→
+   432→  // Gate prediction-derived UI by `mounted` to avoid SSR hydration mismatch
+   433→  // (localStorage is null on server but non-null on client after mount).
+   434→  const displayPredictions = mounted ? (predictions ?? savedSignals) : null;
+   435→  const isRunning = running || (predictions === null && savedSignals !== null && !loading);
+   436→
+   437→  // ===== REAL CASINO SPINS (from CasinoScores API, shared via liveSpinStore) =====
+   438→  // RevoLiveResults writes the latest 30 real spins here. We subscribe so the
+   439→  // engine re-derives predictions whenever fresh real casino data arrives.
+   440→  const liveSpins = useSyncExternalStore(
+   441→    subscribeLiveSpins,
+   442→    getLiveSpins,
+   443→    () => EMPTY_SPINS, // server snapshot — stable empty constant
+   444→  );
+   445→
+   446→  // ===== UNIFIED ENGINE OUTPUT =====
+   447→  // This is THE single source of truth for ALL UI sections.
+   448→  // Re-computed whenever round history OR live casino spins change.
+   449→  // Passes REAL casino spins to the engine so predictions are data-driven
+   450→  // (not always [1,2,5,10]) and varied via weighted probabilistic sampling.
+   451→  const engine: EngineOutput = useMemo(() => {
+   452→    return buildInitial(roundHistory, liveSpins);
+   453→  }, [roundHistory, liveSpins]);
+   454→
+   455→  // ===== STABLE PREDICTION VIEW =====
+   456→  // The engine re-samples every time liveSpins changes (every 4s poll). But
+   457→  // per the stability rule, the prediction cards must NOT change until the
+   458→  // next live result arrives. So we derive the prediction-derived fields
+   459→  // (predictions, excludedOutcomes, nextSignalNames, excludedNames) from the
+   460→  // STABLE displayPredictions (state/localStorage), while using the engine's
+   461→  // live analysis (dashboard, candidateScores, RCA, confidence, decision).
+   462→  const view: EngineOutput = useMemo(() => {
+   463→    const active = displayPredictions ?? engine.predictions.map((p) => ({
+   464→      game: p.game,
+   465→      confidence: p.confidence,
+   466→      time: p.time,
+   467→    }));
+   468→    const activeNames = active.map((p) => p.game.name);
+   469→    const excludedGames = ENGINE_GAMES.filter((g) => !activeNames.includes(g.name));
+   470→    return {
+   471→      ...engine,
+   472→      // Stable prediction-derived fields (from displayPredictions):
+   473→      nextSignalNames: activeNames,
+   474→      excludedOutcomes: excludedGames,
+   475→      excludedNames: excludedGames.map((g) => g.name),
+   476→      // Keep engine's analysis fields (dashboard, candidateScores, RCA, etc.)
+   477→    };
+   478→  }, [engine, displayPredictions]);
+   479→
+   480→  // Derived display values (hydration-safe)
+   481→  const verifiedRounds = roundHistory.length;
+   482→  const hits = roundHistory.filter((r) => r.hit).length;
+   483→  const realAccuracy =
+   484→    verifiedRounds > 0 ? Math.round((hits / verifiedRounds) * 100) : null;
+   485→
+   486→  // Live clock (HH:MM)
+   487→  useEffect(() => {
+   488→    const tick = () => {
+   489→      const d = new Date();
+   490→      setClock(
+   491→        `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+   492→      );
+   493→    };
+   494→    tick();
+   495→    const t = setInterval(tick, 1000);
+   496→    return () => clearInterval(t);
+   497→  }, []);
+   498→
+   499→  // ===== GENERATE PREDICTION (initial only — NO auto-refresh) =====
+   500→  // Prediction is LOCKED once generated. It only changes when a new LIVE
+   501→  // result arrives (via selectActualResult). No countdown, no refresh,
+   502→  // no manual intervention — pure LIVE AUTO mode.
+   503→  const generatePrediction = useCallback(() => {
+   504→    setLoading(true);
+   505→    setPredictions(null);
+   506→    const allRounds = readRoundHistory();
+   507→    const spins = getLiveSpins();
+   508→    const eng = buildInitial(allRounds, spins);
+   509→    const preds = engineToPredictions(eng);
+   510→    setPredictions(preds);
+   511→    setLoading(false);
+   512→    setRunning(true);
+   513→    saveSignals(preds);
+   514→    setStats((s) => {
+   515→      const total = s.total + preds.length;
+   516→      const bonusHits =
+   517→        s.bonusHits +
+   518→        preds.filter((p) => BONUS_NAMES.includes(p.game.name)).length;
+   519→      return { ...s, total, bonusHits, accuracy: s.accuracy };
+   520→    });
+   521→    // SHADOW: seed the experimental engine's locked prediction (same history).
+   522→    const expEng = buildInitial(allRounds, spins, "experimental");
+   523→    expLockedNames = expEng.predictions.map((p) => p.game.name);
+   524→  }, []);
+   525→
+   526→  // AUTO-GENERATE on mount ONLY (no countdown refresh)
+   527→  const autoStarted = useRef(false);
+   528→  useEffect(() => {
+   529→    if (autoStarted.current) return;
+   530→    if (savedSignals) return;
+   531→    autoStarted.current = true;
+   532→    const t = setTimeout(() => generatePrediction(), 100);
+   533→    return () => clearTimeout(t);
+   534→  }, [savedSignals, generatePrediction]);
+   535→
+   536→  // Event debug log — proves the exact pipeline order for each live result
+   537→  const [eventLog, setEventLog] = useState<Array<{
+   538→    eventId: number;
+   539→    actual: string;
+   540→    oldPrediction: string[];
+   541→    hitMiss: string;
+   542→    historyNBefore: number;
+   543→    historyNAfter: number;
+   544→    newPrediction: string[];
+   545→    predictionId: number;
+   546→    locked: boolean;
+   547→    timestamp: number;
+   548→  }>>([]);
+   549→
+   550→  // ===== SHADOW A/B: baseline vs experimental on the SAME live rounds =====
+   551→  // experimentalEnabled is a FEATURE FLAG. When ON, the experimental engine
+   552→  // (k=30 + rare-outcome reliability layer) ALSO runs in shadow — its
+   553→  // prediction is locked at the same moment as baseline, settled against
+   554→  // the same actual, and recorded in `shadowLedger`. The ACTIVE displayed
+   555→  // prediction remains the frozen k=30 baseline (unchanged behavior).
+   556→  const experimentalEnabled = useSyncExternalStore(
+   557→    subscribeExpFlag,
+   558→    readExpFlag,
+   559→    () => false, // server snapshot
+   560→  );
+   561→  const shadowLedger = useSyncExternalStore(
+   562→    subscribeShadow,
+   563→    readShadowLedger,
+   564→    () => EMPTY_SHADOW, // server snapshot — stable constant
+   565→  );
+   566→  // Retrospective diagnostic result (computed on demand).
+   567→  const [retroResult, setRetroResult] = useState<RetroDiagnostic | null>(null);
+   568→  const [retroSource, setRetroSource] = useState<"live" | "synthetic" | null>(null);
+   569→
+   570→  const toggleExperimental = useCallback(() => {
+   571→    const next = !readExpFlag();
+   572→    writeExpFlag(next);
+   573→    expFlagListeners.forEach((l) => l());
+   574→    // When enabling, seed the experimental locked prediction from the
+   575→    // current baseline prediction set so the shadow has a starting point.
+   576→    if (next) {
+   577→      const cur = predictions ?? savedSignals ?? [];
+   578→      expLockedNames = cur.map((p) => p.game.name);
+   579→    }
+   580→  }, [predictions, savedSignals]);
+   581→
+   582→  // ============================================================
+   583→  // CORE ENGINE PIPELINE — runs on EVERY live result / manual selection
+   584→  // ============================================================
+   585→  // LIVE RESULT
+   586→  //   → VERIFY HIT/MISS
+   587→  //   → UPDATE HISTORY (persist)
+   588→  //   → ANALYZE ACTIVE SIGNALS
+   589→  //   → ANALYZE EXCLUDED OUTCOMES
+   590→  //   → COMPARE RECENT + LONG-TERM PERFORMANCE
+   591→  //   → DETECT PATTERN SHIFT
+   592→  //   → RCA IF MISS
+   593→  //   → RECALIBRATE
+   594→  //   → SELECT STRONGEST EVIDENCE-BASED SIGNAL
+   595→  //   → UPDATE PREDICTION IN THE SAME SPOT
+   596→  const selectActualResult = useCallback(
+   597→    (game: Game) => {
+   598→      const currentPreds =
+   599→        predictions ?? readSavedSignals() ?? [];
+   600→      // If there's no active prediction, don't record an unfair MISS.
+   601→      // Wait for the prediction to be generated first.
+   602→      if (currentPreds.length === 0) {
+   603→        // Generate a prediction immediately so the next round has something
+   604→        // to compare against. Don't record this round.
+   605→        const allRounds = readRoundHistory();
+   606→        const spins = getLiveSpins();
+   607→        const eng = buildInitial(allRounds, spins);
+   608→        const preds = engineToPredictions(eng);
+   609→        setPredictions(preds);
+   610→        setRunning(true);
+   611→        saveSignals(preds);
+   612→        // SHADOW: seed experimental locked prediction too.
+   613→        const expEng0 = buildInitial(allRounds, spins, "experimental");
+   614→        expLockedNames = expEng0.predictions.map((p) => p.game.name);
+   615→        return;
+   616→      }
+   617→
+   618→      // ===== PIPELINE AUDIT: log exact event order =====
+   619→      const historyBefore = readRoundHistory();
+   620→      const historyNBefore = historyBefore.length;
+   621→      const oldPredNames = currentPreds.map((p) => p.game.name);
+   622→
+   623→      // STEP 1: SETTLE OLD LOCKED PREDICTION (before history update)
+   624→      const hit = currentPreds.some((p) => p.game.name === game.name);
+   625→      // SHADOW: settle the experimental locked prediction against the SAME
+   626→      // actual result (both computed from the same pre-result history).
+   627→      // `expLockedNames` is the module-level mirror of the experimental
+   628→      // engine's currently-locked prediction names.
+   629→      const expHit = experimentalEnabled && expLockedNames.length > 0
+   630→        ? expLockedNames.includes(game.name)
+   631→        : false;
+   632→      const predConfidence =
+   633→        Math.round(
+   634→          currentPreds.reduce((s, p) => s + p.confidence, 0) /
+   635→            currentPreds.length,
+   636→        );
+   637→      const wasRecalibrated = lastRecalibration?.triggered ?? false;
+   638→      const round: RoundResult = {
+   639→        prediction: currentPreds,
+   640→        actualResult: game,
+   641→        hit,
+   642→        time: Date.now(),
+   643→        confidence: predConfidence,
+   644→        recalibrated: wasRecalibrated,
+   645→        calibrationNote: lastRecalibration?.reason,
+   646→      };
+   647→
+   648→      // STEP 2: APPEND NEW RESULT TO HISTORY
+   649→      const updated = [...historyBefore, round];
+   650→      persistRounds(updated);
+   651→      const historyNAfter = updated.length;
+   652→
+   653→      // STEP 3: RECALCULATE ALL 8 OUTCOMES USING UPDATED HISTORY
+   654→      const spins = getLiveSpins();
+   655→      let nextPreds: Prediction[];
+   656→      let nextRecal: { triggered: boolean; reason: string } | null = null;
+   657→
+   658→      if (!hit) {
+   659→        const reason = `Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover — every outcome re-scored from scratch.`;
+   660→        const eng = recalibrate(updated, reason, spins);
+   661→        nextPreds = engineToPredictions(eng);
+   662→        nextRecal = { triggered: true, reason };
+   663→      } else {
+   664→        const eng = buildInitial(updated, spins);
+   665→        nextPreds = engineToPredictions(eng);
+   666→        nextRecal = null;
+   667→      }
+   668→
+   669→      const newPredNames = nextPreds.map((p) => p.game.name);
+   670→
+   671→      // STEP 4: LOG EVENT DEBUG TABLE
+   672→      const eventId = historyNAfter;
+   673→      setEventLog((prev) => {
+   674→        const next = [{
+   675→          eventId,
+   676→          actual: game.name,
+   677→          oldPrediction: oldPredNames,
+   678→          hitMiss: hit ? "HIT" : "MISS",
+   679→          historyNBefore,
+   680→          historyNAfter,
+   681→          newPrediction: newPredNames,
+   682→          predictionId: eventId + 1,
+   683→          locked: true,
+   684→          timestamp: Date.now(),
+   685→        }, ...prev];
+   686→        return next.slice(0, 20); // keep last 20 events
+   687→      });
+   688→
+   689→      // STEP 5: DISPLAY + LOCK NEW PREDICTION
+   690→      setPredictions(nextPreds);
+   691→      setLastRecalibration(nextRecal);
+   692→      setRunning(true);
+   693→      saveSignals(nextPreds);
+   694→
+   695→      // ===== STEP 6: SHADOW A/B — settle + regenerate experimental =====
+   696→      // Record this round in the shadow ledger (baseline vs experimental on
+   697→      // the SAME actual), then regenerate the experimental locked prediction
+   698→      // from the updated history so it is ready for the NEXT live result.
+   699→      if (experimentalEnabled) {
+   700→        const expEng = !hit
+   701→          ? recalibrate(updated, "Shadow recalibration (experimental mode)", spins, "experimental")
+   702→          : buildInitial(updated, spins, "experimental");
+   703→        const expNextNames = expEng.predictions.map((p) => p.game.name);
+   704→        expLockedNames = expNextNames;
+   705→        const row: ShadowRow = {
+   706→          ts: Date.now(),
+   707→          actual: game.name,
+   708→          baselinePreds: oldPredNames,
+   709→          baselineHit: hit,
+   710→          expPreds: expLockedNames,
+   711→          expHit,
+   712→        };
+   713→        // Append to shadow ledger (useSyncExternalStore notifies subscribers).
+   714→        const prevLedger = readShadowLedger();
+   715→        writeShadowLedger([...prevLedger, row].slice(-200));
+   716→      }
+   717→    },
+   718→    [predictions, savedSignals, lastRecalibration, experimentalEnabled],
+   719→  );
+   720→
+   721→  const clearHistory = useCallback(() => {
+   722→    clearRounds();
+   723→    setLastRecalibration(null);
+   724→  }, []);
+   725→
+   726→  // ===== SHADOW A/B STATS — baseline vs experimental on the SAME rounds =====
+   727→  const shadowStats = useMemo(() => {
+   728→    const rows = shadowLedger;
+   729→    const total = rows.length;
+   730→    const bHits = rows.filter((r) => r.baselineHit).length;
+   731→    const eHits = rows.filter((r) => r.expHit).length;
+   732→    const flipsToHit = rows.filter((r) => !r.baselineHit && r.expHit).length;
+   733→    const flipsToMiss = rows.filter((r) => r.baselineHit && !r.expHit).length;
+   734→    // Per-outcome inclusion counts (both modes)
+   735→    const perOutcome: Record<string, { baseInc: number; expInc: number; actuals: number }> = {};
+   736→    for (const g of ENGINE_GAMES) perOutcome[g.name] = { baseInc: 0, expInc: 0, actuals: 0 };
+   737→    for (const r of rows) {
+   738→      for (const n of r.baselinePreds) if (perOutcome[n]) perOutcome[n].baseInc++;
+   739→      for (const n of r.expPreds) if (perOutcome[n]) perOutcome[n].expInc++;
+   740→      if (perOutcome[r.actual]) perOutcome[r.actual].actuals++;
+   741→    }
+   742→    // 1/2/5/10 exclusion rates (fraction of rounds each was excluded)
+   743→    const exclusionRates: Record<string, { base: number; exp: number }> = {};
+   744→    for (const num of ["1", "2", "5", "10"]) {
+   745→      const baseExcl = rows.filter((r) => !r.baselinePreds.includes(num)).length;
+   746→      const expExcl = rows.filter((r) => !r.expPreds.includes(num)).length;
+   747→      exclusionRates[num] = {
+   748→        base: total > 0 ? baseExcl / total : 0,
+   749→        exp: total > 0 ? expExcl / total : 0,
+   750→      };
+   751→    }
+   752→    return {
+   753→      total, bHits, eHits,
+   754→      bRate: total > 0 ? bHits / total : 0,
+   755→      eRate: total > 0 ? eHits / total : 0,
+   756→      delta: total > 0 ? (eHits - bHits) / total : 0,
+   757→      flipsToHit, flipsToMiss,
+   758→      perOutcome, exclusionRates,
+   759→    };
+   760→  }, [shadowLedger]);
+   761→
+   762→  // ===== RETROSPECTIVE DIAGNOSTIC handlers =====
+   763→  const runRetroLive = useCallback(() => {
+   764→    const names = roundHistory.map((r) => r.actualResult.name);
+   765→    const spins = getLiveSpins();
+   766→    setRetroResult(runRetrospectiveDiagnostic(names, spins));
+   767→    setRetroSource("live");
+   768→  }, [roundHistory]);
+   769→
+   770→  const runRetroSynthetic = useCallback(() => {
+   771→    const spins = getLiveSpins();
+   772→    setRetroResult(runRetrospectiveDiagnostic(SYNTHETIC_50, spins));
+   773→    setRetroSource("synthetic");
+   774→  }, []);
+   775→
+   776→  const clearShadow = useCallback(() => {
+   777→    clearShadowLedger();
+   778→  }, []);
+   779→
+   780→  // NOTE: NO auto-refresh countdown. Prediction is LOCKED until next live result.
+   781→  // The only thing that regenerates the prediction is selectActualResult()
+   782→  // (called automatically when a new live result arrives via liveResultsBus).
+   783→
+   784→  // Live users fluctuation (every 8s)
+   785→  useEffect(() => {
+   786→    liveRef.current = setInterval(() => {
+   787→      setStats((s) => {
+   788→        const change = Math.floor(Math.random() * 20) - 10;
+   789→        return { ...s, liveUsers: Math.max(1000, s.liveUsers + change) };
+   790→      });
+   791→    }, 8000);
+   792→    return () => {
+   793→      if (liveRef.current) clearInterval(liveRef.current);
+   794→    };
+   795→  }, []);
+   796→
+   797→  // NOTE: NO visibility-change auto-refresh. Prediction is LOCKED regardless
+   798→  // of tab visibility — it only changes on new live result.
+   799→
+   800→  // AUTO-RESULT from live API + LATENCY TRACKING
+   801→  const [popupResult, setPopupResult] = useState<Game | null>(null);
+   802→  const [popupEnabled, setPopupEnabled] = useState(true);
+   803→  // Latency tracking for debug performance panel
+   804→  const [latencyStats, setLatencyStats] = useState<{
+   805→    lastEventTime: number;
+   806→    sourceTime: number | null;       // actual settledAt from casino API
+   807→    appReceivedTime: number | null;   // when app received the event
+   808→    sourceToApp: number | null;       // sourceTime → appReceived (detection delay)
+   809→    appToUI: number;                   // appReceived → UI displayed
+   810→    appToPrediction: number;           // appReceived → new prediction generated
+   811→    totalSourceToUI: number | null;    // sourceTime → UI displayed
+   812→    totalSourceToPrediction: number | null; // sourceTime → new prediction
+   813→    sector: string;
+   814→    resultCount: number;
+   815→    duplicateCount: number;
+   816→  } | null>(null);
+   817→  const latencyHistoryRef = useRef<{ sourceToApp: number; totalToUI: number; totalToPred: number }[]>([]);
+   818→  const [latencyAvg, setLatencyAvg] = useState<{ avgSrcToApp: number | null; minSrcToApp: number | null; maxSrcToApp: number | null; p95SrcToApp: number | null; avgAppToUI: number; avgAppToPred: number; minAppToUI: number; maxAppToUI: number; minAppToPred: number; maxAppToPred: number }>({
+   819→    avgSrcToApp: null, minSrcToApp: null, maxSrcToApp: null, p95SrcToApp: null, avgAppToUI: 0, avgAppToPred: 0, minAppToUI: 0, maxAppToUI: 0, minAppToPred: 0, maxAppToPred: 0,
+   820→  });
+   821→  const staleCountRef = useRef(0);
+   822→  const duplicateCountRef = useRef(0);
+   823→  // Secondary dedup guard: Set of all processed result keys
+   824→  const processedResultKeysRef = useRef<Set<string>>(new Set());
+   825→  const [eventStats, setEventStats] = useState({ stale: 0, duplicate: 0, dropped: 0, total: 0 });
+   826→
+   827→  useEffect(() => {
+   828→    const unsub = subscribeLiveResults((e: LiveResultEvent) => {
+   829→      // ===== SECONDARY DEDUP GUARD =====
+   830→      // Even though broadcastLiveResult already deduplicates, we add a
+   831→      // secondary check here to be absolutely certain the same result
+   832→      // never triggers the popup or selectActualResult twice.
+   833→      // This prevents duplicate popups from React batched renders or
+   834→      // concurrent polling cycles.
+   835→      const resultKey = `${e.sector}-${e.time}`;
+   836→      if (processedResultKeysRef.current.has(resultKey)) {
+   837→        duplicateCountRef.current++;
+   838→        setEventStats((prev) => ({ ...prev, duplicate: prev.duplicate + 1 }));
+   839→        return; // Already processed — skip completely
+   840→      }
+   841→      processedResultKeysRef.current.add(resultKey);
+   842→      // Keep only last 50 keys
+   843→      if (processedResultKeysRef.current.size > 50) {
+   844→        const firstKey = processedResultKeysRef.current.values().next().value;
+   845→        if (firstKey) processedResultKeysRef.current.delete(firstKey);
+   846→      }
+   847→
+   848→      const eventReceivedAt = performance.now();
+   849→      const game = SECTOR_TO_GAME[e.sector];
+   850→      if (game) {
+   851→        // Result displayed immediately
+   852→        const resultDisplayedAt = performance.now();
+   853→        if (popupEnabled) {
+   854→          setPopupResult(game);
+   855→          setTimeout(() => setPopupResult(null), 4000);
+   856→        }
+   857→        selectActualResult(game);
+   858→        // Prediction generated after selectActualResult (synchronous)
+   859→        const predictionGeneratedAt = performance.now();
+   860→
+   861→        // Compute full source→app latency
+   862→        const sourceMs = e.sourceTime ?? null;
+   863→        const appMs = e.appReceivedTime ?? null;
+   864→        const srcToApp = (sourceMs !== null && appMs !== null) ? appMs - sourceMs : null;
+   865→        const appToUI = Math.round(resultDisplayedAt - eventReceivedAt);
+   866→        const appToPred = Math.round(predictionGeneratedAt - eventReceivedAt);
+   867→        const totalSrcToUI = srcToApp !== null ? srcToApp + appToUI : null;
+   868→        const totalSrcToPred = srcToApp !== null ? srcToApp + appToPred : null;
+   869→
+   870→        // Track history for averages
+   871→        if (srcToApp !== null && totalSrcToUI !== null && totalSrcToPred !== null) {
+   872→          latencyHistoryRef.current.push({ sourceToApp: srcToApp, totalToUI: totalSrcToUI, totalToPred: totalSrcToPred });
+   873→          if (latencyHistoryRef.current.length > 100) latencyHistoryRef.current.shift();
+   874→          // Update averages via state (not ref during render)
+   875→          const hist = latencyHistoryRef.current;
+   876→          const avgS2A = hist.reduce((s, h) => s + h.sourceToApp, 0) / hist.length;
+   877→          const minS2A = Math.min(...hist.map((h) => h.sourceToApp));
+   878→          const maxS2A = Math.max(...hist.map((h) => h.sourceToApp));
+   879→          // P95: sort and take the 95th percentile
+   880→          const sortedS2A = [...hist.map((h) => h.sourceToApp)].sort((a, b) => a - b);
+   881→          const p95Idx = Math.floor(sortedS2A.length * 0.95);
+   882→          const p95S2A = sortedS2A[p95Idx] ?? maxS2A;
+   883→          const avgA2U = hist.reduce((s, h) => s + h.totalToUI - h.sourceToApp, 0) / hist.length;
+   884→          const avgA2P = hist.reduce((s, h) => s + h.totalToPred - h.sourceToApp, 0) / hist.length;
+   885→          const minA2U = Math.min(...hist.map((h) => h.totalToUI - h.sourceToApp));
+   886→          const maxA2U = Math.max(...hist.map((h) => h.totalToUI - h.sourceToApp));
+   887→          const minA2P = Math.min(...hist.map((h) => h.totalToPred - h.sourceToApp));
+   888→          const maxA2P = Math.max(...hist.map((h) => h.totalToPred - h.sourceToApp));
+   889→          setLatencyAvg({
+   890→            avgSrcToApp: avgS2A, minSrcToApp: minS2A, maxSrcToApp: maxS2A, p95SrcToApp: p95S2A,
+   891→            avgAppToUI: avgA2U, avgAppToPred: avgA2P, minAppToUI: minA2U, maxAppToUI: maxA2U, minAppToPred: minA2P, maxAppToPred: maxA2P,
+   892→          });
+   893→          setEventStats((prev) => ({ ...prev, total: hist.length }));
+   894→        }
+   895→
+   896→        const hist = latencyHistoryRef.current;
+   897→        setLatencyStats({
+   898→          lastEventTime: Date.now(),
+   899→          sourceTime: sourceMs,
+   900→          appReceivedTime: appMs,
+   901→          sourceToApp: srcToApp,
+   902→          appToUI,
+   903→          appToPrediction: appToPred,
+   904→          totalSourceToUI: totalSrcToUI,
+   905→          totalSourceToPrediction: totalSrcToPred,
+   906→          sector: e.sector,
+   907→          resultCount: hist.length,
+   908→          duplicateCount: 0,
+   909→        });
+   910→      }
+   911→    });
+   912→    return unsub;
+   913→  }, [selectActualResult, popupEnabled]);
+   914→
+   915→  const lastActual = roundHistory[roundHistory.length - 1]?.actualResult ?? null;
+   916→
+   917→  return (
+   918→    <section id="game" className="scroll-mt-20 px-4 py-12 sm:px-6">
+   919→      <div className="mx-auto max-w-5xl">
+   920→        <div className="mb-6 text-center">
+   921→          <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#448AFF]">
+   922→            <span className="revo-pulse text-[#2ed573]">●</span> Live Game
+   923→          </div>
+   924→          <h2 className="mt-1 text-2xl font-black text-white sm:text-3xl">
+   925→            <span className="revo-gradient-animate">CRAZY TIME</span> LIVE
+   926→          </h2>
+   927→          <p className="mx-auto mt-1 max-w-lg text-sm text-[#8899cc]">
+   928→            ⚡ {SIGNAL_COUNT} Live Predictions • High Accuracy ⚡ — each box shows
+   929→            a different outcome, never the same.
+   930→          </p>
+   931→        </div>
+   932→
+   933→        {/* ===== NEXT PREDICTION (4 boxes) — LOCKED until next live result ===== */}
+   934→        <div className="revo-card revo-card-glow overflow-hidden">
+   935→          <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#448AFF]/10 to-transparent px-4 py-3">
+   936→            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+   937→              <i className="fas fa-bolt text-[#FFD700]" /> Next Prediction
+   938→            </span>
+   939→            <div className="flex items-center gap-2">
+   940→              {/* LIVE AUTO badge — prediction auto-settles on new live result */}
+   941→              <span className="flex items-center gap-1.5 rounded-full bg-[#2ed573]/15 px-2 py-0.5 text-[9px] font-bold uppercase text-[#2ed573]" title="LIVE AUTO mode — prediction auto-settles when a new live result arrives. No manual refresh.">
+   942→                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#2ed573]" />
+   943→                <i className="fas fa-bolt" /> LIVE AUTO
+   944→              </span>
+   945→              {/* LOCK indicator — prediction immutable until next result */}
+   946→              <span className="flex items-center gap-1 rounded-full bg-[#448AFF]/15 px-2 py-0.5 text-[9px] font-bold uppercase text-[#448AFF]" title="Prediction is LOCKED. Will not change until the next live result arrives.">
+   947→                <i className="fas fa-lock" /> LOCKED
+   948→              </span>
+   949→              {lastRecalibration?.triggered && (
+   950→                <span className="rounded-full bg-[#ffa502]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#ffa502]">
+   951→                  <i className="fas fa-wrench mr-1" /> Recalibrated
+   952→                </span>
+   953→              )}
+   954→              {clock && (
+   955→                <span className="text-[11px] text-[#5a6a99]">• {clock}</span>
+   956→              )}
+   957→              <button
+   958→                onClick={() => setPopupEnabled((v) => !v)}
+   959→                className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase transition ${
+   960→                  popupEnabled
+   961→                    ? "bg-[#2ed573]/15 text-[#2ed573]"
+   962→                    : "bg-[#1e2240] text-[#5a6a99]"
+   963→                }`}
+   964→                title={popupEnabled ? "Popup ON — click to disable" : "Popup OFF — click to enable"}
+   965→              >
+   966→                <i className={`fas ${popupEnabled ? "fa-bell" : "fa-bell-slash"}`} />
+   967→                {popupEnabled ? "Popup ON" : "Popup OFF"}
+   968→              </button>
+   969→            </div>
+   970→          </div>
+   971→
+   972→          {/* Recalibration banner (shows when last round was a MISS) */}
+   973→          {lastRecalibration?.triggered && (
+   974→            <div className="border-b border-[#ffa502]/20 bg-[#ffa502]/8 px-4 py-2.5">
+   975→              <div className="flex items-start gap-2 text-[11px]">
+   976→                <i className="fas fa-wrench mt-0.5 text-[#ffa502]" />
+   977→                <div className="flex-1">
+   978→                  <span className="font-bold text-[#ffa502]">
+   979→                    Auto-recalibration applied:
+   980→                  </span>{" "}
+   981→                  <span className="text-[#bcc6e0]">{lastRecalibration.reason}</span>
+   982→                </div>
+   983→              </div>
+   984→            </div>
+   985→          )}
+   986→
+   987→          <div className="p-4 sm:p-6">
+   988→            {loading && (
+   989→              <div className="flex flex-col items-center justify-center py-10 text-center">
+   990→                <div className="mb-3 h-11 w-11 animate-spin rounded-full border-4 border-[#448AFF]/15 border-t-[#448AFF]" />
+   991→                <div className="text-sm font-bold text-white">Analyzing Patterns…</div>
+   992→                <div className="text-xs text-[#5a6a99]">Generating predictions</div>
+   993→              </div>
+   994→            )}
+   995→
+   996→            {displayPredictions && !loading && (
+   997→              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+   998→                {displayPredictions.map((pred, i) => (
+   999→                  <SignalCard
+  1000→                    key={`${pred.game.name}-${pred.time}-${i}`}
+  1001→                    pred={pred}
+  1002→                    index={i}
+  1003→                    verifiedRounds={verifiedRounds}
+  1004→                    rank={pred.rank ?? i + 1}
+  1005→                    rankLabel={pred.label ?? ""}
+  1006→                    signals={pred.signals ?? []}
+  1007→                  />
+  1008→                ))}
+  1009→              </div>
+  1010→            )}
+  1011→          </div>
+  1012→        </div>
+  1013→
+  1014→        {/* ===== DEBUG PERFORMANCE PANEL (full source→app latency tracking) ===== */}
+  1015→        {latencyStats && (
+  1016→          <div className="revo-card mt-2 overflow-hidden border border-[#00d4ff]/20">
+  1017→            <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#00d4ff]/5 to-transparent px-4 py-2">
+  1018→              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#00d4ff]">
+  1019→                <i className="fas fa-stopwatch" /> Performance Debug — {latencyStats.sector}
+  1020→              </span>
+  1021→              <div className="flex items-center gap-1.5">
+  1022→                <span className="text-[9px] text-[#5a6a99]">
+  1023→                  {new Date(latencyStats.lastEventTime).toLocaleTimeString()}
+  1024→                </span>
+  1025→                <span className="rounded-full bg-[#1e2240] px-1.5 py-0.5 text-[8px] font-bold text-[#5a6a99]">
+  1026→                  n={latencyStats.resultCount}
+  1027→                </span>
+  1028→              </div>
+  1029→            </div>
+  1030→            {/* Current latency (last event) */}
+  1031→            <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-6">
+  1032→              <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+  1033→                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Src→App (now)</div>
+  1034→                <div className="text-sm font-black" style={{
+  1035→                  color: latencyStats.sourceToApp === null ? "#5a6a99" : latencyStats.sourceToApp < 3000 ? "#2ed573" : latencyStats.sourceToApp < 6000 ? "#448AFF" : "#ffa502",
+  1036→                }}>
+  1037→                  {latencyStats.sourceToApp !== null ? `${(latencyStats.sourceToApp / 1000).toFixed(1)}s` : "—"}
+  1038→                </div>
+  1039→              </div>
+  1040→              <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+  1041→                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">App→UI (now)</div>
+  1042→                <div className="text-sm font-black" style={{
+  1043→                  color: latencyStats.appToUI < 50 ? "#2ed573" : latencyStats.appToUI < 300 ? "#448AFF" : "#ffa502",
+  1044→                }}>
+  1045→                  {latencyStats.appToUI}ms
+  1046→                </div>
+  1047→              </div>
+  1048→              <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+  1049→                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">App→Pred (now)</div>
+  1050→                <div className="text-sm font-black" style={{
+  1051→                  color: latencyStats.appToPrediction < 50 ? "#2ed573" : latencyStats.appToPrediction < 500 ? "#448AFF" : "#ffa502",
+  1052→                }}>
+  1053→                  {latencyStats.appToPrediction}ms
+  1054→                </div>
+  1055→              </div>
+  1056→              <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5 text-center">
+  1057→                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Total→UI (now)</div>
+  1058→                <div className="text-sm font-black" style={{
+  1059→                  color: latencyStats.totalSourceToUI === null ? "#5a6a99" : latencyStats.totalSourceToUI < 3000 ? "#2ed573" : latencyStats.totalSourceToUI < 6000 ? "#448AFF" : "#ffa502",
+  1060→                }}>
+  1061→                  {latencyStats.totalSourceToUI !== null ? `${(latencyStats.totalSourceToUI / 1000).toFixed(1)}s` : "—"}
+  1062→                </div>
+  1063→              </div>
+  1064→              <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5 text-center">
+  1065→                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Total→Pred (now)</div>
+  1066→                <div className="text-sm font-black" style={{
+  1067→                  color: latencyStats.totalSourceToPrediction === null ? "#5a6a99" : latencyStats.totalSourceToPrediction < 3000 ? "#2ed573" : latencyStats.totalSourceToPrediction < 6000 ? "#448AFF" : "#ffa502",
+  1068→                }}>
+  1069→                  {latencyStats.totalSourceToPrediction !== null ? `${(latencyStats.totalSourceToPrediction / 1000).toFixed(1)}s` : "—"}
+  1070→                </div>
+  1071→              </div>
+  1072→              <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+  1073→                <div className="text-[7px] uppercase tracking-wider text-[#5a6a99]">Events</div>
+  1074→                <div className="text-sm font-black text-[#a78bfa]">{eventStats.total}</div>
+  1075→                <div className="text-[6px] text-[#5a6a99]">
+  1076→                  stale:{eventStats.stale} dup:{eventStats.duplicate}
+  1077→                </div>
+  1078→              </div>
+  1079→            </div>
+  1080→            {/* Aggregated stats */}
+  1081→            {latencyAvg.avgSrcToApp !== null && (
+  1082→              <div className="border-t border-[#1e2240] px-3 py-2">
+  1083→                <div className="mb-1 text-[8px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1084→                  Aggregated Live Statistics (genuine NEW events only, n={eventStats.total})
+  1085→                </div>
+  1086→                <div className="grid grid-cols-3 gap-2 text-[9px]">
+  1087→                  {/* Source → App */}
+  1088→                  <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5">
+  1089→                    <div className="text-[7px] font-bold uppercase text-[#00d4ff]">Source→App</div>
+  1090→                    <div className="grid grid-cols-2 gap-0.5 mt-0.5">
+  1091→                      <div>Avg: <span className="font-bold text-white">{(latencyAvg.avgSrcToApp / 1000).toFixed(1)}s</span></div>
+  1092→                      <div>P95: <span className="font-bold text-[#ffa502]">{(latencyAvg.p95SrcToApp! / 1000).toFixed(1)}s</span></div>
+  1093→                      <div>Min: <span className="font-bold text-[#2ed573]">{(latencyAvg.minSrcToApp! / 1000).toFixed(1)}s</span></div>
+  1094→                      <div>Max: <span className="font-bold text-[#ff4757]">{(latencyAvg.maxSrcToApp! / 1000).toFixed(1)}s</span></div>
+  1095→                    </div>
+  1096→                  </div>
+  1097→                  {/* App → UI */}
+  1098→                  <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5">
+  1099→                    <div className="text-[7px] font-bold uppercase text-[#2ed573]">App→UI</div>
+  1100→                    <div className="grid grid-cols-2 gap-0.5 mt-0.5">
+  1101→                      <div>Avg: <span className="font-bold text-white">{latencyAvg.avgAppToUI.toFixed(0)}ms</span></div>
+  1102→                      <div>Min: <span className="font-bold text-[#2ed573]">{latencyAvg.minAppToUI.toFixed(0)}ms</span></div>
+  1103→                      <div>Max: <span className="font-bold text-[#ff4757]">{latencyAvg.maxAppToUI.toFixed(0)}ms</span></div>
+  1104→                    </div>
+  1105→                  </div>
+  1106→                  {/* App → Prediction */}
+  1107→                  <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5">
+  1108→                    <div className="text-[7px] font-bold uppercase text-[#448AFF]">App→Prediction</div>
+  1109→                    <div className="grid grid-cols-2 gap-0.5 mt-0.5">
+  1110→                      <div>Avg: <span className="font-bold text-white">{latencyAvg.avgAppToPred.toFixed(0)}ms</span></div>
+  1111→                      <div>Min: <span className="font-bold text-[#2ed573]">{latencyAvg.minAppToPred.toFixed(0)}ms</span></div>
+  1112→                      <div>Max: <span className="font-bold text-[#ff4757]">{latencyAvg.maxAppToPred.toFixed(0)}ms</span></div>
+  1113→                    </div>
+  1114→                  </div>
+  1115→                </div>
+  1116→              </div>
+  1117→            )}
+  1118→            {/* Latency note */}
+  1119→            <div className="border-t border-[#1e2240] px-4 py-1.5 text-[8px] text-[#5a6a99]">
+  1120→              <i className="fas fa-circle-info mr-1" />
+  1121→              No stale live-result cache. Polling=2s, API always fresh. Source→App = casino settledAt → app detection.
+  1122→              App→UI = internal pipeline (target &lt;300ms). App→Pred = prediction generation (target &lt;500ms).
+  1123→              Initial stale result excluded from stats. Dedup by timestamp, NOT by result name.
+  1124→            </div>
+  1125→          </div>
+  1126→        )}
+  1127→
+  1128→        {/* ===== EVENT DEBUG TABLE (pipeline audit) ===== */}
+  1129→        {eventLog.length > 0 && (
+  1130→          <div className="revo-card mt-2 overflow-hidden border border-[#a78bfa]/20">
+  1131→            <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#a78bfa]/5 to-transparent px-4 py-2">
+  1132→              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#a78bfa]">
+  1133→                <i className="fas fa-list-check" /> Event Debug Log (pipeline audit)
+  1134→              </span>
+  1135→              <span className="text-[9px] text-[#5a6a99]">{eventLog.length} events logged</span>
+  1136→            </div>
+  1137→            <div className="overflow-x-auto revo-scroll">
+  1138→              <table className="w-full min-w-[900px] text-center text-[8px]">
+  1139→                <thead>
+  1140→                  <tr className="border-b border-[#1e2240] bg-[#0d1020]/60">
+  1141→                    <th className="px-1 py-1.5">Event#</th>
+  1142→                    <th className="px-1 py-1.5">Actual</th>
+  1143→                    <th className="px-1 py-1.5">Old Pred (LOCKED)</th>
+  1144→                    <th className="px-1 py-1.5">H/M</th>
+  1145→                    <th className="px-1 py-1.5">N Before</th>
+  1146→                    <th className="px-1 py-1.5">N After</th>
+  1147→                    <th className="px-1 py-1.5">New Pred</th>
+  1148→                    <th className="px-1 py-1.5">Pred#</th>
+  1149→                    <th className="px-1 py-1.5">Lock</th>
+  1150→                  </tr>
+  1151→                </thead>
+  1152→                <tbody>
+  1153→                  {eventLog.map((e, i) => (
+  1154→                    <tr key={i} className="border-b border-[#1e2240]/40 hover:bg-white/[0.02]">
+  1155→                      <td className="px-1 py-1 font-bold text-[#a78bfa]">{e.eventId}</td>
+  1156→                      <td className="px-1 py-1">
+  1157→                        <span className={`font-bold ${["COIN FLIP","CASH HUNT","PACHINKO","CRAZY TIME"].includes(e.actual) ? "text-[#FFD700]" : "text-white"}`}>
+  1158→                          {e.actual}
+  1159→                        </span>
+  1160→                      </td>
+  1161→                      <td className="px-1 py-1 text-[#5a6a99]">
+  1162→                        [{e.oldPrediction.join(",")}]
+  1163→                      </td>
+  1164→                      <td className="px-1 py-1">
+  1165→                        <span className={`font-bold ${e.hitMiss === "HIT" ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
+  1166→                          {e.hitMiss}
+  1167→                        </span>
+  1168→                      </td>
+  1169→                      <td className="px-1 py-1 text-[#5a6a99]">{e.historyNBefore}</td>
+  1170→                      <td className="px-1 py-1 text-[#2ed573]">{e.historyNAfter}</td>
+  1171→                      <td className="px-1 py-1 font-bold text-[#00d4ff]">
+  1172→                        [{e.newPrediction.join(",")}]
+  1173→                      </td>
+  1174→                      <td className="px-1 py-1 text-[#a78bfa]">{e.predictionId}</td>
+  1175→                      <td className="px-1 py-1">
+  1176→                        {e.locked ? <i className="fas fa-lock text-[#2ed573]" /> : <i className="fas fa-lock-open text-[#ff4757]" />}
+  1177→                      </td>
+  1178→                    </tr>
+  1179→                  ))}
+  1180→                </tbody>
+  1181→              </table>
+  1182→            </div>
+  1183→            <div className="border-t border-[#1e2240] px-4 py-1 text-[8px] text-[#5a6a99]">
+  1184→              <i className="fas fa-shield-halved mr-1 text-[#2ed573]" />
+  1185→              <b>Pipeline proof:</b> Old prediction settled BEFORE history update. New prediction uses updated history (N+1).
+  1186→              Prediction Y tested against result X+1, NEVER against result X.
+  1187→            </div>
+  1188→          </div>
+  1189→        )}
+  1190→
+  1191→        {/* ===== LIVE RESULT POPUP ===== */}
+  1192→        {popupResult && (
+  1193→          <div className="fixed inset-0 z-[200] flex items-center justify-center px-4" onClick={() => setPopupResult(null)}>
+  1194→            <div className="absolute inset-0 bg-black/70 backdrop-blur-md" aria-hidden />
+  1195→            <div
+  1196→              className="relative w-full max-w-sm overflow-hidden rounded-3xl border-2 p-8 text-center"
+  1197→              style={{
+  1198→                borderColor: popupResult.isBonus ? "#FFD700" : "#2ed573",
+  1199→                background: "linear-gradient(180deg, #141827, #0a0b14)",
+  1200→                boxShadow: `0 0 60px -10px ${popupResult.isBonus ? "#FFD700" : "#2ed573"}80`,
+  1201→              }}
+  1202→            >
+  1203→              <div className="mb-4 flex items-center justify-center gap-2">
+  1204→                <span className="flex items-center gap-1.5 rounded-full bg-[#ff4757]/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#ff4757]">
+  1205→                  <span className="h-2 w-2 animate-pulse rounded-full bg-[#ff4757]" />
+  1206→                  LIVE RESULT
+  1207→                </span>
+  1208→              </div>
+  1209→              <img
+  1210→                src={GAME_IMAGES[popupResult.imageKey]}
+  1211→                alt={popupResult.name}
+  1212→                className="mx-auto mb-3 h-28 w-28 object-contain"
+  1213→                style={{ animation: "revoPop 0.4s ease-out" }}
+  1214→              />
+  1215→              <div
+  1216→                className="text-4xl font-black sm:text-5xl"
+  1217→                style={{
+  1218→                  color: popupResult.isBonus ? "#FFD700" : "#2ed573",
+  1219→                  textShadow: popupResult.isBonus
+  1220→                    ? "0 0 20px rgba(255,215,0,0.5)"
+  1221→                    : "0 0 20px rgba(46,213,115,0.5)",
+  1222→                }}
+  1223→              >
+  1224→                {popupResult.name}
+  1225→              </div>
+  1226→              {popupResult.isBonus && (
+  1227→                <span className="mt-2 inline-block rounded-full bg-[#FFD700]/20 px-3 py-1 text-[11px] font-bold uppercase text-[#FFD700]">
+  1228→                  ★ Bonus Round
+  1229→                </span>
+  1230→              )}
+  1231→              <div className="mt-4 flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#2ed573]">
+  1232→                <i className="fas fa-check-circle" /> Result Confirmed
+  1233→              </div>
+  1234→              <div className="mt-3 text-[10px] text-[#5a6a99]">
+  1235→                Auto-dismiss in 4s · Tap to close
+  1236→              </div>
+  1237→            </div>
+  1238→          </div>
+  1239→        )}
+  1240→
+  1241→        {/* ===== NOT IN PREDICTION (4 Excluded Outcomes) ===== */}
+  1242→        <div className="revo-card mt-4 overflow-hidden">
+  1243→          <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#ff4757]/10 to-transparent px-4 py-3">
+  1244→            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+  1245→              <i className="fas fa-ban text-[#ff4757]" /> Not In Prediction
+  1246→            </span>
+  1247→            <span className="text-[10px] text-[#5a6a99]">
+  1248→              4 outcomes not covered
+  1249→            </span>
+  1250→          </div>
+  1251→
+  1252→          <div className="p-4">
+  1253→            <p className="mb-3 text-center text-[11px] text-[#8899cc]">
+  1254→              <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
+  1255→              These 4 outcomes are NOT in the current prediction. If any of these
+  1256→              hit, the prediction will MISS — triggering RCA + recalibration.
+  1257→              <b className="text-[#ff4757]"> Not treated as a bet signal.</b>
+  1258→            </p>
+  1259→
+  1260→            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+  1261→              {view.excludedOutcomes.map((g) => (
+  1262→                <div
+  1263→                  key={g.name}
+  1264→                  className={`flex flex-col items-center rounded-xl border p-2.5 ${
+  1265→                    g.isBonus
+  1266→                      ? "border-[#FFD700]/30 bg-[#FFD700]/5"
+  1267→                      : "border-[#ff4757]/30 bg-[#ff4757]/5"
+  1268→                  }`}
+  1269→                >
+  1270→                  <img
+  1271→                    src={GAME_IMAGES[g.imageKey]}
+  1272→                    alt={g.name}
+  1273→                    className="h-12 w-full object-contain opacity-70"
+  1274→                  />
+  1275→                  <div className="mt-1 text-xs font-bold text-[#8899cc]">
+  1276→                    {g.name}
+  1277→                  </div>
+  1278→                  {g.isBonus && (
+  1279→                    <span className="text-[8px] font-bold uppercase text-[#FFD700]">★</span>
+  1280→                  )}
+  1281→                </div>
+  1282→              ))}
+  1283→            </div>
+  1284→
+  1285→            {lastActual && (
+  1286→              <div className="mt-4 rounded-xl border border-[#2ed573]/40 bg-[#2ed573]/8 p-3 text-center">
+  1287→                <div className="text-[10px] font-bold uppercase tracking-wider text-[#2ed573]">
+  1288→                  <i className="fas fa-check-circle mr-1" />
+  1289→                  Last Live Result
+  1290→                </div>
+  1291→                <div className="mt-1 text-2xl font-black text-white">
+  1292→                  {lastActual.name}
+  1293→                </div>
+  1294→                {lastActual.isBonus && (
+  1295→                  <span className="mt-0.5 inline-block rounded-full bg-[#FFD700]/20 px-2 py-0.5 text-[9px] font-bold uppercase text-[#FFD700]">
+  1296→                    ★ Bonus Round
+  1297→                  </span>
+  1298→                )}
+  1299→              </div>
+  1300→            )}
+  1301→          </div>
+  1302→        </div>
+  1303→
+  1304→        {/* ===== PERFORMANCE DASHBOARD (NEW — unified engine data) ===== */}
+  1305→        <PerformanceDashboardPanel dashboard={view.dashboard} roundHistory={roundHistory} />
+  1306→        {/* ===== SHADOW A/B: baseline (frozen k=30) vs experimental (reliability layer) ===== */}
+  1307→        <div className="mt-4 rounded-lg border-2 border-[#a855f7]/30 bg-[#0d1020]/60 p-4">
+  1308→          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+  1309→            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#a855f7]">
+  1310→              <i className="fas fa-flask-vial" /> Shadow A/B — Rare-Outcome Reliability Layer
+  1311→            </span>
+  1312→            <div className="flex items-center gap-2">
+  1313→              <span className="rounded-full bg-[#1e2240] px-2 py-0.5 text-[9px] font-bold uppercase text-[#8899cc]">
+  1314→                RELIABILITY_K = {EXPERIMENTAL_CONFIG.reliabilityK}
+  1315→              </span>
+  1316→              <button
+  1317→                type="button"
+  1318→                onClick={toggleExperimental}
+  1319→                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase transition-colors ${
+  1320→                  experimentalEnabled
+  1321→                    ? "bg-[#2ed573]/20 text-[#2ed573] hover:bg-[#2ed573]/30"
+  1322→                    : "bg-[#1e2240] text-[#8899cc] hover:bg-[#2a2f4d]"
+  1323→                }`}
+  1324→                aria-pressed={experimentalEnabled}
+  1325→              >
+  1326→                <span className={`inline-block h-2 w-2 rounded-full ${experimentalEnabled ? "bg-[#2ed573]" : "bg-[#5a6a99]"}`} />
+  1327→                {experimentalEnabled ? "EXPERIMENTAL SHADOW ON" : "SHADOW OFF"}
+  1328→              </button>
+  1329→            </div>
+  1330→          </div>
+  1331→
+  1332→          <div className="mb-2 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-2 text-[9px] leading-relaxed text-[#8899cc]">
+  1333→            <b className="text-[#a855f7]">Root cause (50-round k=30 validation, 78% HIT):</b> 7 of 11 misses
+  1334→            involved PACHINKO (3 appearances → +39% deviation) displacing a higher-prior number.
+  1335→            Fix: a <b>continuous, generic</b> reliability factor
+  1336→            <code className="mx-1 rounded bg-[#0d1020] px-1 text-[#00d4ff]">r = N_obs / (N_obs + {EXPERIMENTAL_CONFIG.reliabilityK})</code>
+  1337→            dampens the <b>positive</b> deviation of any outcome resting on few observations.
+  1338→            Negative deviations pass through (never inflate unseen rare outcomes). NO hard cutoff,
+  1339→            NO PACHINKO ban, NO forced [1,2,5,10]. The active displayed prediction stays the frozen
+  1340→            k=30 <b>baseline</b>; experimental runs in <b>shadow</b> on the SAME live rounds.
+  1341→          </div>
+  1342→
+  1343→          {!experimentalEnabled ? (
+  1344→            <div className="py-4 text-center text-xs text-[#5a6a99]">
+  1345→              <i className="fas fa-toggle-off mb-1 text-xl text-[#5a6a99]" />
+  1346→              <div>Shadow A/B is OFF. Enable to run the experimental engine in parallel.</div>
+  1347→              <div className="text-[9px] mt-1">Baseline (frozen k=30) remains the active prediction either way.</div>
+  1348→            </div>
+  1349→          ) : (
+  1350→            <>
+  1351→              {/* Paired comparison KPIs */}
+  1352→              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1353→                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+  1354→                  <div className="text-lg font-black text-white">{shadowStats.total}</div>
+  1355→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Paired Rounds</div>
+  1356→                </div>
+  1357→                <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-2 text-center">
+  1358→                  <div className="text-lg font-black text-[#00d4ff]">{Math.round(shadowStats.bRate * 100)}%</div>
+  1359→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline HIT ({shadowStats.bHits})</div>
+  1360→                </div>
+  1361→                <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/8 p-2 text-center">
+  1362→                  <div className="text-lg font-black text-[#a855f7]">{Math.round(shadowStats.eRate * 100)}%</div>
+  1363→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental HIT ({shadowStats.eHits})</div>
+  1364→                </div>
+  1365→                <div className={`rounded border p-2 text-center ${shadowStats.delta >= 0 ? "border-[#2ed573]/30 bg-[#2ed573]/8" : "border-[#ff4757]/30 bg-[#ff4757]/8"}`}>
+  1366→                  <div className={`text-lg font-black ${shadowStats.delta >= 0 ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
+  1367→                    {shadowStats.delta >= 0 ? "+" : ""}{Math.round(shadowStats.delta * 100)}%
+  1368→                  </div>
+  1369→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Δ (exp − base)</div>
+  1370→                </div>
+  1371→              </div>
+  1372→
+  1373→              {/* Flips */}
+  1374→              <div className="mb-3 grid grid-cols-2 gap-2">
+  1375→                <div className="rounded border border-[#2ed573]/30 bg-[#2ed573]/8 p-2 text-center">
+  1376→                  <div className="text-sm font-black text-[#2ed573]">{shadowStats.flipsToHit}</div>
+  1377→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">MISS→HIT (experimental saved)</div>
+  1378→                </div>
+  1379→                <div className="rounded border border-[#ff4757]/30 bg-[#ff4757]/8 p-2 text-center">
+  1380→                  <div className="text-sm font-black text-[#ff4757]">{shadowStats.flipsToMiss}</div>
+  1381→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">HIT→MISS (experimental lost)</div>
+  1382→                </div>
+  1383→              </div>
+  1384→
+  1385→              {/* Per-outcome inclusion table */}
+  1386→              <div className="mb-3 overflow-x-auto rounded border border-[#1e2240]">
+  1387→                <table className="w-full text-[10px]">
+  1388→                  <thead>
+  1389→                    <tr className="bg-[#1e2240] text-[#5a6a99]">
+  1390→                      <th className="px-2 py-1 text-left">Outcome</th>
+  1391→                      <th className="px-2 py-1 text-right">Actuals</th>
+  1392→                      <th className="px-2 py-1 text-right">Base Inc</th>
+  1393→                      <th className="px-2 py-1 text-right">Exp Inc</th>
+  1394→                      <th className="px-2 py-1 text-right">Δ Inc</th>
+  1395→                    </tr>
+  1396→                  </thead>
+  1397→                  <tbody>
+  1398→                    {ENGINE_GAMES.map((g) => {
+  1399→                      const st = shadowStats.perOutcome[g.name];
+  1400→                      const dInc = st.expInc - st.baseInc;
+  1401→                      return (
+  1402→                        <tr key={g.name} className="border-t border-[#1e2240]">
+  1403→                          <td className="px-2 py-1 font-bold text-white">{g.name}</td>
+  1404→                          <td className="px-2 py-1 text-right text-[#8899cc]">{st.actuals}</td>
+  1405→                          <td className="px-2 py-1 text-right text-[#00d4ff]">{st.baseInc}</td>
+  1406→                          <td className="px-2 py-1 text-right text-[#a855f7]">{st.expInc}</td>
+  1407→                          <td className={`px-2 py-1 text-right font-bold ${dInc < 0 ? "text-[#2ed573]" : dInc > 0 ? "text-[#ffa502]" : "text-[#5a6a99]"}`}>{dInc > 0 ? "+" : ""}{dInc}</td>
+  1408→                        </tr>
+  1409→                      );
+  1410→                    })}
+  1411→                  </tbody>
+  1412→                </table>
+  1413→              </div>
+  1414→
+  1415→              {/* 1/2/5/10 exclusion rates */}
+  1416→              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1417→                {(["1", "2", "5", "10"] as const).map((num) => {
+  1418→                  const er = shadowStats.exclusionRates[num];
+  1419→                  const dExcl = er.exp - er.base;
+  1420→                  return (
+  1421→                    <div key={num} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+  1422→                      <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">"{num}" excluded</div>
+  1423→                      <div className="text-sm font-black text-white">
+  1424→                        {Math.round(er.base * 100)}% <span className="text-[#5a6a99]">→</span> {Math.round(er.exp * 100)}%
+  1425→                      </div>
+  1426→                      <div className={`text-[8px] font-bold ${dExcl < 0 ? "text-[#2ed573]" : dExcl > 0 ? "text-[#ff4757]" : "text-[#5a6a99]"}`}>
+  1427→                        {dExcl < 0 ? "less excluded" : dExcl > 0 ? "more excluded" : "same"}
+  1428→                      </div>
+  1429→                    </div>
+  1430→                  );
+  1431→                })}
+  1432→              </div>
+  1433→
+  1434→              <div className="flex items-center justify-between">
+  1435→                <div className="text-[8px] text-[#5a6a99]">
+  1436→                  <i className="fas fa-shield-halved mr-1 text-[#2ed573]" />
+  1437→                  Both engines see the SAME pre-result history. No data leakage. Persisted across reloads.
+  1438→                </div>
+  1439→                <button
+  1440→                  type="button"
+  1441→                  onClick={clearShadow}
+  1442→                  className="rounded bg-[#ff4757]/10 px-2 py-1 text-[9px] font-bold uppercase text-[#ff4757] hover:bg-[#ff4757]/20"
+  1443→                >
+  1444→                  Clear Ledger
+  1445→                </button>
+  1446→              </div>
+  1447→              {shadowStats.total < 50 && (
+  1448→                <div className="mt-2 rounded border border-[#ffa502]/30 bg-[#ffa502]/8 p-2 text-[9px] text-[#ffa502]">
+  1449→                  <i className="fas fa-triangle-exclamation mr-1" />
+  1450→                  {shadowStats.total}/50 paired rounds. Need 50+ for a meaningful comparison. No mid-test tuning.
+  1451→                </div>
+  1452→              )}
+  1453→            </>
+  1454→          )}
+  1455→        </div>
+  1456→
+  1457→        {/* ===== RETROSPECTIVE DIAGNOSTIC (SIMULATION — not a validation result) ===== */}
+  1458→        <div className="mt-4 rounded-lg border-2 border-[#ffa502]/30 bg-[#0d1020]/60 p-4">
+  1459→          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+  1460→            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#ffa502]">
+  1461→              <i className="fas fa-magnifying-glass-chart" /> Retrospective Diagnostic
+  1462→            </span>
+  1463→            <div className="flex items-center gap-1.5">
+  1464→              <button
+  1465→                type="button"
+  1466→                onClick={runRetroLive}
+  1467→                className="rounded bg-[#00d4ff]/10 px-2.5 py-1 text-[10px] font-bold uppercase text-[#00d4ff] hover:bg-[#00d4ff]/20"
+  1468→              >
+  1469→                Replay LIVE rounds ({roundHistory.length})
+  1470→              </button>
+  1471→              <button
+  1472→                type="button"
+  1473→                onClick={runRetroSynthetic}
+  1474→                className="rounded bg-[#a855f7]/10 px-2.5 py-1 text-[10px] font-bold uppercase text-[#a855f7] hover:bg-[#a855f7]/20"
+  1475→              >
+  1476→                Replay Synthetic 50
+  1477→              </button>
+  1478→            </div>
+  1479→          </div>
+  1480→
+  1481→          <div className="mb-2 rounded-lg border border-[#ffa502]/20 bg-[#ffa502]/5 p-2 text-[9px] leading-relaxed text-[#8899cc]">
+  1482→            <b className="text-[#ffa502]">SIMULATION ONLY.</b> Replays a result sequence through BOTH engines
+  1483→            round-by-round (no leakage) to estimate direction/magnitude of the reliability layer.
+  1484→            <b> This is NOT a validation result.</b> Do NOT claim improved accuracy from this test.
+  1485→            Genuine validation = the live Shadow A/B above on fresh out-of-sample rounds.
+  1486→          </div>
+  1487→
+  1488→          {retroResult ? (
+  1489→            <>
+  1490→              <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1491→                Source: {retroSource === "live"
+  1492→                  ? `${roundHistory.length} real verified rounds (replayed)`
+  1493→                  : "synthetic 50-round representative sample"}
+  1494→              </div>
+  1495→
+  1496→              {/* Headline comparison */}
+  1497→              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1498→                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+  1499→                  <div className="text-lg font-black text-white">{retroResult.baseline.totalRounds}</div>
+  1500→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Rounds Replayed</div>
+  1501→                </div>
+  1502→                <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-2 text-center">
+  1503→                  <div className="text-lg font-black text-[#00d4ff]">{Math.round(retroResult.baseline.hitRate * 100)}%</div>
+  1504→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline HIT ({retroResult.baseline.hits}/{retroResult.baseline.totalRounds})</div>
+  1505→                </div>
+  1506→                <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/8 p-2 text-center">
+  1507→                  <div className="text-lg font-black text-[#a855f7]">{Math.round(retroResult.experimental.hitRate * 100)}%</div>
+  1508→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental HIT ({retroResult.experimental.hits}/{retroResult.experimental.totalRounds})</div>
+  1509→                </div>
+  1510→                <div className={`rounded border p-2 text-center ${(retroResult.experimental.hits - retroResult.baseline.hits) >= 0 ? "border-[#2ed573]/30 bg-[#2ed573]/8" : "border-[#ff4757]/30 bg-[#ff4757]/8"}`}>
+  1511→                  <div className={`text-lg font-black ${(retroResult.experimental.hits - retroResult.baseline.hits) >= 0 ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
+  1512→                    {retroResult.flipsToHit > 0 ? "+" : ""}{retroResult.experimental.hits - retroResult.baseline.hits}
+  1513→                  </div>
+  1514→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Net Δ Hits</div>
+  1515→                </div>
+  1516→              </div>
+  1517→
+  1518→              {/* Flip summary */}
+  1519→              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1520→                <div className="rounded border border-[#2ed573]/30 bg-[#2ed573]/8 p-2 text-center">
+  1521→                  <div className="text-sm font-black text-[#2ed573]">{retroResult.flipsToHit}</div>
+  1522→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">MISS→HIT saved</div>
+  1523→                </div>
+  1524→                <div className="rounded border border-[#ff4757]/30 bg-[#ff4757]/8 p-2 text-center">
+  1525→                  <div className="text-sm font-black text-[#ff4757]">{retroResult.flipsToMiss}</div>
+  1526→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">HIT→MISS lost</div>
+  1527→                </div>
+  1528→                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+  1529→                  <div className="text-sm font-black text-[#a855f7]">{retroResult.pachinkoInclusionsRemoved}</div>
+  1530→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">PACHINKO Inc Removed</div>
+  1531→                </div>
+  1532→                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+  1533→                  <div className="text-sm font-black text-[#2ed573]">{retroResult.pachinkoActualsRetained}/{retroResult.baseline.pachinkoActuals}</div>
+  1534→                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">PACHINKO Actuals Retained</div>
+  1535→                </div>
+  1536→              </div>
+  1537→
+  1538→              {/* Per-outcome inclusion comparison */}
+  1539→              <div className="mb-3 overflow-x-auto rounded border border-[#1e2240]">
+  1540→                <table className="w-full text-[10px]">
+  1541→                  <thead>
+  1542→                    <tr className="bg-[#1e2240] text-[#5a6a99]">
+  1543→                      <th className="px-2 py-1 text-left">Outcome</th>
+  1544→                      <th className="px-2 py-1 text-right">Actuals</th>
+  1545→                      <th className="px-2 py-1 text-right">Base Inc</th>
+  1546→                      <th className="px-2 py-1 text-right">Exp Inc</th>
+  1547→                      <th className="px-2 py-1 text-right">Base Cov</th>
+  1548→                      <th className="px-2 py-1 text-right">Exp Cov</th>
+  1549→                    </tr>
+  1550→                  </thead>
+  1551→                  <tbody>
+  1552→                    {retroResult.baseline.perOutcome.map((b, i) => {
+  1553→                      const e = retroResult.experimental.perOutcome[i];
+  1554→                      return (
+  1555→                        <tr key={b.name} className="border-t border-[#1e2240]">
+  1556→                          <td className="px-2 py-1 font-bold text-white">{b.name}</td>
+  1557→                          <td className="px-2 py-1 text-right text-[#8899cc]">{b.actuals}</td>
+  1558→                          <td className="px-2 py-1 text-right text-[#00d4ff]">{b.inclusions}</td>
+  1559→                          <td className="px-2 py-1 text-right text-[#a855f7]">{e.inclusions}</td>
+  1560→                          <td className="px-2 py-1 text-right text-[#2ed573]">{b.actuals > 0 ? `${b.coveredActuals}/${b.actuals}` : "—"}</td>
+  1561→                          <td className="px-2 py-1 text-right text-[#2ed573]">{e.actuals > 0 ? `${e.coveredActuals}/${e.actuals}` : "—"}</td>
+  1562→                        </tr>
+  1563→                      );
+  1564→                    })}
+  1565→                  </tbody>
+  1566→                </table>
+  1567→              </div>
+  1568→
+  1569→              {/* 1/2/5/10 exclusion rate comparison */}
+  1570→              <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1571→                {(["1", "2", "5", "10"] as const).map((num) => {
+  1572→                  const b = retroResult.baseline.exclusionRates[num] ?? 0;
+  1573→                  const e = retroResult.experimental.exclusionRates[num] ?? 0;
+  1574→                  const prevented = retroResult.exclusionPrevented[num] ?? 0;
+  1575→                  return (
+  1576→                    <div key={num} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+  1577→                      <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">"{num}" excluded</div>
+  1578→                      <div className="text-xs font-black text-white">
+  1579→                        {Math.round(b * 100)}% <span className="text-[#5a6a99]">→</span> {Math.round(e * 100)}%
+  1580→                      </div>
+  1581→                      <div className={`text-[8px] font-bold ${prevented > 0 ? "text-[#2ed573]" : "text-[#5a6a99]"}`}>
+  1582→                        {prevented > 0 ? `${prevented} exclusions prevented` : "no change"}
+  1583→                      </div>
+  1584→                    </div>
+  1585→                  );
+  1586→                })}
+  1587→              </div>
+  1588→
+  1589→              <div className="rounded-lg border border-[#ffa502]/20 bg-[#ffa502]/5 p-2 text-[9px] italic text-[#ffa502]">
+  1590→                <i className="fas fa-circle-info mr-1" />
+  1591→                {retroResult.note}
+  1592→              </div>
+  1593→            </>
+  1594→          ) : (
+  1595→            <div className="py-4 text-center text-xs text-[#5a6a99]">
+  1596→              <i className="fas fa-play mb-1 text-xl text-[#5a6a99]" />
+  1597→              <div>Run a retrospective replay to estimate the reliability layer's effect.</div>
+  1598→              <div className="text-[9px] mt-1">"Replay LIVE rounds" uses your actual verified history. "Synthetic 50" uses a representative sample.</div>
+  1599→            </div>
+  1600→          )}
+  1601→        </div>
+  1602→
+  1603→        {/* ===== WHEEL BASE-PROBABILITY MODEL (54 segments) ===== */}
+  1604→        <WheelProbabilityPanel candidateScores={view.candidateScores} />
+  1605→
+  1606→        {/* ===== ADVANCED DECISION ENGINE ===== */}
+  1607→        <DecisionEnginePanel engine={view} />
+  1608→
+  1609→        {/* ===== VERIFIED ACCURACY (from manual results only) ===== */}
+  1610→        {verifiedRounds > 0 && (
+  1611→          <div className="revo-card mt-4 p-4">
+  1612→            <div className="mb-3 flex items-center justify-between">
+  1613→              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+  1614→                <i className="fas fa-circle-check text-[#2ed573]" /> Verified Accuracy
+  1615→              </span>
+  1616→              <span className="text-[10px] text-[#5a6a99]">
+  1617→                from {verifiedRounds} result{verifiedRounds !== 1 ? "s" : ""}
+  1618→              </span>
+  1619→            </div>
+  1620→            <div className="grid grid-cols-3 gap-2">
+  1621→              <div className="rounded-lg border border-[#2ed573]/30 bg-[#2ed573]/8 p-2.5 text-center">
+  1622→                <div className="text-xl font-black text-[#2ed573]">{realAccuracy}%</div>
+  1623→                <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Accuracy</div>
+  1624→              </div>
+  1625→              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020] p-2.5 text-center">
+  1626→                <div className="text-xl font-black text-[#2ed573]">{hits}</div>
+  1627→                <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Hits</div>
+  1628→              </div>
+  1629→              <div className="rounded-lg border border-[#1e2240] bg-[#0d1020] p-2.5 text-center">
+  1630→                <div className="text-xl font-black text-[#ff4757]">{verifiedRounds - hits}</div>
+  1631→                <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Misses</div>
+  1632→              </div>
+  1633→            </div>
+  1634→            {/* Sample-size validation tier — honest disclaimer */}
+  1635→            {verifiedRounds < 20 && (
+  1636→              <div className="mt-3 rounded-lg border border-[#ffa502]/30 bg-[#ffa502]/8 p-2.5 text-[10px] text-[#ffa502]">
+  1637→                <i className="fas fa-triangle-exclamation mr-1" />
+  1638→                <b>EARLY DATA — sample size {verifiedRounds}/20.</b>{" "}
+  1639→                {verifiedRounds < 5
+  1640→                  ? "Insufficient for any accuracy claim. Predictions are exploratory."
+  1641→                  : verifiedRounds < 10
+  1642→                    ? "Low confidence — need 10+ rounds for LOW CONFIDENCE tier."
+  1643→                    : verifiedRounds < 20
+  1644→                      ? "Moderate tier — need 20+ rounds for STRONG label."
+  1645→                      : ""}
+  1646→                {" "}A few HITs do NOT prove predictive accuracy.
+  1647→              </div>
+  1648→            )}
+  1649→            {/* Validation tier progress bars: 5 / 10 / 20 / 50 / 100+ */}
+  1650→            <div className="mt-3 grid grid-cols-5 gap-1.5">
+  1651→              {[
+  1652→                { tier: 5, label: "5" },
+  1653→                { tier: 10, label: "10" },
+  1654→                { tier: 20, label: "20" },
+  1655→                { tier: 50, label: "50" },
+  1656→                { tier: 100, label: "100+" },
+  1657→              ].map((t) => {
+  1658→                const reached = verifiedRounds >= t.tier;
+  1659→                const pct = Math.min(100, (verifiedRounds / t.tier) * 100);
+  1660→                return (
+  1661→                  <div key={t.tier} className="text-center">
+  1662→                    <div className="mx-auto mb-0.5 h-1.5 w-full overflow-hidden rounded-full bg-[#1e2240]">
+  1663→                      <div
+  1664→                        className="h-full rounded-full transition-all"
+  1665→                        style={{
+  1666→                          width: `${pct}%`,
+  1667→                          background: reached ? "#2ed573" : "#448AFF",
+  1668→                        }}
+  1669→                      />
+  1670→                    </div>
+  1671→                    <div className={`text-[8px] font-bold ${reached ? "text-[#2ed573]" : "text-[#5a6a99]"}`}>
+  1672→                      {t.label}{reached ? " ✓" : ""}
+  1673→                    </div>
+  1674→                  </div>
+  1675→                );
+  1676→              })}
+  1677→            </div>
+  1678→          </div>
+  1679→        )}
+  1680→
+  1681→        {/* ===== ROUND HISTORY ===== */}
+  1682→        {roundHistory.length > 0 && (
+  1683→          <div className="revo-card mt-4 overflow-hidden">
+  1684→            <div className="flex items-center justify-between border-b border-[#1e2240] px-4 py-3">
+  1685→              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+  1686→                <i className="fas fa-clock-rotate-left text-[#448AFF]" /> Round History
+  1687→              </span>
+  1688→              <button
+  1689→                onClick={clearHistory}
+  1690→                className="text-[11px] font-semibold text-[#ff4757] transition hover:text-[#ff6b6b]"
+  1691→              >
+  1692→                <i className="fas fa-trash mr-1" /> Clear
+  1693→              </button>
+  1694→            </div>
+  1695→            <div className="max-h-72 overflow-y-auto revo-scroll p-2">
+  1696→              {[...roundHistory].reverse().map((r, i) => (
+  1697→                <RoundRow key={r.time + "-" + i} round={r} />
+  1698→              ))}
+  1699→            </div>
+  1700→          </div>
+  1701→        )}
+  1702→
+  1703→        {/* ===== ORIGINAL STATS ===== */}
+  1704→        <div className="revo-card mt-4 p-4">
+  1705→          <div className="grid grid-cols-4 gap-2">
+  1706→            <Stat value={stats.total.toLocaleString()} label="Total" color="#448AFF" />
+  1707→            <Stat value={`${stats.accuracy}%`} label="Accuracy" color="#2ed573" />
+  1708→            <Stat value={String(stats.bonusHits)} label="Bonus" color="#FFD700" />
+  1709→            <Stat value={`${(stats.liveUsers / 1000).toFixed(1)}k`} label="Live" color="#00d4ff" />
+  1710→          </div>
+  1711→        </div>
+  1712→
+  1713→        {/* Game outcomes reference */}
+  1714→        <div className="mt-4">
+  1715→          <div className="mb-2 text-center text-[11px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1716→            Possible outcomes
+  1717→          </div>
+  1718→          <div className="flex flex-wrap justify-center gap-1.5">
+  1719→            {GAMES.map((g) => (
+  1720→              <span
+  1721→                key={g.name}
+  1722→                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+  1723→                  g.isBonus
+  1724→                    ? "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]"
+  1725→                    : "border-[#1e2240] bg-[#0d1020] text-[#8899cc]"
+  1726→                }`}
+  1727→              >
+  1728→                {g.name}
+  1729→              </span>
+  1730→            ))}
+  1731→          </div>
+  1732→        </div>
+  1733→
+  1734→        <p className="mt-4 text-center text-[11px] text-[#5a6a99]">
+  1735→          <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
+  1736→          Each signal box shows a different game. Select the actual result after
+  1737→          each round to verify accuracy &amp; improve the next prediction.
+  1738→          Predictions are for entertainment. Play responsibly.
+  1739→        </p>
+  1740→      </div>
+  1741→    </section>
+  1742→  );
+  1743→}
+  1744→
+  1745→// ============================================================
+  1746→// PERFORMANCE DASHBOARD PANEL
+  1747→// ============================================================
+  1748→function PerformanceDashboardPanel({ dashboard, roundHistory: rh }: { dashboard: PerformanceDashboard; roundHistory: RoundResult[] }) {
+  1749→  const {
+  1750→    totalRounds,
+  1751→    hits,
+  1752→    misses,
+  1753→    predictionHitRate,
+  1754→    predictionMissRate,
+  1755→    recentHitRate,
+  1756→    recentHitRateLong,
+  1757→    longTermHitRate,
+  1758→    adaptiveWeight,
+  1759→    excludedResultRate,
+  1760→    modelStability,
+  1761→    currentStreak,
+  1762→    patternShiftDetected,
+  1763→    anomalyDetected,
+  1764→    patternShiftNote,
+  1765→    anomalyNote,
+  1766→    signalWiseHitRate,
+  1767→    // NEW performance windows:
+  1768→    recent5HitRate,
+  1769→    recent10HitRate,
+  1770→    recent20HitRate,
+  1771→    recent50HitRate,
+  1772→    recent100HitRate,
+  1773→    recent5Count,
+  1774→    recent10Count,
+  1775→    recent20Count,
+  1776→    recent50Count,
+  1777→    recent100Count,
+  1778→    hitStreak,
+  1779→    missStreak,
+  1780→    predictionCoverage,
+  1781→    // NEW bonus risk analysis:
+  1782→    normalOutcomeCoverage,
+  1783→    bonusOutcomeCoverage,
+  1784→    bonusOutcomeRisk,
+  1785→    totalPredictionCoverage,
+  1786→    bonusRecentRate,
+  1787→    bonusLongTermRate,
+  1788→    bonusTrend,
+  1789→    bonusBursts,
+  1790→    bonusActive,
+  1791→    // NEW normal vs bonus result performance:
+  1792→    normalResultHitRate,
+  1793→    bonusResultHitRate,
+  1794→    normalResultMissRate,
+  1795→    bonusResultMissRate,
+  1796→    normalResultCount,
+  1797→    bonusResultCount,
+  1798→    // NEW excluded risk breakdown:
+  1799→    excludedNormalRisk,
+  1800→    excludedBonusRisk,
+  1801→    totalMissExposure,
+  1802→    // NEW per-bonus performance:
+  1803→    perBonusPerformance,
+  1804→    bonusUnderrepresented,
+  1805→    bonusUnderrepresentationNote,
+  1806→    modelBiasWarning,
+  1807→    modelBiasNote,
+  1808→    // NEW selection bias detection:
+  1809→    perBonusSelectionBias,
+  1810→    selectionBiasWarning,
+  1811→    selectionBiasNote,
+  1812→  } = dashboard;
+  1813→
+  1814→  return (
+  1815→    <div className="revo-card mt-4 overflow-hidden">
+  1816→      <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#00d4ff]/10 to-transparent px-4 py-3">
+  1817→        <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+  1818→          <i className="fas fa-gauge-high text-[#00d4ff]" /> Performance Dashboard
+  1819→        </span>
+  1820→        <div className="flex items-center gap-1.5">
+  1821→          {hitStreak > 0 && (
+  1822→            <span className="rounded-full bg-[#2ed573]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#2ed573]">
+  1823→              {hitStreak}× HIT streak
+  1824→            </span>
+  1825→          )}
+  1826→          {missStreak > 0 && (
+  1827→            <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#ff4757]">
+  1828→              {missStreak}× MISS streak
+  1829→            </span>
+  1830→          )}
+  1831→          <span className="rounded-full bg-[#1e2240] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#5a6a99]">
+  1832→            n={totalRounds}
+  1833→          </span>
+  1834→        </div>
+  1835→      </div>
+  1836→
+  1837→      <div className="space-y-3 p-4">
+  1838→        {/* KPI grid */}
+  1839→        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1840→          <Kpi label="Hit Rate" value={`${Math.round(predictionHitRate * 100)}%`} color="#2ed573" />
+  1841→          <Kpi label="Miss Rate" value={`${Math.round(predictionMissRate * 100)}%`} color="#ff4757" />
+  1842→          <Kpi label="Coverage" value={`${Math.round(predictionCoverage * 100)}%`} color="#FFD700" />
+  1843→          <Kpi label="Stability" value={`${modelStability}%`} color={modelStability >= 50 ? "#2ed573" : "#ffa502"} />
+  1844→        </div>
+  1845→
+  1846→        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+  1847→          <Kpi label="Long-Term" value={`${Math.round(longTermHitRate * 100)}%`} color="#a78bfa" />
+  1848→          <Kpi label="Excluded Rate" value={`${Math.round(excludedResultRate * 100)}%`} color="#ff4757" />
+  1849→          <Kpi label="Adaptive Wt" value={`${Math.round(adaptiveWeight * 100)}%`} color="#FFD700" />
+  1850→          <Kpi label="Recent (5)" value={`${Math.round(recentHitRate * 100)}%`} color="#448AFF" />
+  1851→        </div>
+  1852→
+  1853→        {/* ===== NEW: Performance Windows (5/10/20/50/100+) ===== */}
+  1854→        <div className="rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-3">
+  1855→          <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1856→            Performance Windows (separate hit-rates)
+  1857→          </div>
+  1858→          <div className="grid grid-cols-5 gap-1.5">
+  1859→            {[
+  1860→              { label: "5", rate: recent5HitRate, count: recent5Count },
+  1861→              { label: "10", rate: recent10HitRate, count: recent10Count },
+  1862→              { label: "20", rate: recent20HitRate, count: recent20Count },
+  1863→              { label: "50", rate: recent50HitRate, count: recent50Count },
+  1864→              { label: "100+", rate: recent100HitRate, count: recent100Count },
+  1865→            ].map((w) => {
+  1866→              const pct = Math.round(w.rate * 100);
+  1867→              const color = w.count === 0 ? "#5a6a99" : w.rate >= 0.7 ? "#2ed573" : w.rate >= 0.5 ? "#448AFF" : w.rate >= 0.3 ? "#ffa502" : "#ff4757";
+  1868→              return (
+  1869→                <div key={w.label} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-center">
+  1870→                  <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Last {w.label}</div>
+  1871→                  <div className="text-sm font-black" style={{ color }}>{w.count > 0 ? `${pct}%` : "—"}</div>
+  1872→                  <div className="text-[7px] text-[#5a6a99]">{w.count} rounds</div>
+  1873→                </div>
+  1874→              );
+  1875→            })}
+  1876→          </div>
+  1877→          <div className="mt-1.5 text-[9px] text-[#5a6a99]">
+  1878→            <i className="fas fa-circle-info mr-1" />
+  1879→            Separate windows prevent small streaks from inflating perceived accuracy.
+  1880→            A few HITs do NOT prove predictive performance.
+  1881→          </div>
+  1882→        </div>
+  1883→
+  1884→        {/* Hits / Misses / Sample size */}
+  1885→        <div className="grid grid-cols-3 gap-2">
+  1886→          <div className="rounded-lg border border-[#2ed573]/30 bg-[#2ed573]/8 p-2.5 text-center">
+  1887→            <div className="text-lg font-black text-[#2ed573]">{hits}</div>
+  1888→            <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Hits</div>
+  1889→          </div>
+  1890→          <div className="rounded-lg border border-[#ff4757]/30 bg-[#ff4757]/8 p-2.5 text-center">
+  1891→            <div className="text-lg font-black text-[#ff4757]">{misses}</div>
+  1892→            <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Misses</div>
+  1893→          </div>
+  1894→          <div className="rounded-lg border border-[#1e2240] bg-[#0d1020] p-2.5 text-center">
+  1895→            <div className="text-lg font-black text-white">{totalRounds}</div>
+  1896→            <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">Sample Size</div>
+  1897→          </div>
+  1898→        </div>
+  1899→
+  1900→        {/* ===== BONUS RISK ANALYSIS (no bonus blind spot) ===== */}
+  1901→        <div className="rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5 p-3">
+  1902→          <div className="mb-2 flex items-center justify-between">
+  1903→            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700]">
+  1904→              <i className="fas fa-triangle-exclamation" /> Bonus Risk Analysis
+  1905→            </span>
+  1906→            {bonusActive && (
+  1907→              <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]">
+  1908→                <i className="fas fa-circle-dot mr-0.5" /> Bonus Active
+  1909→              </span>
+  1910→            )}
+  1911→          </div>
+  1912→          {/* Coverage breakdown */}
+  1913→          <div className="grid grid-cols-3 gap-1.5">
+  1914→            <div className="rounded border border-[#448AFF]/30 bg-[#448AFF]/5 p-1.5 text-center">
+  1915→              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Normal Coverage</div>
+  1916→              <div className="text-sm font-black text-[#448AFF]">{(normalOutcomeCoverage * 100).toFixed(1)}%</div>
+  1917→            </div>
+  1918→            <div className="rounded border border-[#FFD700]/30 bg-[#FFD700]/5 p-1.5 text-center">
+  1919→              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Bonus Coverage</div>
+  1920→              <div className="text-sm font-black text-[#FFD700]">{(bonusOutcomeCoverage * 100).toFixed(1)}%</div>
+  1921→            </div>
+  1922→            <div className={`rounded border p-1.5 text-center ${bonusOutcomeRisk > 0.1 ? "border-[#ff4757]/40 bg-[#ff4757]/8" : "border-[#2ed573]/30 bg-[#2ed573]/5"}`}>
+  1923→              <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Bonus Risk</div>
+  1924→              <div className={`text-sm font-black ${bonusOutcomeRisk > 0.1 ? "text-[#ff4757]" : "text-[#2ed573]"}`}>{(bonusOutcomeRisk * 100).toFixed(1)}%</div>
+  1925→            </div>
+  1926→          </div>
+  1927→          {/* Bonus activity stats */}
+  1928→          <div className="mt-2 grid grid-cols-2 gap-1.5 text-[9px] sm:grid-cols-4">
+  1929→            <div className="rounded bg-[#0d1020]/60 px-1.5 py-1 text-center">
+  1930→              <div className="text-[#5a6a99]">Bonus Recent</div>
+  1931→              <div className="font-bold text-white">{(bonusRecentRate * 100).toFixed(1)}%</div>
+  1932→            </div>
+  1933→            <div className="rounded bg-[#0d1020]/60 px-1.5 py-1 text-center">
+  1934→              <div className="text-[#5a6a99]">Bonus Long-Term</div>
+  1935→              <div className="font-bold text-white">{(bonusLongTermRate * 100).toFixed(1)}%</div>
+  1936→            </div>
+  1937→            <div className="rounded bg-[#0d1020]/60 px-1.5 py-1 text-center">
+  1938→              <div className="text-[#5a6a99]">Trend</div>
+  1939→              <div className={`font-bold ${bonusTrend > 0 ? "text-[#ff4757]" : bonusTrend < 0 ? "text-[#2ed573]" : "text-[#5a6a99]"}`}>
+  1940→                {bonusTrend > 0 ? "↑" : bonusTrend < 0 ? "↓" : "→"} {Math.abs(bonusTrend * 100).toFixed(1)}%
+  1941→              </div>
+  1942→            </div>
+  1943→            <div className="rounded bg-[#0d1020]/60 px-1.5 py-1 text-center">
+  1944→              <div className="text-[#5a6a99]">Clusters</div>
+  1945→              <div className="font-bold text-white">{bonusBursts}</div>
+  1946→            </div>
+  1947→          </div>
+  1948→          {/* Total coverage bar */}
+  1949→          <div className="mt-2">
+  1950→            <div className="mb-0.5 flex items-center justify-between text-[9px]">
+  1951→              <span className="text-[#5a6a99]">Total Prediction Coverage</span>
+  1952→              <span className="font-bold text-[#2ed573]">{(totalPredictionCoverage * 100).toFixed(1)}%</span>
+  1953→            </div>
+  1954→            <div className="h-2 overflow-hidden rounded-full bg-[#1e2240]">
+  1955→              <div
+  1956→                className="h-full rounded-full"
+  1957→                style={{
+  1958→                  width: `${totalPredictionCoverage * 100}%`,
+  1959→                  background: "linear-gradient(90deg,#448AFF,#FFD700,#2ed573)",
+  1960→                }}
+  1961→              />
+  1962→            </div>
+  1963→          </div>
+  1964→          <div className="mt-1.5 text-[9px] text-[#8899cc]">
+  1965→            <i className="fas fa-circle-info mr-1 text-[#448AFF]" />
+  1966→            <b className="text-white">No bonus blind spot:</b> ALL 8 outcomes (numbers + bonuses) are scored
+  1967→            equally. If bonus evidence is strong, a bonus CAN enter the Top-4 — no
+  1968→            fixed [1,2,5,10]. Bonus risk = probability of MISS from excluded bonus outcomes.
+  1969→          </div>
+  1970→
+  1971→          {/* ===== Excluded Risk Breakdown ===== */}
+  1972→          <div className="mt-2 rounded-lg border border-[#ff4757]/20 bg-[#0d1020]/40 p-2">
+  1973→            <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1974→              Excluded Risk Breakdown (MISS exposure)
+  1975→            </div>
+  1976→            <div className="grid grid-cols-3 gap-1.5">
+  1977→              <div className="rounded bg-[#448AFF]/5 px-1.5 py-1 text-center">
+  1978→                <div className="text-[8px] text-[#5a6a99]">Excl. Normal</div>
+  1979→                <div className="text-[11px] font-bold text-[#448AFF]">{(excludedNormalRisk * 100).toFixed(1)}%</div>
+  1980→              </div>
+  1981→              <div className="rounded bg-[#FFD700]/5 px-1.5 py-1 text-center">
+  1982→                <div className="text-[8px] text-[#5a6a99]">Excl. Bonus</div>
+  1983→                <div className="text-[11px] font-bold text-[#FFD700]">{(excludedBonusRisk * 100).toFixed(1)}%</div>
+  1984→              </div>
+  1985→              <div className="rounded bg-[#ff4757]/8 px-1.5 py-1 text-center">
+  1986→                <div className="text-[8px] text-[#5a6a99]">Total Exposure</div>
+  1987→                <div className="text-[11px] font-bold text-[#ff4757]">{(totalMissExposure * 100).toFixed(1)}%</div>
+  1988→              </div>
+  1989→            </div>
+  1990→          </div>
+  1991→
+  1992→          {/* ===== Normal vs Bonus Result Performance Validation ===== */}
+  1993→          <div className="mt-2 rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-2">
+  1994→            <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+  1995→              Result-Type Performance (reveals genuine improvement)
+  1996→            </div>
+  1997→            <div className="grid grid-cols-2 gap-1.5">
+  1998→              {/* Normal results */}
+  1999→              <div className="rounded border border-[#448AFF]/30 bg-[#448AFF]/5 p-1.5">
+  2000→                <div className="mb-0.5 text-[8px] font-bold uppercase text-[#448AFF]">Normal Results</div>
+
+[showing lines 1-2000 of 3055; use offset=2001 with limit to continue reading]

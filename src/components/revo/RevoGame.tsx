@@ -162,9 +162,16 @@ let cachedRounds: RoundResult[] | undefined;
 let cachedRoundsRaw = "";
 
 // Module-level store for the experimental engine's currently-LOCKED prediction
-// names (the shadow A/B mirror of the baseline locked prediction). Written by
-// generatePrediction + selectActualResult, read at settlement time. Not reactive.
-let expLockedNames: string[] = [];
+// data (names + coverage + all 8 calibrated probs) at generation time, so it's
+// available at settlement time. Written by generatePrediction +
+// selectActualResult, read at settlement time. Not reactive.
+interface LockedEngineData {
+  names: string[];
+  coverage: number;
+  probs: Record<string, number>;
+}
+let baselineLockedData: LockedEngineData = { names: [], coverage: 0, probs: {} };
+let expLockedData: LockedEngineData = { names: [], coverage: 0, probs: {} };
 
 function readRoundHistory(): RoundResult[] {
   if (typeof window === "undefined") return EMPTY_ROUNDS;
@@ -269,12 +276,18 @@ const SHADOW_KEY = "revo_shadowLedger";
 const EXP_FLAG_KEY = "revo_experimentalFlag";
 
 interface ShadowRow {
-  ts: number;
-  actual: string;
-  baselinePreds: string[];
+  roundId: number;              // prediction ID (synchronized between both models)
+  ts: number;                   // timestamp
+  actual: string;               // actual result name
+  baselinePreds: string[];     // old locked baseline Top-4
   baselineHit: boolean;
-  expPreds: string[];
+  baselineCoverage: number;     // expected coverage = sum of 4 selected calibrated probs
+  baselineProbs: Record<string, number>; // all 8 calibrated probabilities
+  expPreds: string[];           // old locked experimental Top-4
   expHit: boolean;
+  expCoverage: number;
+  expProbs: Record<string, number>;
+  theoHit: boolean;             // theoretical [1,2,5,10] baseline HIT?
 }
 
 const EMPTY_SHADOW: ShadowRow[] = [];
@@ -371,6 +384,54 @@ function notifyShadowListeners() {
   shadowListeners.forEach((l) => l());
 }
 
+// ============================================================
+// VALIDATION START TIMESTAMP — when "START FRESH VALIDATION" was pressed
+// ============================================================
+const VALIDATION_START_KEY = "revo_validationStart";
+const validationStartListeners = new Set<() => void>();
+
+function readValidationStart(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(VALIDATION_START_KEY);
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeValidationStart(ts: number) {
+  try {
+    localStorage.setItem(VALIDATION_START_KEY, String(ts));
+  } catch {
+    /* ignore */
+  }
+  validationStartListeners.forEach((l) => l());
+}
+
+function clearValidationStart() {
+  try {
+    localStorage.removeItem(VALIDATION_START_KEY);
+  } catch {
+    /* ignore */
+  }
+  validationStartListeners.forEach((l) => l());
+}
+
+function subscribeValidationStart(cb: () => void): () => void {
+  validationStartListeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === VALIDATION_START_KEY) cb();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    validationStartListeners.delete(cb);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
 // Representative synthetic 50-round sequence matching the reported fresh
 // k=30 validation marginals (PACHINKO=3, ~78% theoretical coverage).
 // Used ONLY by the retrospective diagnostic to estimate direction when
@@ -396,6 +457,19 @@ function engineToPredictions(engine: EngineOutput): Prediction[] {
     label: p.label,
     signals: p.signals,
   }));
+}
+
+/** Extract per-engine locked data (Top-4 names + coverage + all 8 calibrated
+ *  probabilities) at generation time, so it's available at settlement time. */
+function extractEngineData(eng: EngineOutput): LockedEngineData {
+  const names = eng.predictions.map((p) => p.game.name);
+  const probs: Record<string, number> = {};
+  for (const c of eng.candidateScores) {
+    const cp = (c as CandidateScore & { calibratedProbability?: number }).calibratedProbability;
+    probs[c.game.name] = cp ?? 0;
+  }
+  const coverage = names.reduce((s, n) => s + (probs[n] ?? 0), 0);
+  return { names, coverage, probs };
 }
 
 // ============================================================
@@ -518,9 +592,12 @@ export function RevoGame() {
         preds.filter((p) => BONUS_NAMES.includes(p.game.name)).length;
       return { ...s, total, bonusHits, accuracy: s.accuracy };
     });
-    // SHADOW: seed the experimental engine's locked prediction (same history).
+    // SHADOW: capture the baseline engine's full locked data (names + coverage
+    // + all 8 calibrated probs) so it's available at settlement time.
+    baselineLockedData = extractEngineData(eng);
+    // Seed the experimental engine's locked prediction too (same history).
     const expEng = buildInitial(allRounds, spins, "experimental");
-    expLockedNames = expEng.predictions.map((p) => p.game.name);
+    expLockedData = extractEngineData(expEng);
   }, []);
 
   // AUTO-GENERATE on mount ONLY (no countdown refresh)
@@ -572,12 +649,15 @@ export function RevoGame() {
     writeExpFlag(next);
     expFlagListeners.forEach((l) => l());
     // When enabling, seed the experimental locked prediction from the
-    // current baseline prediction set so the shadow has a starting point.
+    // current baseline locked data so the shadow has a starting point.
     if (next) {
-      const cur = predictions ?? savedSignals ?? [];
-      expLockedNames = cur.map((p) => p.game.name);
+      expLockedData = {
+        names: [...baselineLockedData.names],
+        coverage: baselineLockedData.coverage,
+        probs: { ...baselineLockedData.probs },
+      };
     }
-  }, [predictions, savedSignals]);
+  }, []);
 
   // ============================================================
   // CORE ENGINE PIPELINE — runs on EVERY live result / manual selection
@@ -609,9 +689,10 @@ export function RevoGame() {
         setPredictions(preds);
         setRunning(true);
         saveSignals(preds);
-        // SHADOW: seed experimental locked prediction too.
+        // SHADOW: capture baseline locked data + seed experimental.
+        baselineLockedData = extractEngineData(eng);
         const expEng0 = buildInitial(allRounds, spins, "experimental");
-        expLockedNames = expEng0.predictions.map((p) => p.game.name);
+        expLockedData = extractEngineData(expEng0);
         return;
       }
 
@@ -621,14 +702,19 @@ export function RevoGame() {
       const oldPredNames = currentPreds.map((p) => p.game.name);
 
       // STEP 1: SETTLE OLD LOCKED PREDICTION (before history update)
+      // `currentPreds` is what was actually displayed; `baselineLockedData`
+      // is the engine's locked data captured at generation time (names +
+      // coverage + all 8 calibrated probs). They should be in sync.
       const hit = currentPreds.some((p) => p.game.name === game.name);
       // SHADOW: settle the experimental locked prediction against the SAME
       // actual result (both computed from the same pre-result history).
-      // `expLockedNames` is the module-level mirror of the experimental
-      // engine's currently-locked prediction names.
-      const expHit = experimentalEnabled && expLockedNames.length > 0
-        ? expLockedNames.includes(game.name)
+      // `expLockedData` is the module-level mirror of the experimental
+      // engine's currently-locked prediction data.
+      const expHit = experimentalEnabled && expLockedData.names.length > 0
+        ? expLockedData.names.includes(game.name)
         : false;
+      // Theoretical [1,2,5,10] baseline HIT? — fixed reference benchmark.
+      const theoHit = ["1", "2", "5", "10"].includes(game.name);
       const predConfidence =
         Math.round(
           currentPreds.reduce((s, p) => s + p.confidence, 0) /
@@ -654,15 +740,17 @@ export function RevoGame() {
       const spins = getLiveSpins();
       let nextPreds: Prediction[];
       let nextRecal: { triggered: boolean; reason: string } | null = null;
-
+      // Hoist baselineEng so we can extract its locked data AFTER the
+      // ShadowRow (which uses the OLD locked data) has been built.
+      let baselineEng: EngineOutput;
       if (!hit) {
         const reason = `Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover — every outcome re-scored from scratch.`;
-        const eng = recalibrate(updated, reason, spins);
-        nextPreds = engineToPredictions(eng);
+        baselineEng = recalibrate(updated, reason, spins);
+        nextPreds = engineToPredictions(baselineEng);
         nextRecal = { triggered: true, reason };
       } else {
-        const eng = buildInitial(updated, spins);
-        nextPreds = engineToPredictions(eng);
+        baselineEng = buildInitial(updated, spins);
+        nextPreds = engineToPredictions(baselineEng);
         nextRecal = null;
       }
 
@@ -693,27 +781,41 @@ export function RevoGame() {
       saveSignals(nextPreds);
 
       // ===== STEP 6: SHADOW A/B — settle + regenerate experimental =====
-      // Record this round in the shadow ledger (baseline vs experimental on
-      // the SAME actual), then regenerate the experimental locked prediction
-      // from the updated history so it is ready for the NEXT live result.
+      // Build the ShadowRow using the OLD locked data (the prediction that
+      // was actually settled against this actual), then regenerate the
+      // experimental locked prediction from the updated history so it's
+      // ready for the NEXT live result. The baseline locked data is updated
+      // from the hoisted `baselineEng` AFTER the row is built.
       if (experimentalEnabled) {
-        const expEng = !hit
-          ? recalibrate(updated, "Shadow recalibration (experimental mode)", spins, "experimental")
-          : buildInitial(updated, spins, "experimental");
-        const expNextNames = expEng.predictions.map((p) => p.game.name);
-        expLockedNames = expNextNames;
+        // Build the full ShadowRow using OLD locked data (settlement source-of-truth).
         const row: ShadowRow = {
+          roundId: historyNAfter,
           ts: Date.now(),
           actual: game.name,
-          baselinePreds: oldPredNames,
+          baselinePreds: [...baselineLockedData.names],
           baselineHit: hit,
-          expPreds: expLockedNames,
+          baselineCoverage: baselineLockedData.coverage,
+          baselineProbs: { ...baselineLockedData.probs },
+          expPreds: [...expLockedData.names],
           expHit,
+          expCoverage: expLockedData.coverage,
+          expProbs: { ...expLockedData.probs },
+          theoHit,
         };
         // Append to shadow ledger (useSyncExternalStore notifies subscribers).
         const prevLedger = readShadowLedger();
         writeShadowLedger([...prevLedger, row].slice(-200));
+
+        // Regenerate experimental for the NEXT round (uses updated history).
+        const expEng = !hit
+          ? recalibrate(updated, "Shadow recalibration (experimental mode)", spins, "experimental")
+          : buildInitial(updated, spins, "experimental");
+        expLockedData = extractEngineData(expEng);
       }
+
+      // Update baseline locked data from the NEW baseline engine output so
+      // the next settlement has access to it. (Hoisted baselineEng above.)
+      baselineLockedData = extractEngineData(baselineEng);
     },
     [predictions, savedSignals, lastRecalibration, experimentalEnabled],
   );
@@ -729,17 +831,43 @@ export function RevoGame() {
     const total = rows.length;
     const bHits = rows.filter((r) => r.baselineHit).length;
     const eHits = rows.filter((r) => r.expHit).length;
+    const bMisses = total - bHits;
+    const eMisses = total - eHits;
     const flipsToHit = rows.filter((r) => !r.baselineHit && r.expHit).length;
     const flipsToMiss = rows.filter((r) => r.baselineHit && !r.expHit).length;
-    // Per-outcome inclusion counts (both modes)
-    const perOutcome: Record<string, { baseInc: number; expInc: number; actuals: number }> = {};
-    for (const g of ENGINE_GAMES) perOutcome[g.name] = { baseInc: 0, expInc: 0, actuals: 0 };
+
+    // ===== Normal vs Bonus breakdown =====
+    // Normal results = actual is in [1,2,5,10]; Bonus = otherwise.
+    const bNormalRows = rows.filter((r) => ["1", "2", "5", "10"].includes(r.actual));
+    const bBonusRows = rows.filter((r) => !["1", "2", "5", "10"].includes(r.actual));
+    const bNormalHits = bNormalRows.filter((r) => r.baselineHit).length;
+    const bNormalTotal = bNormalRows.length;
+    const eNormalHits = bNormalRows.filter((r) => r.expHit).length;
+    const eNormalTotal = bNormalRows.length; // same actuals → same denominator
+    const bBonusHits = bBonusRows.filter((r) => r.baselineHit).length;
+    const bBonusTotal = bBonusRows.length;
+    const eBonusHits = bBonusRows.filter((r) => r.expHit).length;
+    const eBonusTotal = bBonusRows.length;
+
+    // ===== Per-outcome inclusion rates + actuals =====
+    const perOutcome: Record<string, {
+      baseInc: number; expInc: number; actuals: number;
+      baseRate: number; expRate: number;
+    }> = {};
+    for (const g of ENGINE_GAMES) {
+      perOutcome[g.name] = { baseInc: 0, expInc: 0, actuals: 0, baseRate: 0, expRate: 0 };
+    }
     for (const r of rows) {
       for (const n of r.baselinePreds) if (perOutcome[n]) perOutcome[n].baseInc++;
       for (const n of r.expPreds) if (perOutcome[n]) perOutcome[n].expInc++;
       if (perOutcome[r.actual]) perOutcome[r.actual].actuals++;
     }
-    // 1/2/5/10 exclusion rates (fraction of rounds each was excluded)
+    for (const g of ENGINE_GAMES) {
+      perOutcome[g.name].baseRate = total > 0 ? perOutcome[g.name].baseInc / total : 0;
+      perOutcome[g.name].expRate = total > 0 ? perOutcome[g.name].expInc / total : 0;
+    }
+
+    // ===== 1/2/5/10 exclusion rates (fraction of rounds each was excluded) =====
     const exclusionRates: Record<string, { base: number; exp: number }> = {};
     for (const num of ["1", "2", "5", "10"]) {
       const baseExcl = rows.filter((r) => !r.baselinePreds.includes(num)).length;
@@ -749,15 +877,176 @@ export function RevoGame() {
         exp: total > 0 ? expExcl / total : 0,
       };
     }
+
+    // ===== Theoretical [1,2,5,10] baseline =====
+    const theoHits = rows.filter((r) => r.theoHit).length;
+    const theoRate = total > 0 ? theoHits / total : 0;
+
+    // ===== Stale runs (3+ consecutive rounds where the SAME Top-4 set was used) =====
+    // Compare sorted prediction arrays between consecutive rows.
+    const sortKey = (names: string[]) => [...names].sort().join("|");
+    let bStaleRuns = 0;
+    let eStaleRuns = 0;
+    if (rows.length >= 3) {
+      // Baseline stale runs
+      let runLen = 1;
+      for (let i = 1; i < rows.length; i++) {
+        if (sortKey(rows[i].baselinePreds) === sortKey(rows[i - 1].baselinePreds)) {
+          runLen++;
+        } else {
+          if (runLen >= 3) bStaleRuns++;
+          runLen = 1;
+        }
+      }
+      if (runLen >= 3) bStaleRuns++;
+      // Experimental stale runs
+      runLen = 1;
+      for (let i = 1; i < rows.length; i++) {
+        if (sortKey(rows[i].expPreds) === sortKey(rows[i - 1].expPreds)) {
+          runLen++;
+        } else {
+          if (runLen >= 3) eStaleRuns++;
+          runLen = 1;
+        }
+      }
+      if (runLen >= 3) eStaleRuns++;
+    }
+
+    // ===== Prediction changes (Top-4 set differs from previous round) =====
+    let bPredChanges = 0;
+    let ePredChanges = 0;
+    for (let i = 1; i < rows.length; i++) {
+      if (sortKey(rows[i].baselinePreds) !== sortKey(rows[i - 1].baselinePreds)) bPredChanges++;
+      if (sortKey(rows[i].expPreds) !== sortKey(rows[i - 1].expPreds)) ePredChanges++;
+    }
+
+    // ===== Avg expected coverage (sum of 4 selected calibrated probs per round) =====
+    const bAvgCoverage = total > 0
+      ? rows.reduce((s, r) => s + (r.baselineCoverage ?? 0), 0) / total
+      : 0;
+    const eAvgCoverage = total > 0
+      ? rows.reduce((s, r) => s + (r.expCoverage ?? 0), 0) / total
+      : 0;
+
+    // ===== MISS RCA flips (rounds where one model hit and the other missed) =====
+    const flips: Array<{
+      roundId: number;
+      actual: string;
+      type: "MISS_TO_HIT" | "HIT_TO_MISS";
+      bPreds: string[];
+      ePreds: string[];
+      rca: string;
+    }> = [];
+    const NUMBER_NAMES = ["1", "2", "5", "10"];
+    for (const r of rows) {
+      if (!r.baselineHit && r.expHit) {
+        // MISS_TO_HIT (baseline missed, experimental hit)
+        const baseBonusOnly = r.baselinePreds.filter((n) => BONUS_NAMES.includes(n));
+        const bonusBaselineHad = baseBonusOnly.filter((n) => !r.expPreds.includes(n));
+        const numExpAdded = r.expPreds.filter((n) => NUMBER_NAMES.includes(n) && !r.baselinePreds.includes(n));
+        let rca: string;
+        if (bonusBaselineHad.length > 0) {
+          rca = `rare-outcome displacement correction: baseline included ${bonusBaselineHad.join(",")} which displaced a number`;
+        } else if (numExpAdded.length > 0) {
+          rca = `number restored: experimental included ${numExpAdded.join(",")} which baseline excluded`;
+        } else {
+          rca = "better combination selection";
+        }
+        flips.push({
+          roundId: r.roundId,
+          actual: r.actual,
+          type: "MISS_TO_HIT",
+          bPreds: [...r.baselinePreds],
+          ePreds: [...r.expPreds],
+          rca,
+        });
+      } else if (r.baselineHit && !r.expHit) {
+        // HIT_TO_MISS (baseline hit, experimental missed)
+        const bonusBaselineHad = r.baselinePreds.filter((n) => BONUS_NAMES.includes(n));
+        const bonusExpDropped = bonusBaselineHad.filter((n) => !r.expPreds.includes(n));
+        const numExpDifferent = r.expPreds.filter((n) => NUMBER_NAMES.includes(n) && !r.baselinePreds.includes(n));
+        let rca: string;
+        if (bonusExpDropped.length > 0) {
+          rca = `reliability layer dampened ${bonusExpDropped.join(",")} evidence below selection threshold`;
+        } else if (numExpDifferent.length > 0) {
+          rca = `reliability layer shifted combination: experimental swapped in ${numExpDifferent.join(",")} for ${r.baselinePreds.filter((n) => !r.expPreds.includes(n)).join(",")}`;
+        } else {
+          rca = "combination changed by reliability adjustment";
+        }
+        flips.push({
+          roundId: r.roundId,
+          actual: r.actual,
+          type: "HIT_TO_MISS",
+          bPreds: [...r.baselinePreds],
+          ePreds: [...r.expPreds],
+          rca,
+        });
+      }
+    }
+
     return {
-      total, bHits, eHits,
+      total, bHits, eHits, bMisses, eMisses,
       bRate: total > 0 ? bHits / total : 0,
       eRate: total > 0 ? eHits / total : 0,
       delta: total > 0 ? (eHits - bHits) / total : 0,
       flipsToHit, flipsToMiss,
-      perOutcome, exclusionRates,
+      // Normal vs bonus breakdown
+      bNormalHits, bNormalTotal,
+      bNormalRate: bNormalTotal > 0 ? bNormalHits / bNormalTotal : 0,
+      eNormalHits, eNormalTotal,
+      eNormalRate: eNormalTotal > 0 ? eNormalHits / eNormalTotal : 0,
+      bBonusHits, bBonusTotal,
+      bBonusRate: bBonusTotal > 0 ? bBonusHits / bBonusTotal : 0,
+      eBonusHits, eBonusTotal,
+      eBonusRate: eBonusTotal > 0 ? eBonusHits / eBonusTotal : 0,
+      // Per-outcome inclusion rates
+      perOutcome,
+      // Theoretical [1,2,5,10] baseline
+      theoHits, theoRate,
+      // Stale runs + prediction changes
+      bStaleRuns, eStaleRuns,
+      bPredChanges, ePredChanges,
+      // Avg expected coverage
+      bAvgCoverage, eAvgCoverage,
+      // MISS RCA flips list
+      flips,
+      // 1/2/5/10 exclusion rates (legacy field kept for back-compat)
+      exclusionRates,
     };
   }, [shadowLedger]);
+
+  // ===== VALIDATION START TIMESTAMP (useSyncExternalStore — hydration-safe) =====
+  const validationStartedAt = useSyncExternalStore(
+    subscribeValidationStart,
+    readValidationStart,
+    () => null, // server snapshot
+  );
+
+  // ===== START FRESH VALIDATION handler =====
+  // Clears the shadow ledger, enables the experimental engine, sets the
+  // validation start timestamp, and seeds both locked data stores fresh
+  // from the current history + spins so the next live result starts a
+  // clean A/B comparison.
+  const startFreshValidation = useCallback(() => {
+    // 1) Clear the shadow ledger.
+    clearShadowLedger();
+    // 2) Enable the experimental engine.
+    writeExpFlag(true);
+    expFlagListeners.forEach((l) => l());
+    // 3) Set the validation start timestamp.
+    writeValidationStart(Date.now());
+    // 4) Seed both locked data stores fresh from current history + spins.
+    const allRounds = readRoundHistory();
+    const spins = getLiveSpins();
+    const baseEng = buildInitial(allRounds, spins);
+    baselineLockedData = extractEngineData(baseEng);
+    const expEng = buildInitial(allRounds, spins, "experimental");
+    expLockedData = extractEngineData(expEng);
+  }, []);
+
+  const clearValidationStartTs = useCallback(() => {
+    clearValidationStart();
+  }, []);
 
   // ===== RETROSPECTIVE DIAGNOSTIC handlers =====
   const runRetroLive = useCallback(() => {
@@ -1309,7 +1598,7 @@ export function RevoGame() {
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#a855f7]">
               <i className="fas fa-flask-vial" /> Shadow A/B — Rare-Outcome Reliability Layer
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-[#1e2240] px-2 py-0.5 text-[9px] font-bold uppercase text-[#8899cc]">
                 RELIABILITY_K = {EXPERIMENTAL_CONFIG.reliabilityK}
               </span>
@@ -1326,6 +1615,52 @@ export function RevoGame() {
                 <span className={`inline-block h-2 w-2 rounded-full ${experimentalEnabled ? "bg-[#2ed573]" : "bg-[#5a6a99]"}`} />
                 {experimentalEnabled ? "EXPERIMENTAL SHADOW ON" : "SHADOW OFF"}
               </button>
+            </div>
+          </div>
+
+          {/* ===== START FRESH VALIDATION (prominent button + timestamp) ===== */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border-2 border-[#a855f7]/40 bg-gradient-to-r from-[#a855f7]/10 to-transparent p-2.5">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={startFreshValidation}
+                className="flex items-center gap-2 rounded-md bg-[#a855f7] px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-white shadow-md transition hover:bg-[#9333ea]"
+                title="Clears the shadow ledger, enables the experimental engine, and starts a fresh A/B validation. Both engines will be re-seeded from current history."
+              >
+                <i className="fas fa-play" /> START FRESH VALIDATION
+              </button>
+              <button
+                type="button"
+                onClick={clearShadow}
+                className="rounded bg-[#ff4757]/10 px-2 py-1 text-[9px] font-bold uppercase text-[#ff4757] hover:bg-[#ff4757]/20"
+                title="Clear only the shadow ledger (keeps experimental flag + validation timestamp)"
+              >
+                <i className="fas fa-broom mr-0.5" /> Clear Ledger
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-[9px] text-[#5a6a99]">
+              {validationStartedAt ? (
+                <>
+                  <span className="flex items-center gap-1 rounded-full bg-[#2ed573]/10 px-2 py-0.5 font-bold uppercase text-[#2ed573]">
+                    <i className="fas fa-stopwatch" /> Validation Started
+                  </span>
+                  <span className="font-mono text-[#8899cc]">
+                    {new Date(validationStartedAt).toLocaleString()}
+                  </span>
+                  <span className="text-[#5a6a99]">
+                    ({Math.round((Date.now() - validationStartedAt) / 1000)}s ago)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearValidationStartTs}
+                    className="ml-1 rounded bg-[#1e2240] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#5a6a99] hover:bg-[#2a2f4d]"
+                  >
+                    Reset TS
+                  </button>
+                </>
+              ) : (
+                <span className="italic">No validation started — press "START FRESH VALIDATION" to begin.</span>
+              )}
             </div>
           </div>
 
@@ -1356,17 +1691,100 @@ export function RevoGame() {
                 </div>
                 <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-2 text-center">
                   <div className="text-lg font-black text-[#00d4ff]">{Math.round(shadowStats.bRate * 100)}%</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline HIT ({shadowStats.bHits})</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline HIT ({shadowStats.bHits}/{shadowStats.total})</div>
                 </div>
                 <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/8 p-2 text-center">
                   <div className="text-lg font-black text-[#a855f7]">{Math.round(shadowStats.eRate * 100)}%</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental HIT ({shadowStats.eHits})</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental HIT ({shadowStats.eHits}/{shadowStats.total})</div>
                 </div>
                 <div className={`rounded border p-2 text-center ${shadowStats.delta >= 0 ? "border-[#2ed573]/30 bg-[#2ed573]/8" : "border-[#ff4757]/30 bg-[#ff4757]/8"}`}>
                   <div className={`text-lg font-black ${shadowStats.delta >= 0 ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
                     {shadowStats.delta >= 0 ? "+" : ""}{Math.round(shadowStats.delta * 100)}%
                   </div>
                   <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Δ (exp − base)</div>
+                </div>
+              </div>
+
+              {/* ===== Normal vs Bonus HIT breakdown (4 KPIs) ===== */}
+              <div className="mb-3 rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-2.5">
+                <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                  Normal vs Bonus HIT breakdown
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5 text-center">
+                    <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline Normal</div>
+                    <div className="text-sm font-black text-[#00d4ff]">
+                      {shadowStats.bNormalTotal > 0 ? `${Math.round(shadowStats.bNormalRate * 100)}%` : "—"}
+                    </div>
+                    <div className="text-[7px] text-[#5a6a99]">{shadowStats.bNormalHits}/{shadowStats.bNormalTotal} normal rounds</div>
+                  </div>
+                  <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/5 p-1.5 text-center">
+                    <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental Normal</div>
+                    <div className="text-sm font-black text-[#a855f7]">
+                      {shadowStats.eNormalTotal > 0 ? `${Math.round(shadowStats.eNormalRate * 100)}%` : "—"}
+                    </div>
+                    <div className="text-[7px] text-[#5a6a99]">{shadowStats.eNormalHits}/{shadowStats.eNormalTotal} normal rounds</div>
+                  </div>
+                  <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5 text-center">
+                    <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline Bonus</div>
+                    <div className="text-sm font-black text-[#00d4ff]">
+                      {shadowStats.bBonusTotal > 0 ? `${Math.round(shadowStats.bBonusRate * 100)}%` : "—"}
+                    </div>
+                    <div className="text-[7px] text-[#5a6a99]">{shadowStats.bBonusHits}/{shadowStats.bBonusTotal} bonus rounds</div>
+                  </div>
+                  <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/5 p-1.5 text-center">
+                    <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental Bonus</div>
+                    <div className="text-sm font-black text-[#a855f7]">
+                      {shadowStats.eBonusTotal > 0 ? `${Math.round(shadowStats.eBonusRate * 100)}%` : "—"}
+                    </div>
+                    <div className="text-[7px] text-[#5a6a99]">{shadowStats.eBonusHits}/{shadowStats.eBonusTotal} bonus rounds</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ===== Theoretical [1,2,5,10] baseline row ===== */}
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded border border-[#ffa502]/30 bg-[#ffa502]/8 p-2 text-center">
+                  <div className="text-sm font-black text-[#ffa502]">{Math.round(shadowStats.theoRate * 100)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Theoretical [1,2,5,10] ({shadowStats.theoHits}/{shadowStats.total})</div>
+                </div>
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-sm font-black text-[#00d4ff]">{shadowStats.bPredChanges}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline Pred Changes</div>
+                </div>
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-sm font-black text-[#a855f7]">{shadowStats.ePredChanges}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental Pred Changes</div>
+                </div>
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-[9px] text-[#5a6a99]">Stale Runs</div>
+                  <div className="text-sm font-black">
+                    <span className="text-[#00d4ff]">{shadowStats.bStaleRuns}</span>
+                    <span className="text-[#5a6a99]"> / </span>
+                    <span className="text-[#a855f7]">{shadowStats.eStaleRuns}</span>
+                  </div>
+                  <div className="text-[7px] text-[#5a6a99]">base / exp (3+ same)</div>
+                </div>
+              </div>
+
+              {/* ===== Avg expected coverage comparison ===== */}
+              <div className="mb-3 rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-2.5">
+                <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                  Avg Expected Coverage (sum of 4 selected calibrated probs per round)
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5 text-center">
+                    <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline Avg Coverage</div>
+                    <div className="text-sm font-black text-[#00d4ff]">{(shadowStats.bAvgCoverage * 100).toFixed(2)}%</div>
+                  </div>
+                  <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/5 p-1.5 text-center">
+                    <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental Avg Coverage</div>
+                    <div className="text-sm font-black text-[#a855f7]">{(shadowStats.eAvgCoverage * 100).toFixed(2)}%</div>
+                  </div>
+                </div>
+                <div className="mt-1 text-[8px] text-[#5a6a99]">
+                  <i className="fas fa-circle-info mr-0.5" />
+                  Higher coverage = the 4 chosen outcomes cover more of the probability mass. Doesn't equal hit rate, but tracks expected value.
                 </div>
               </div>
 
@@ -1391,6 +1809,8 @@ export function RevoGame() {
                       <th className="px-2 py-1 text-right">Actuals</th>
                       <th className="px-2 py-1 text-right">Base Inc</th>
                       <th className="px-2 py-1 text-right">Exp Inc</th>
+                      <th className="px-2 py-1 text-right">Base Rate</th>
+                      <th className="px-2 py-1 text-right">Exp Rate</th>
                       <th className="px-2 py-1 text-right">Δ Inc</th>
                     </tr>
                   </thead>
@@ -1404,6 +1824,8 @@ export function RevoGame() {
                           <td className="px-2 py-1 text-right text-[#8899cc]">{st.actuals}</td>
                           <td className="px-2 py-1 text-right text-[#00d4ff]">{st.baseInc}</td>
                           <td className="px-2 py-1 text-right text-[#a855f7]">{st.expInc}</td>
+                          <td className="px-2 py-1 text-right text-[#8899cc]">{Math.round(st.baseRate * 100)}%</td>
+                          <td className="px-2 py-1 text-right text-[#8899cc]">{Math.round(st.expRate * 100)}%</td>
                           <td className={`px-2 py-1 text-right font-bold ${dInc < 0 ? "text-[#2ed573]" : dInc > 0 ? "text-[#ffa502]" : "text-[#5a6a99]"}`}>{dInc > 0 ? "+" : ""}{dInc}</td>
                         </tr>
                       );
@@ -1431,6 +1853,35 @@ export function RevoGame() {
                 })}
               </div>
 
+              {/* ===== MISS RCA flips summary ===== */}
+              {shadowStats.flips.length > 0 && (
+                <div className="mb-3 rounded-lg border border-[#ffa502]/30 bg-[#ffa502]/5 p-2.5">
+                  <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-[#ffa502]">
+                    MISS RCA — flips ({shadowStats.flips.length} total)
+                  </div>
+                  <div className="max-h-48 overflow-y-auto revo-scroll space-y-1">
+                    {shadowStats.flips.map((f, i) => (
+                      <div key={i} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-1.5 text-[9px]">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-bold text-white">#{f.roundId}</span>
+                          <span className={`rounded px-1 py-0.5 text-[8px] font-bold uppercase ${f.type === "MISS_TO_HIT" ? "bg-[#2ed573]/15 text-[#2ed573]" : "bg-[#ff4757]/15 text-[#ff4757]"}`}>
+                            {f.type === "MISS_TO_HIT" ? "MISS→HIT" : "HIT→MISS"}
+                          </span>
+                          <span className="text-[#8899cc]">actual:</span>
+                          <span className={`font-bold ${BONUS_NAMES.includes(f.actual) ? "text-[#FFD700]" : "text-white"}`}>{f.actual}</span>
+                        </div>
+                        <div className="mt-0.5 text-[#8899cc]">
+                          <span className="text-[#00d4ff]">base: [{f.bPreds.join(",")}]</span>
+                          {" → "}
+                          <span className="text-[#a855f7]">exp: [{f.ePreds.join(",")}]</span>
+                        </div>
+                        <div className="mt-0.5 italic text-[#ffa502]">↳ {f.rca}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="text-[8px] text-[#5a6a99]">
                   <i className="fas fa-shield-halved mr-1 text-[#2ed573]" />
@@ -1453,6 +1904,9 @@ export function RevoGame() {
             </>
           )}
         </div>
+
+        {/* ===== ROUND-BY-ROUND VALIDATION LOG (collapsible, scrollable) ===== */}
+        <RoundByRoundLog ledger={shadowLedger} experimentalEnabled={experimentalEnabled} />
 
         {/* ===== RETROSPECTIVE DIAGNOSTIC (SIMULATION — not a validation result) ===== */}
         <div className="mt-4 rounded-lg border-2 border-[#ffa502]/30 bg-[#0d1020]/60 p-4">
@@ -3049,6 +3503,209 @@ function Stat({ value, label, color }: { value: string; label: string; color: st
         {value}
       </div>
       <div className="text-[9px] uppercase tracking-wider text-[#5a6a99]">{label}</div>
+    </div>
+  );
+}
+
+// ============================================================
+// ROUND-BY-ROUND VALIDATION LOG (collapsible, scrollable)
+// ============================================================
+function RoundByRoundLog({
+  ledger,
+  experimentalEnabled,
+}: {
+  ledger: ShadowRow[];
+  experimentalEnabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const BONUS_NAMES_LOG = ["PACHINKO", "COIN FLIP", "CASH HUNT", "CRAZY TIME"];
+
+  if (!experimentalEnabled) return null;
+  if (ledger.length === 0) {
+    return (
+      <div className="mt-4 rounded-lg border-2 border-[#a855f7]/20 bg-[#0d1020]/40 p-3">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#a855f7]">
+            <i className="fas fa-list" /> Round-by-Round Validation Log
+          </span>
+          <span className="text-[9px] text-[#5a6a99]">No rounds yet</span>
+        </div>
+        <div className="mt-2 text-center text-[10px] text-[#5a6a99]">
+          Live rounds will appear here as they accumulate.
+        </div>
+      </div>
+    );
+  }
+
+  const reversed = [...ledger].reverse(); // newest first
+
+  return (
+    <div className="mt-4 rounded-lg border-2 border-[#a855f7]/20 bg-[#0d1020]/40 p-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-left"
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#a855f7]">
+          <i className={`fas ${open ? "fa-chevron-down" : "fa-chevron-right"}`} />
+          Round-by-Round Validation Log
+        </span>
+        <span className="text-[9px] text-[#5a6a99]">
+          {ledger.length} round{ledger.length !== 1 ? "s" : ""} • {open ? "click to collapse" : "click to expand"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-2 max-h-96 overflow-y-auto revo-scroll space-y-1.5 pr-1">
+          {reversed.map((row, i) => {
+            const isFlip = row.baselineHit !== row.expHit;
+            const flipType =
+              !row.baselineHit && row.expHit ? "MISS_TO_HIT"
+              : row.baselineHit && !row.expHit ? "HIT_TO_MISS"
+              : null;
+
+            // Compute RCA inline for highlighting
+            let rca: string | null = null;
+            if (isFlip && flipType === "MISS_TO_HIT") {
+              const bonusBaselineHad = row.baselinePreds.filter((n) => BONUS_NAMES_LOG.includes(n) && !row.expPreds.includes(n));
+              const numExpAdded = row.expPreds.filter((n) => ["1", "2", "5", "10"].includes(n) && !row.baselinePreds.includes(n));
+              if (bonusBaselineHad.length > 0) {
+                rca = `rare-outcome displacement correction: baseline included ${bonusBaselineHad.join(",")} which displaced a number`;
+              } else if (numExpAdded.length > 0) {
+                rca = `number restored: experimental included ${numExpAdded.join(",")} which baseline excluded`;
+              } else {
+                rca = "better combination selection";
+              }
+            } else if (isFlip && flipType === "HIT_TO_MISS") {
+              const bonusExpDropped = row.baselinePreds.filter((n) => BONUS_NAMES_LOG.includes(n) && !row.expPreds.includes(n));
+              const numExpDifferent = row.expPreds.filter((n) => ["1", "2", "5", "10"].includes(n) && !row.baselinePreds.includes(n));
+              if (bonusExpDropped.length > 0) {
+                rca = `reliability layer dampened ${bonusExpDropped.join(",")} evidence below selection threshold`;
+              } else if (numExpDifferent.length > 0) {
+                rca = `reliability layer shifted combination: experimental swapped in ${numExpDifferent.join(",")}`;
+              } else {
+                rca = "combination changed by reliability adjustment";
+              }
+            }
+
+            return (
+              <div
+                key={i}
+                className={`rounded border p-2 text-[9px] ${
+                  isFlip
+                    ? flipType === "MISS_TO_HIT"
+                      ? "border-[#2ed573]/50 bg-[#2ed573]/8"
+                      : "border-[#ff4757]/50 bg-[#ff4757]/8"
+                    : "border-[#1e2240] bg-[#0d1020]/60"
+                }`}
+              >
+                {/* Row header: roundId, timestamp, actual */}
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                  <span className="font-black text-white">#{row.roundId}</span>
+                  <span className="text-[#5a6a99]">
+                    {new Date(row.ts).toLocaleTimeString(undefined, { hour12: false })}
+                  </span>
+                  <span className="text-[#5a6a99]">·</span>
+                  <span className="text-[#8899cc]">actual:</span>
+                  <span className={`font-bold ${BONUS_NAMES_LOG.includes(row.actual) ? "text-[#FFD700]" : "text-white"}`}>
+                    {row.actual}
+                  </span>
+                  {isFlip && (
+                    <span className={`rounded px-1 py-0.5 text-[8px] font-bold uppercase ${
+                      flipType === "MISS_TO_HIT"
+                        ? "bg-[#2ed573]/20 text-[#2ed573]"
+                        : "bg-[#ff4757]/20 text-[#ff4757]"
+                    }`}>
+                      {flipType === "MISS_TO_HIT" ? "MISS→HIT" : "HIT→MISS"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Baseline + Experimental columns */}
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {/* Baseline */}
+                  <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 p-1.5">
+                    <div className="mb-0.5 flex items-center justify-between">
+                      <span className="text-[8px] font-bold uppercase text-[#00d4ff]">Baseline</span>
+                      <span className={`rounded px-1 py-0.5 text-[7px] font-bold uppercase ${row.baselineHit ? "bg-[#2ed573]/20 text-[#2ed573]" : "bg-[#ff4757]/20 text-[#ff4757]"}`}>
+                        {row.baselineHit ? "HIT" : "MISS"}
+                      </span>
+                    </div>
+                    <div className="text-[#8899cc]">
+                      <span className="text-[#00d4ff]">[{row.baselinePreds.join(",")}]</span>
+                      <span className="ml-1 text-[#5a6a99]">cov {(row.baselineCoverage * 100).toFixed(1)}%</span>
+                    </div>
+                    {/* mini bar of all 8 probs */}
+                    <ProbBar probs={row.baselineProbs} selected={row.baselinePreds} color="#00d4ff" />
+                  </div>
+
+                  {/* Experimental */}
+                  <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/5 p-1.5">
+                    <div className="mb-0.5 flex items-center justify-between">
+                      <span className="text-[8px] font-bold uppercase text-[#a855f7]">Experimental</span>
+                      <span className={`rounded px-1 py-0.5 text-[7px] font-bold uppercase ${row.expHit ? "bg-[#2ed573]/20 text-[#2ed573]" : "bg-[#ff4757]/20 text-[#ff4757]"}`}>
+                        {row.expHit ? "HIT" : "MISS"}
+                      </span>
+                    </div>
+                    <div className="text-[#8899cc]">
+                      <span className="text-[#a855f7]">[{row.expPreds.join(",")}]</span>
+                      <span className="ml-1 text-[#5a6a99]">cov {(row.expCoverage * 100).toFixed(1)}%</span>
+                    </div>
+                    {/* mini bar of all 8 probs */}
+                    <ProbBar probs={row.expProbs} selected={row.expPreds} color="#a855f7" />
+                  </div>
+                </div>
+
+                {/* Theoretical row + RCA */}
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[#5a6a99]">Theo [1,2,5,10]:</span>
+                  <span className={`rounded px-1 py-0.5 text-[7px] font-bold uppercase ${row.theoHit ? "bg-[#2ed573]/20 text-[#2ed573]" : "bg-[#ff4757]/20 text-[#ff4757]"}`}>
+                    {row.theoHit ? "HIT" : "MISS"}
+                  </span>
+                  {rca && (
+                    <span className="italic text-[#ffa502]">↳ {rca}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Mini horizontal bar showing all 8 calibrated probabilities, with the
+ *  selected Top-4 outcomes highlighted. */
+function ProbBar({
+  probs,
+  selected,
+  color,
+}: {
+  probs: Record<string, number>;
+  selected: string[];
+  color: string;
+}) {
+  const ordered = ENGINE_GAMES.map((g) => ({ name: g.name, p: probs[g.name] ?? 0 }));
+  const total = ordered.reduce((s, o) => s + o.p, 0) || 1;
+  return (
+    <div className="mt-1 flex h-2 w-full overflow-hidden rounded-sm bg-[#0d1020]">
+      {ordered.map((o) => {
+        const isSel = selected.includes(o.name);
+        const w = (o.p / total) * 100;
+        return (
+          <div
+            key={o.name}
+            title={`${o.name}: ${(o.p * 100).toFixed(2)}%${isSel ? " (selected)" : ""}`}
+            style={{
+              width: `${w}%`,
+              backgroundColor: isSel ? color : "#2a2f4d",
+              opacity: isSel ? 1 : 0.4,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }

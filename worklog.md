@@ -2217,3 +2217,192 @@ Stage Summary:
 - The reliability layer is CONTINUOUS (no hard cutoff), GENERIC (applies to ALL outcomes), and preserves negative deviations (never inflates unseen rare outcomes).
 - Genuine live A/B validation can now begin: enable the shadow, let 50+ fresh live rounds accumulate, compare baseline vs experimental on the SAME rounds.
 - No mid-test tuning. No parameter changes during validation. If experimental doesn't improve genuine out-of-sample performance, revert it.
+
+---
+Task ID: VAL-1 (user request — ENHANCE SHADOW A/B PIPELINE FOR FULL VALIDATION)
+Agent: Z.ai Code
+Task: Enhance the existing Shadow A/B pipeline in RevoGame.tsx to capture full per-round data, support a "START FRESH VALIDATION" workflow, compute comprehensive stats (normal/bonus, theo, stale runs, prediction changes, avg coverage, MISS RCA flips), and add a round-by-round log panel.
+
+CRITICAL CONSTRAINT: Do NOT modify `src/components/revo/decisionEngine.ts` (frozen k=30 baseline). All changes in `src/components/revo/RevoGame.tsx` only.
+
+Work Log:
+
+1. ShadowRow interface expanded (full per-round schema):
+   - roundId (synchronized prediction ID), ts, actual
+   - baselinePreds, baselineHit, baselineCoverage (sum of 4 calibrated probs), baselineProbs (all 8 calibrated)
+   - expPreds, expHit, expCoverage, expProbs (same shape)
+   - theoHit (theoretical [1,2,5,10] HIT? reference benchmark)
+
+2. Module-level locked-data stores:
+   - Replaced `let expLockedNames: string[]` with `baselineLockedData` + `expLockedData` (both `LockedEngineData`: `{ names, coverage, probs }`)
+   - These store the FULL engine output (names + coverage + all 8 probs) at generation time, so they're available at settlement time
+   - Not reactive (module-level variables), set in generatePrediction + selectActualResult, read at settlement time
+
+3. Added `extractEngineData(eng: EngineOutput): LockedEngineData` helper:
+   - Names from `eng.predictions`
+   - Probs from `eng.candidateScores` (calibratedProbability field, defaults to 0 if undefined)
+   - Coverage = sum of selected probs
+
+4. Updated `generatePrediction`:
+   - Captures `baselineLockedData = extractEngineData(eng)` (the locked baseline prediction set)
+   - Seeds `expLockedData = extractEngineData(expEng)` from the experimental engine
+
+5. Updated `selectActualResult` — the CRITICAL function:
+   - At "no active prediction" early return: seeds both locked data stores fresh
+   - At settlement: hoisted `baselineEng` outside the if/else so its data is available after settlement
+   - Settlement uses OLD `baselineLockedData` (for ShadowRow enrichment) and OLD `expLockedData.names` (for expHit)
+   - Added `theoHit = ["1","2","5","10"].includes(game.name)`
+   - Builds full ShadowRow with all enriched fields (roundId = historyNAfter, coverage, probs, theoHit)
+   - AFTER row creation: regenerates experimental engine → updates `expLockedData`
+   - AFTER row creation: updates `baselineLockedData = extractEngineData(baselineEng)` from the NEW baseline output
+
+6. Updated `toggleExperimental`:
+   - When enabling, seeds `expLockedData` from current `baselineLockedData` (deep clone)
+
+7. Added "START FRESH VALIDATION" workflow:
+   - New localStorage key `revo_validationStart`
+   - `validationStartedAt` state via useSyncExternalStore (hydration-safe — same pattern as experimentalEnabled/shadowLedger)
+   - `startFreshValidation()` handler:
+     1. Clears shadow ledger
+     2. Enables experimental engine (`writeExpFlag(true)` + notify listeners)
+     3. Sets validation start timestamp (`writeValidationStart(Date.now())`)
+     4. Seeds both locked data stores fresh from current history + spins
+   - `clearValidationStartTs()` handler to reset the timestamp
+   - Validation timestamp displayed in UI with date + "Xs ago" + reset button
+
+8. Enhanced `shadowStats` useMemo with ALL required metrics:
+   - total, bHits, eHits, bMisses, eMisses, bRate, eRate, delta
+   - flipsToHit, flipsToMiss
+   - Normal vs Bonus breakdown (12 numbers: bNormalHits/Total/Rate, eNormal, bBonus, eBonus)
+   - Per-outcome inclusion: baseInc, expInc, actuals, baseRate, expRate (per-round fraction)
+   - theoHits, theoRate (theoretical [1,2,5,10] reference)
+   - bStaleRuns, eStaleRuns (3+ consecutive rounds where same sorted Top-4 set was used)
+   - bPredChanges, ePredChanges (rounds where Top-4 sorted set differs from previous)
+   - bAvgCoverage, eAvgCoverage (avg expected coverage = mean of per-round coverage)
+   - flips[] array of { roundId, actual, type (MISS_TO_HIT/HIT_TO_MISS), bPreds, ePreds, rca }
+   - MISS RCA logic:
+     * MISS_TO_HIT: bonusBaselineHad → "rare-outcome displacement correction: baseline included [BONUS] which displaced a number"
+                  : else numExpAdded → "number restored: experimental included [NUM] which baseline excluded"
+                  : else → "better combination selection"
+     * HIT_TO_MISS: bonusExpDropped → "reliability layer dampened [BONUS] evidence below selection threshold"
+                 : else numExpDifferent → "reliability layer shifted combination: experimental swapped in [NUM]"
+                 : else → "combination changed by reliability adjustment"
+
+9. Updated Shadow A/B panel UI with enhanced stats:
+   - Prominent "START FRESH VALIDATION" button (purple, top of panel) + validation timestamp display
+   - 4 paired KPIs (Total / Baseline% / Experimental% / Δ)
+   - Normal vs Bonus HIT breakdown (4 KPIs: baseline normal%, experimental normal%, baseline bonus%, experimental bonus%)
+   - Theoretical [1,2,5,10] row + Baseline Pred Changes + Experimental Pred Changes + Stale Runs (base/exp)
+   - Avg expected coverage comparison (baseline vs experimental — both as %)
+   - Flips (MISS→HIT / HIT→MISS)
+   - Per-outcome table (now with Base Rate + Exp Rate + Δ Inc columns)
+   - 1/2/5/10 exclusion rates
+   - MISS RCA flips summary (scrollable, max-h-48)
+   - Clear Ledger button (kept)
+
+10. Added Round-by-Round Validation Log panel (NEW component `RoundByRoundLog`):
+    - Collapsible (click header to expand/collapse)
+    - Scrollable (`max-h-96 overflow-y-auto revo-scroll` with custom scrollbar styling)
+    - Per round:
+      * Round ID + timestamp (HH:MM:SS) + actual result + flip badge if applicable
+      * Baseline Top-4 + HIT/MISS + coverage%
+      * Experimental Top-4 + HIT/MISS + coverage%
+      * Theoretical [1,2,5,10] HIT/MISS
+      * Mini bar of all 8 baseline probabilities (selected Top-4 highlighted in #00d4ff, others dim)
+      * Mini bar of all 8 experimental probabilities (selected Top-4 highlighted in #a855f7, others dim)
+      * MISS RCA inline (italic #ffa502) when one model hit and the other missed
+    - Rows highlighted:
+      * MISS_TO_HIT (baseline missed, exp hit): green border (#2ed573)
+      * HIT_TO_MISS (baseline hit, exp missed): red border (#ff4757)
+      * Same result: neutral (#1e2240)
+
+11. Helper component `ProbBar` added:
+    - Mini horizontal bar showing all 8 calibrated probabilities
+    - Selected Top-4 outcomes highlighted with model color
+    - Title attribute shows per-outcome probability % + selection status
+
+12. Hook dependencies cleaned:
+   - `toggleExperimental` no longer depends on `predictions` / `savedSignals` (now uses module-level `baselineLockedData` instead)
+   - `expBonusOnly` unused variable removed (was kept in shadowStats RCA for clarity but never used)
+
+Verification:
+- `bun run lint` → 0 errors, 0 warnings.
+- Dev log shows clean compilation: "✓ Compiled in 200ms" etc., no errors.
+- All new localStorage reads use the useSyncExternalStore pattern (NOT useState+useEffect):
+  - `validationStartedAt` uses `subscribeValidationStart` / `readValidationStart` / `() => null` server snapshot
+  - This avoids hydration mismatches and is lint-safe.
+- Frozen k=30 baseline (decisionEngine.ts) is UNCHANGED — only the shadow A/B pipeline in RevoGame.tsx was touched.
+- The active displayed prediction remains the frozen k=30 baseline (unchanged behavior); experimental runs in shadow on the SAME live rounds.
+- The Retrospective Diagnostic panel was kept unchanged (per spec).
+- The Shadow A/B toggle button is preserved.
+
+Stage Summary:
+- The Shadow A/B pipeline is now capable of supporting a genuine, well-instrumented live validation:
+  - Full per-round data captured (coverage, all 8 probs, theo benchmark)
+  - "START FRESH VALIDATION" workflow clears prior data and starts a clean A/B with timestamp
+  - Comprehensive stats surface Normal vs Bonus HIT rates, theoretical benchmark, stale runs, prediction changes, avg coverage, and MISS RCA flips
+  - Round-by-round log gives per-round inspection with mini probability bars and inline RCA
+- Both engines continue to run on the SAME pre-result history → no data leakage
+- No mid-test tuning. No parameter changes during validation. The reliability layer is CONTINUOUS (no hard cutoff) and GENERIC (applies to ALL outcomes via the same reliability factor r = N_obs / (N_obs + RELIABILITY_K), K=10).
+
+---
+Task ID: VAL-1 (user request — START FRESH LIVE SHADOW A/B VALIDATION)
+Agent: Z.ai Code + full-stack-developer subagent
+Task: Set up and start a completely fresh out-of-sample live validation comparing frozen k=30 baseline vs experimental rare-outcome reliability layer on the SAME NEW live rounds. No model modifications. Full per-round logging with MISS RCA.
+
+Work Log:
+- Enhanced ShadowRow interface to capture full per-round data: roundId, ts, actual, baselinePreds/Hit/Coverage/Probs, expPreds/Hit/Coverage/Probs, theoHit.
+- Added module-level LockedEngineData stores (baselineLockedData + expLockedData) to preserve names + coverage + all 8 probabilities at GENERATION time, available at SETTLEMENT time.
+- Added extractEngineData(eng) helper to extract names + calibrated probs + coverage from EngineOutput.
+- Enhanced generatePrediction to seed both locked data stores at initial prediction.
+- Enhanced selectActualResult (CRITICAL):
+  - Hoisted baselineEng outside if/else.
+  - Settlement now uses OLD locked data (from previous round's generation).
+  - Builds full ShadowRow with roundId, coverage, probs, theoHit.
+  - After settlement: regenerates experimental → updates expLockedData; updates baselineLockedData from new baseline eng.
+- Added "START FRESH VALIDATION" button: clears ledger, enables experimental, sets validation start timestamp, seeds both locked data stores fresh.
+- Added validationStartedAt via useSyncExternalStore (hydration-safe).
+- Enhanced shadowStats with ALL 21 metrics:
+  - Total HIT/MISS, rates, delta
+  - Normal vs Bonus HIT breakdown (4 KPIs)
+  - Per-outcome inclusion rates (baseRate, expRate)
+  - Theoretical [1,2,5,10] baseline HIT rate
+  - Stale runs (3+ consecutive same Top-4)
+  - Prediction changes (Top-4 differs from previous)
+  - Avg expected coverage (both models)
+  - MISS RCA flips list with detailed root-cause analysis
+- Added Round-by-Round Validation Log panel (scrollable, max-h-96):
+  - Per row: roundId, timestamp, actual, flip badge
+  - Baseline Top-4 + HIT/MISS + coverage%
+  - Experimental Top-4 + HIT/MISS + coverage%
+  - Theoretical HIT/MISS
+  - Mini probability bars for both engines (selected outcomes highlighted)
+  - Inline MISS RCA for flip rows
+- MISS RCA logic:
+  - MISS_TO_HIT: identifies rare-outcome displacement correction, number restoration, or better combination selection
+  - HIT_TO_MISS: identifies reliability layer dampening, combination shift, or other
+- Verified: bun run lint → 0 errors
+- Verified: agent-browser → page loads cleanly, no console/runtime errors
+- Started fresh validation: clicked "START FRESH VALIDATION" button
+  - localStorage: validationStart = 1788886858749, experimentalFlag = "1", shadowLedger = []
+  - First genuinely NEW live result = Round 1
+- Event integrity verified after 7 rounds:
+  - 7 unique round IDs, 0 duplicates, 0 gaps, 0 incomplete rows
+  - Data integrity: OK
+- Early results (7 rounds): Baseline 0/7, Experimental 1/7, Theoretical 7/7
+  - 1 MISS→HIT flip (Round 4: actual="1", baseline missed, experimental hit)
+  - Both models struggling with small-sample bonus deviations in live data
+  - Theoretical [1,2,5,10] hitting 100% (all actuals were 1 or 5)
+- Set up monitoring cron (every 15 min) to track validation progress
+
+Stage Summary:
+- Fresh live Shadow A/B validation is RUNNING.
+- All 21 tracked metrics are being recorded per round.
+- No model modifications — frozen k=30 baseline is unchanged.
+- Experimental (reliability layer) runs in shadow on the SAME live rounds.
+- Both models receive the EXACT SAME historical data and the EXACT SAME new live result.
+- No data leakage (old prediction settled BEFORE history update).
+- No duplicate settlements (Set-based dedup via processedResultKeysRef).
+- Validation will accumulate automatically as live Crazy Time results arrive (~30-60s per round).
+- 50+ rounds needed for meaningful comparison; 100+ preferred.
+- Monitoring cron will check progress every 15 minutes.
