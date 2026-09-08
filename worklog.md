@@ -3327,3 +3327,34 @@ Stage Summary:
 - DOMINANT SOURCE of the 20.5pp gap: structural bonus-slot displacement of normals, driven by CALIBRATION (model's own probs rank bonus outcomes into the Top-4 over '5'/'10'), amplified by persistence (stale runs re-miss the same excluded number). The optimizer is faithful (0-1 violations); the floor's advantage is that it cannot over-select bonuses and cannot exclude anything.
 - The model's edge (25/22 floor-beating bonus rounds) is real but covers only 38% of its deviation cost (66/63).
 - Candidates for the OWNER's future consideration (NOT executed, NOT recommended for immediate action): coverage-aware slot budgeting (cap bonus slots as function of their calibrated mass vs normals'), '1'/'2' inclusion floors, stale-run eviction. Any such change would be a NEW experimental shadow arm — never a direct engine edit.
+
+---
+Task ID: 66 (cron monitor — Job ID 369099, pass 21 — metrics-only steady state)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 21, 06:01 +08). All triggers clear. No engine changes.
+
+Work Log:
+- Read worklog tail: pass 20 (Task 64/65) anchor = window 91-290, 121/121 tie, audit complete.
+- Feed probe: ALIVE (16 new rounds 291-306; window 107-306). Tab reused, NO reload — 15th consecutive clean pass (zero new degraded rows).
+- All 3 documented outages auto-excluded by gap memory; no new gaps.
+- Window: base 119/200 = 59.5%, exp 119/200 = 59.5% — FOURTH consecutive perfect dead tie (119/119, 119/119, 121/121, 119/119). theo 166/200 = 83.0% — HIGHEST floor rate recorded; floor now leads both models by 23.5pp.
+- Regime: deep number-storm continues ('1'×7, '2'×6, '5'×2, COIN FLIP×1 in new rounds). The floor's refusal-to-learn keeps compounding its edge in this regime — exactly per the Task 57 regime-luck analysis (floor cannot adapt and does not need to here).
+- Streak 70 (last flip #236). 16/16 new rounds agreed. Zero new flips, zero new degraded.
+- Panel cross-check matched (modulo ≤1-round slide). Engine freeze: git verified — zero diffs.
+
+Metrics (FIFO window n=200, IDs 107-306):
+1. Paired rounds: 200 (clean 200 — third consecutive fully-clean window)
+2. Baseline HIT: 119/200 = 59.5%
+3. Experimental HIT: 119/200 = 59.5%
+4. Delta: 0.0pp (perfect tie, raw = clean)
+5. MISS→HIT (window): 4 (#116, #163, #164, #178) — lifetime 7
+6. HIT→MISS (window): 4 verified (#161, #188, #200, #236) — lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 166/200 = 83.0% (record high)
+8. MISS RCA: lifetime 15, unchanged
+- McNemar: window 4v4 p=1.000; lifetime verified 7v5 p=0.774; raw 7v8 p=1.000
+
+Stage Summary:
+- Fourth consecutive dead tie; equivalence verdict now corroborated across four separate FIFO windows (two fully clean).
+- Floor at 83.0% (record) — the audit's structural explanation (Task 65: bonus-slot displacement via calibration beliefs) grows MORE relevant as the number-storm deepens: every bonus slot costs more expected hits in this regime. The layer still offsets exactly (0.0pp), confirming mechanism symmetry under stress.
+- Post-audit watch: the audit's candidate items (slot budgeting, '1'/'2' floors, stale eviction) remain OWNER-DECISION-ONLY; no shadow arm exists for them; nothing to monitor on that front.
+- Protocol continues: metrics-only; triggers unchanged. Engine untouched.
