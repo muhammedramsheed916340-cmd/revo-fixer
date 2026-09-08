@@ -2908,3 +2908,54 @@ Stage Summary:
 - The layer's mechanism has now demonstrated: repeatable across 3 windows, correct signature (PACHINKO displacement), adaptive (#164 correction after #163), and regime-triggered (fires in number storms).
 - 8 consecutive zero-degradation passes; engine untouched; pipeline clean.
 - Next: 200-round final checkpoint likely next pass; significance watch (p<0.05 at 10v2) is now the primary analytical thread.
+
+---
+Task ID: 57 (cron monitor — Job ID 369099, pass 13 — 200-ROUND FINAL CHECKPOINT)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 13). 8-metric extraction + FINAL PLANNED CHECKPOINT ANALYSIS (200 rounds). No code changes.
+
+Work Log:
+- Read worklog: pass 12 (Task 56) at n=183 (save burst, raw lead exp, p=0.180). Feed probe: alive. Tab reused, NO reload — 9th consecutive clean pass.
+- Ledger: n=200 (FINAL CHECKPOINT CROSSED). DATA-STRUCTURE DISCOVERY: ledger enforces a 200-row FIFO cap — rounds 2-3 were EVICTED this pass (183+19 new = 202 → capped to 200; oldest evicted first; new range 4-203, contiguous, 0 dupes, ts ascending).
+- Eviction impact assessment (from Task 45-era records): rounds 2 and 3 were both MISSES for BOTH models (baseline was 0/7 through round 8; flip lists start at #4/#12), zero flips, zero hit-count impact. Only denominators shrink (lifetime 202 vs capped 200). Both readings reported below.
+- New flips at the checkpoint: #188 (COIN FLIP — base held it, exp swapped to '5' at 13% CH prob) and #200 (PACHINKO — base held, exp swapped to '10' at 12.3% PA prob). BOTH verified losses are the EXACT INVERSE of the save mechanism: in bonus windows, the displaced bonus lands.
+
+Validation snapshot at n=200 (capped ledger, rounds 4-203):
+1. Paired rounds: 200 in ledger (202 lifetime incl. evicted r2-r3)
+2. Baseline HIT: 126/200 = 63.0% (lifetime 126/202 = 62.4%)
+3. Experimental HIT: 126/200 = 63.0% (lifetime 126/202 = 62.4%)
+4. Delta: 0 hits (0.0pp) raw — TIED at the checkpoint (the 2 new losses exactly erased the pass-12 organic +2 lead)
+5. MISS→HIT: 7 (all PACHINKO-displacement saves: #4, #8, #22, #116, #163, #164, #178)
+6. HIT→MISS: 7 (4 verified: #12 dampening, #161 selection-edge, #188 COIN FLIP inverse-save, #200 PACHINKO inverse-save; 3 degraded artifacts)
+7. Theoretical [1,2,5,10]: 159/200 = 79.5% (lifetime ≈161/202 = 79.7%)
+8. MISS RCA: 14 entries (7 displacement saves, 4 verified losses across 3 distinct mechanisms, 3 degraded)
+- Verified-only (n=196): base 62.8% vs exp 64.3%, Δ +3 hits (+1.5pp)
+- McNemar final: raw 7v7 p=1.0; verified 7v4 p=0.549 — the #188/#200 losses arrived exactly as significance was approaching (0.180 → 0.549), a textbook regime-mean-reversion event
+- Verification streak: 9 consecutive zero-degradation passes; engine frozen with 0 diffs on every one of 13 passes.
+
+200-ROUND FINAL CHECKPOINT ANALYSIS:
+
+A. HEADLINE VERDICT: baseline and experimental are STATISTICALLY INDISTINGUISHABLE over 200 fresh out-of-sample rounds. Raw 63.0% vs 63.0% (dead tie); verified-only +1.5pp experimental (range across passes: +1.3 to +3.2pp, never significant, final McNemar p=0.549).
+
+B. THE DEEPEST FINDING — MECHANISM SYMMETRY: the layer and baseline differ structurally in exactly one habit: the layer trades bonus/bottom slots for retained numbers ('2', '10', '1'); baseline holds PACHINKO/bonus slots longer. This single structural difference produces BOTH outcomes depending on regime:
+   - Number-storm windows (rounds 4-22, 116, 163-178): numbers land → 7 displacement SAVES for the layer.
+   - Bonus windows (#12, #188, #200) and '5'-rebound (#161): the displaced outcomes land → verified LOSSES for the layer.
+   Net effect over 200 rounds: ZERO (raw tie). The layer's edge is real, repeatable, and exactly offset by its inverse failure mode. It is a regime bet, not a free lunch.
+
+C. Regime accounting: this window was extreme — '1' landed ~45% of rounds, CRAZY TIME only 2/202, CASH HUNT 2/202. The naive [1,2,5,10] floor rode the number-storm to 79.5-79.7%, beating both models by ~16pp. In a bonus-normalized regime the floor would fall fastest (it cannot adapt), the layer second (it dampens but retains), baseline third (it chases). The floor's win here is regime luck + refusal-to-learn, not skill.
+
+D. DATA QUALITY (final): 202 lifetime rounds; 4 degraded rows (2.0%, all pre-tab-reuse monitoring reloads, all attributed and flagged); ~13-18 outage-missing rounds (coverage gap, unbiased); 9 consecutive clean collection passes after tab-reuse adoption; ledger FIFO cap discovered at n=200 (r2/r3 evicted, zero analytic impact — both double-misses). Pipeline is publication-clean.
+
+E. DECISION FRAME for the engine owner (logged, not executed):
+   1. Statistical case for switching: NONE (p=0.549 verified, p=1.0 raw). The layer does not provably beat the frozen baseline.
+   2. Statistical case against: NONE either — no significant harm. The layer is cost-neutral overall with regime-dependent variance.
+   3. Qualitative case for the layer: bounded downside by design (never inflates unseen rare outcomes — validated: zero 'unseen-inflation' failures in 202 rounds), demonstrated adaptivity (#164 correction), and superior behavior in exactly the regime (number-storms) this live window kept producing.
+   4. If adoption is desired: the honest claim is 'equivalent on average, better in number-storms, worse in bonus clusters' — a portfolio choice, not an accuracy upgrade.
+   5. Post-freeze engineering queue (from Task 47): persist LockedEngineData to localStorage (kills the reload-degradation class), annotate the 200-row FIFO cap (lifetime stats currently lose pre-cap rounds), backfill outage gap documentation.
+
+F. If monitoring continues beyond 200: reduce analytical overhead (metrics-only) unless (a) McNemar verified crosses p<0.05 in EITHER direction, or (b) a new degradation/coverage anomaly appears. The two events that would change the verdict: 3+ consecutive same-direction flips in a single regime window.
+
+FINAL STAGE SUMMARY:
+- 200-round validation COMPLETE at the final planned checkpoint: raw tie 63.0%/63.0%, verified +1.5pp experimental, p=0.549 — the rare-outcome reliability layer is statistically equivalent to the frozen k=30 baseline over this window, with a real, repeatable, and fully offset regime-dependent edge.
+- All 13 passes observation-only: engine untouched (git-verified each pass), no tuning, no leakage, no dupes; 9-clean-pass collection streak after the tab-reuse fix; every anomaly attributed and documented.
+- The validation's own instrumentation findings (reload-degradation class, FIFO cap, outage gap) are logged as the post-freeze engineering queue.
