@@ -3457,3 +3457,36 @@ Stage Summary:
 - The 338-347 block is the audit's thesis playing out in real time: 7/10 rounds lost to bonus-over-'5'/'10'/'2' calibration bias, identically for both engines. Equivalence intact (streak 111); floor dominance compounding (83.5% record).
 - Next pass MUST resolve watch item 1: if newest-age grows toward ~20 min, expect outage #5 documentation; if recovered, log cadence note only.
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 70 (cron monitor — Job ID 369099, pass 25 — OUTAGE #5 documented per trigger (b))
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 25, 07:16 +08); resolve Task 69 watch item 1. Full analysis per trigger (b). No engine changes.
+
+Work Log:
+- Read worklog tail: anchor = Task 69, window 148-347; watch item 1 pending resolution.
+- Watch item 1 RESOLVED -> became OUTAGE #5: the 07:01 8.3-min silence was a stall start. Gap measured #347 (06:53:0x +08) -> #348 (07:14:0x +08) = 20.8 min. Feed recovered before this pass: 4 new rounds 348-351 ingested, newest age 0.3 min. IDs contiguous, zero data loss. Gap auto-memorized as anchor known_gaps [347,348]; repeat escalation suppressed.
+- Lifetime outage ledger now 5: 75->76 (31.6m), 227->228 (25.2m), 271->272 (16.0m), 306->307 (25.5m), 347->348 (20.8m). Lifetime unobserved est. ~66-84 rounds. Coverage documentation case strengthens further.
+- Window: base 129/200 = 64.5%, exp 128/200 = 64.0% — delta HOLDS at -1 hit (-0.50pp), FOURTH consecutive window (new 4 rounds symmetric: both +3).
+- theo 168/200 = 84.0% — SECOND CONSECUTIVE RECORD (83.5% -> 84.0%). Floor leads both models by 19.5pp.
+- Agreement streak 115 (last flip still #236). 4/4 new rounds agreed: '2'x2 hit, '1'x1 miss (both — calibration exposure again), PACHINKO hit (bonus).
+- Panel cross-check: exact match (200 paired, 65%/64%, theo 84% (168/200)); normal/bonus base 106/168 vs exp 108/168 normal, base 23/32 vs exp 20/32 bonus — +2 normal / -3 bonus signature now FIVE consecutive windows; the most stable structural signature of the validation.
+- Engine freeze: git verified — zero engine diffs.
+
+Metrics (FIFO window n=200, IDs 152-351, clean 200):
+1. Paired rounds: 200 (fully clean; 6th consecutive clean window)
+2. Baseline HIT: 129/200 = 64.5%
+3. Experimental HIT: 128/200 = 64.0%
+4. Delta: -1 hit (-0.50pp), unchanged fourth window (FIFO composition artifact)
+5. MISS->HIT flips: window 3 (#163, #164, #178); lifetime 7
+6. HIT->MISS flips: window 4 verified (#161, #188, #200, #236); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 168/200 = 84.0% (record high, 2nd consecutive)
+8. MISS RCA: lifetime 15, unchanged (zero new flips)
+- McNemar: window 3v4 p=1.000; lifetime verified 7v5 p=0.774; raw 7v8 p=1.000
+- Feed/quality: outage #5 gap flagged by analyzer and resolved via documentation; no degraded rows; cadence normal post-recovery (16s newest age).
+
+Stage Summary:
+- OUTAGE #5 (20.8 min) documented and memorized — monitoring duty complete; no data lost; analyzer gap-memory chain intact across all 5 outages.
+- Validation metrics unchanged in character: equivalence intact (streak 115, McNemar n.s. everywhere), delta artifact stable at -1, floor compounding to consecutive records (84.0%).
+- The +2 normal / -3 bonus per-window signature (5 windows) remains the only persistent structural A/B difference; still noise-range (3-4 rounds); watch-only.
+- Protocol continues: metrics-only; triggers re-armed. Engine untouched.
