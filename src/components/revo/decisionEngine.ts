@@ -120,6 +120,70 @@ export const THEORETICAL: Record<string, number> = {
 export const BONUS_NAMES = ["PACHINKO", "COIN FLIP", "CASH HUNT", "CRAZY TIME"];
 
 // ============================================================
+// RARE-OUTCOME EVIDENCE RELIABILITY LAYER (EXPERIMENTAL)
+// ============================================================
+// Frozen baseline: k=30, evidence 50% / prior 50%, live/user 70/30,
+// 70-combination optimizer ACTIVE, persistence penalty ACTIVE.
+//
+// ROOT CAUSE (from 50-round fresh k=30 validation, 39/50 = 78% HIT):
+// 7 of 11 misses involved a rare outcome (PACHINKO) DISPLACING a
+// higher-prior number outcome. PACHINKO appeared 3× in 50 rounds
+// (theoretical 3.7%, expected ~1.85). That small sample generated a
+// +39% relative deviation which — via evidenceScore = 1 + dev — was
+// enough to overcome the 24% prior advantage of "2". PACHINKO was
+// included in Top-4 36/50 times but only 3 actual PACHINKO rounds
+// occurred → 33 wasted inclusions, 7 of which directly caused misses.
+//
+// FIX (do NOT ban PACHINKO, do NOT force [1,2,5,10], do NOT hardcode
+// any outcome, do NOT create a permanent slot):
+//
+// Add a continuous, generic, sample-size RELIABILITY factor that
+// dampens the POSITIVE deviation of ANY outcome whose evidence rests
+// on a small number of independent observations. Negative deviations
+// (outcome appeared less than expected) pass through unchanged so we
+// never inflate a rare outcome that hasn't appeared.
+//
+//   reliability = effectiveSampleSize / (effectiveSampleSize + RELIABILITY_K)
+//
+// where effectiveSampleSize = combined observed count for this outcome
+// (user rounds + live spins). The function is:
+//   - continuous (no hard cutoff)        ✓
+//   - monotonic increasing in evidence    ✓
+//   - converges to 1 as evidence grows    ✓
+//   - generic — applies to ALL outcomes  ✓ (rare ones naturally have
+//     fewer observations → lower reliability, no hardcoding)
+//
+// RELIABILITY_K = 10. Calibration:
+//   count=3  → r=0.23  (PACHINKO +39% → +9% — no longer displaces "2")
+//   count=5  → r=0.33  (PACHINKO +106% → +35% — can still displace when
+//                       deviation is genuinely large)
+//   count=8  → r=0.44  (PACHINKO +200% → +89% — strong signal passes)
+//   count=20 → r=0.67  (common outcomes barely affected — their
+//                       deviations are small anyway)
+//
+// IMPORTANT PRINCIPLE:
+//   Evidence answers "Is there enough independent/repeated evidence to
+//   justify displacing a higher-prior outcome?" — NOT "Has this rare
+//   outcome appeared recently?". No simple recency chasing.
+export type EngineMode = "baseline" | "experimental";
+
+export const RELIABILITY_K = 10;
+
+export const EXPERIMENTAL_CONFIG = {
+  // Sample-size reliability softness constant.
+  // reliability = effectiveSampleSize / (effectiveSampleSize + RELIABILITY_K)
+  reliabilityK: RELIABILITY_K,
+  // Reliability is applied ONLY to the POSITIVE portion of the deviation.
+  // Negative deviations (under-appearing outcomes) pass through unchanged
+  // so we never inflate a rare outcome that has not appeared.
+  applyToPositiveDeviationOnly: true,
+  // Frozen baseline weights (UNCHANGED — for A/B parity):
+  shrinkageK: 30,
+  evidenceWeight: 0.50,
+  priorWeight: 0.50,
+} as const;
+
+// ============================================================
 // ROUND MODEL
 // ============================================================
 export interface RoundResult {
@@ -172,6 +236,11 @@ export interface CandidateScore {
   stabilizedDeviation: number; // sample-size-stabilized relative deviation
   calibratedProbability?: number; // normalized probability (sum to 1)
   logEvidence?: number;       // log(posterior / prior) — log-scaled evidence
+  // ===== EXPERIMENTAL: rare-outcome evidence reliability layer =====
+  engineMode?: EngineMode;      // "baseline" | "experimental"
+  effectiveSampleSize?: number; // combined observed count (user + live) for this outcome
+  reliability?: number;        // sample-size reliability factor (0..1), continuous
+  reliableDeviation?: number;  // cappedDeviation dampened by reliability (pos only)
 }
 
 // ============================================================
@@ -1019,6 +1088,7 @@ function scoreCandidates(
   prevPredNames: string[],
   lastHit: boolean | null,
   liveSpins: SpinData[] = [],
+  mode: EngineMode = "baseline",
 ): CandidateScore[] {
   // Get adaptive signal weights (learn from HIT/MISS history)
   const sigWeights = dashboard.signalWeights ?? {};
@@ -1259,6 +1329,48 @@ function scoreCandidates(
     // Cap stabilized deviation to prevent extreme swings: [-0.6, +2.0]
     const cappedDeviation = Math.max(-0.6, Math.min(2.0, stabilizedDeviation));
 
+    // ===== EXPERIMENTAL: RARE-OUTCOME EVIDENCE RELIABILITY LAYER =====
+    // (ACTIVE only in mode === "experimental"; baseline passes through unchanged)
+    //
+    // A small sample of rare-outcome appearances (e.g. PACHINKO 3× in 50
+    // rounds) can generate a large RELATIVE deviation (+39%) that, via
+    // evidenceScore = 1 + dev, displaces a substantially higher-prior
+    // number outcome. This is statistically unsound: the relative
+    // deviation of a rare outcome has much higher variance per observation
+    // than a common outcome, so the same count implies far less confidence.
+    //
+    // Reliability factor (continuous, generic, NO hard cutoff):
+    //   reliability = effectiveSampleSize / (effectiveSampleSize + RELIABILITY_K)
+    //
+    //   effectiveSampleSize = combinedCount (user rounds + live spins that
+    //   landed on this outcome — the independent observations supporting
+    //   THIS outcome's deviation estimate).
+    //
+    // Applied ONLY to the POSITIVE portion of the deviation:
+    //   - Positive dev (outcome appeared MORE than prior) → dampened by
+    //     reliability. A rare outcome needs many independent observations
+    //     before its positive evidence can dominate a high-prior outcome.
+    //   - Negative dev (outcome appeared LESS than prior) → passes through
+    //     UNCHANGED. We must NOT inflate a rare outcome that hasn't
+    //     appeared (that would push never-seen rare outcomes INTO Top-4,
+    //     the opposite of the goal). The prior term already keeps them low.
+    //
+    // This is NOT recency chasing: a single recent appearance does not
+    // move reliability much (count 0→1: r 0→0.09). Genuine repeated
+    // evidence accumulates count → reliability rises → evidence reaches
+    // full strength. A rare outcome with 8+ appearances CAN still enter.
+    const experimentalActive = mode === "experimental";
+    const effectiveSampleSize = combinedCount; // independent observations
+    const reliability = experimentalActive
+      ? effectiveSampleSize / (effectiveSampleSize + RELIABILITY_K)
+      : 1.0; // baseline: full strength (no reliability discount)
+    // Dampen positive deviation only; keep negative deviation as-is.
+    const reliableDeviation = experimentalActive
+      ? (cappedDeviation > 0
+          ? cappedDeviation * reliability
+          : cappedDeviation)
+      : cappedDeviation; // baseline: identity
+
     // ===== BASE SCORE — BALANCED EVIDENCE + PRIOR =====
     // CRITICAL FIX: The previous 85% evidence / 15% prior ratio allowed rare
     // outcomes (CRAZY TIME 1.85%) to displace common outcomes ("1" 38.89%)
@@ -1285,7 +1397,12 @@ function scoreCandidates(
     //     evidence=3.21, score=3.21*0.50+0.0185*0.50=1.614
     //   "1" appearing 12× in 30: score=0.702
     //   → CRAZY TIME (1.614) > "1" (0.702) — rare outcome CAN enter when justified ✓
-    const evidenceScore = 1 + cappedDeviation;
+    //
+    // EXPERIMENTAL mode: evidenceScore uses reliableDeviation (positive dev
+    // dampened by sample-size reliability). Baseline mode: reliableDeviation
+    // === cappedDeviation (identity), so behavior is BIT-FOR-BIT identical
+    // to the frozen k=30 baseline. This guarantees a clean A/B comparison.
+    const evidenceScore = 1 + reliableDeviation;
     let score = evidenceScore * 0.50 + theo * 0.50;
     if (sampleN === 0) score = theo; // no data at all → pure theoretical
 
@@ -1495,6 +1612,11 @@ function scoreCandidates(
       smoothedFrequency: smoothedFreq,
       rawDeviation,
       stabilizedDeviation,
+      // EXPERIMENTAL reliability layer:
+      engineMode: mode,
+      effectiveSampleSize,
+      reliability,
+      reliableDeviation,
     });
   }
 
@@ -1738,6 +1860,7 @@ export function runEngine(
   recalibrated = false,
   recalibrationReason = "",
   liveSpins: SpinData[] = [],
+  mode: EngineMode = "baseline",
 ): EngineOutput {
   const dashboard = buildDashboard(rounds, liveSpins);
   const anomaly = detectAnomaly(rounds);
@@ -1776,7 +1899,7 @@ export function runEngine(
 
   // Score all 8 candidates using the multi-signal evidence engine.
   // Pass REAL casino spins so the prior reflects actual observed frequency.
-  const candidates = scoreCandidates(rounds, dashboard, prevPredNames, lastHit, liveSpins);
+  const candidates = scoreCandidates(rounds, dashboard, prevPredNames, lastHit, liveSpins, mode);
 
   // ===== EVIDENCE-RANKED TOP-4 SELECTION (pure, no fixed slots) =====
   // Rank ALL 8 candidates by their complete AI evidence score (no fixed top-2,
@@ -1932,20 +2055,196 @@ export function runEngine(
  * It re-scores candidates using the FULL history (including the MISS just
  * recorded) and returns a fresh prediction set + dashboard.
  */
-export function recalibrate(rounds: RoundResult[], reason: string, liveSpins: SpinData[] = []): EngineOutput {
+export function recalibrate(rounds: RoundResult[], reason: string, liveSpins: SpinData[] = [], mode: EngineMode = "baseline"): EngineOutput {
   const last = rounds[rounds.length - 1];
   const prevPredNames = last ? last.prediction.map((p) => p.game.name) : [];
   const lastHit = last ? last.hit : null;
-  return runEngine(rounds, prevPredNames, lastHit, true, reason, liveSpins);
+  return runEngine(rounds, prevPredNames, lastHit, true, reason, liveSpins, mode);
 }
 
 /**
  * Build the INITIAL engine output (no verified rounds yet, or after a HIT).
  * Used for GET SIGNAL. Pass REAL casino spins to drive data-driven predictions.
  */
-export function buildInitial(rounds: RoundResult[], liveSpins: SpinData[] = []): EngineOutput {
+export function buildInitial(rounds: RoundResult[], liveSpins: SpinData[] = [], mode: EngineMode = "baseline"): EngineOutput {
   const last = rounds[rounds.length - 1];
   const prevPredNames = last ? last.prediction.map((p) => p.game.name) : [];
   const lastHit = last ? last.hit : null;
-  return runEngine(rounds, prevPredNames, lastHit, false, "", liveSpins);
+  return runEngine(rounds, prevPredNames, lastHit, false, "", liveSpins, mode);
+}
+
+// ============================================================
+// RETROSPECTIVE DIAGNOSTIC — replay a result sequence in BOTH modes
+// ============================================================
+/**
+ * Replays a sequence of actual result names through the engine in BOTH
+ * baseline and experimental modes, round-by-round, with NO data leakage
+ * (each prediction is computed from the history BEFORE that round's result).
+ *
+ * IMPORTANT: This is a RETROSPECTIVE / SIMULATION diagnostic ONLY.
+ *   - Do NOT call the result a "new validation".
+ *   - Do NOT claim improved accuracy from this test.
+ *   - It estimates DIRECTION and MAGNITUDE of the reliability layer's effect.
+ *   - Genuine validation requires fresh out-of-sample rounds (live A/B).
+ *
+ * @param actualNames  Sequence of actual result names (oldest→newest).
+ * @param liveSpins    Real casino spins (shared prior for both modes).
+ * @returns Per-mode hit/miss, per-outcome inclusion counts, PACHINKO
+ *          inclusion/coverage, 1/2/5/10 exclusion rates, and the rounds
+ *          where experimental flipped a baseline MISS into a HIT (or vice
+ *          versa).
+ */
+export interface RetroOutcomeStat {
+  name: string;
+  inclusions: number;     // rounds where this outcome was in Top-4
+  actuals: number;        // rounds where this was the actual result
+  coveredActuals: number; // actuals that were in Top-4 (covered)
+}
+export interface RetroModeResult {
+  mode: EngineMode;
+  hits: number;
+  misses: number;
+  hitRate: number;          // 0..1
+  totalRounds: number;
+  perOutcome: RetroOutcomeStat[];
+  pachinkoInclusions: number;
+  pachinkoActuals: number;
+  pachinkoCoveredActuals: number;
+  exclusionRates: Record<string, number>; // for 1/2/5/10: fraction of rounds excluded
+  rounds: Array<{
+    idx: number;
+    actual: string;
+    preds: string[];
+    hit: boolean;
+  }>;
+}
+export interface RetroDiagnostic {
+  baseline: RetroModeResult;
+  experimental: RetroModeResult;
+  flipsToHit: number;     // baseline MISS → experimental HIT
+  flipsToMiss: number;    // baseline HIT → experimental MISS
+  pachinkoInclusionsRemoved: number;
+  pachinkoActualsRetained: number; // experimental still covered actual PACHINKO rounds
+  exclusionPrevented: Record<string, number>; // for 1/2/5/10: rounds experimental kept it in Top-4 when baseline excluded
+  note: string;
+}
+
+function gameByName(name: string): GameModel {
+  return GAMES.find((g) => g.name === name) ?? GAMES[0];
+}
+
+export function runRetrospectiveDiagnostic(
+  actualNames: string[],
+  liveSpins: SpinData[] = [],
+): RetroDiagnostic {
+  const runMode = (mode: EngineMode): RetroModeResult => {
+    const rounds: RoundResult[] = [];
+    const perOutcomeMap = new Map<string, RetroOutcomeStat>();
+    for (const g of GAMES) perOutcomeMap.set(g.name, { name: g.name, inclusions: 0, actuals: 0, coveredActuals: 0 });
+    const roundLog: RetroModeResult["rounds"] = [];
+    let hits = 0;
+    let misses = 0;
+    let pachinkoInclusions = 0;
+    let pachinkoActuals = 0;
+    let pachinkoCoveredActuals = 0;
+    const exclusionCounts: Record<string, number> = { "1": 0, "2": 0, "5": 0, "10": 0 };
+
+    for (let i = 0; i < actualNames.length; i++) {
+      const actualName = actualNames[i];
+      const actualGame = gameByName(actualName);
+      // Build the prediction from history BEFORE this round (no leakage).
+      const prevPredNames = rounds.length > 0
+        ? rounds[rounds.length - 1].prediction.map((p) => p.game.name)
+        : [];
+      const lastHit = rounds.length > 0 ? rounds[rounds.length - 1].hit : null;
+      const eng = runEngine(rounds, prevPredNames, lastHit, false, "", liveSpins, mode);
+      const preds = eng.predictions.map((p) => p.game);
+      const predNames = preds.map((p) => p.name);
+      const hit = predNames.includes(actualName);
+      // Record inclusion stats for THIS prediction set.
+      for (const name of predNames) {
+        const st = perOutcomeMap.get(name);
+        if (st) st.inclusions++;
+      }
+      if (predNames.includes("PACHINKO")) pachinkoInclusions++;
+      for (const num of ["1", "2", "5", "10"]) {
+        if (!predNames.includes(num)) exclusionCounts[num]++;
+      }
+      // Settle.
+      const round: RoundResult = {
+        prediction: preds.map((g, idx) => ({ game: g, confidence: 50, time: Date.now() + i, rank: idx + 1 })),
+        actualResult: actualGame,
+        hit,
+        time: Date.now() + i,
+        confidence: 50,
+        recalibrated: false,
+      };
+      rounds.push(round);
+      if (hit) hits++; else misses++;
+      // Track actuals + coverage.
+      const st = perOutcomeMap.get(actualName);
+      if (st) {
+        st.actuals++;
+        if (hit) st.coveredActuals++;
+      }
+      if (actualName === "PACHINKO") {
+        pachinkoActuals++;
+        if (hit) pachinkoCoveredActuals++;
+      }
+      roundLog.push({ idx: i + 1, actual: actualName, preds: predNames, hit });
+    }
+
+    const perOutcome = GAMES.map((g) => perOutcomeMap.get(g.name)!);
+    const totalRounds = actualNames.length;
+    const exclusionRates: Record<string, number> = {};
+    for (const num of ["1", "2", "5", "10"]) {
+      exclusionRates[num] = totalRounds > 0 ? exclusionCounts[num] / totalRounds : 0;
+    }
+    return {
+      mode,
+      hits,
+      misses,
+      hitRate: totalRounds > 0 ? hits / totalRounds : 0,
+      totalRounds,
+      perOutcome,
+      pachinkoInclusions,
+      pachinkoActuals,
+      pachinkoCoveredActuals,
+      exclusionRates,
+      rounds: roundLog,
+    };
+  };
+
+  const baseline = runMode("baseline");
+  const experimental = runMode("experimental");
+
+  // Compare round-by-round.
+  let flipsToHit = 0;
+  let flipsToMiss = 0;
+  let pachinkoActualsRetained = 0;
+  const exclusionPrevented: Record<string, number> = { "1": 0, "2": 0, "5": 0, "10": 0 };
+  const minLen = Math.min(baseline.rounds.length, experimental.rounds.length);
+  for (let i = 0; i < minLen; i++) {
+    const b = baseline.rounds[i];
+    const e = experimental.rounds[i];
+    if (!b.hit && e.hit) flipsToHit++;
+    if (b.hit && !e.hit) flipsToMiss++;
+    // PACHINKO actuals retained by experimental
+    if (b.actual === "PACHINKO" && e.hit) pachinkoActualsRetained++;
+    // Exclusion prevented: baseline excluded num, experimental included it.
+    for (const num of ["1", "2", "5", "10"]) {
+      if (!b.preds.includes(num) && e.preds.includes(num)) exclusionPrevented[num]++;
+    }
+  }
+
+  return {
+    baseline,
+    experimental,
+    flipsToHit,
+    flipsToMiss,
+    pachinkoInclusionsRemoved: baseline.pachinkoInclusions - experimental.pachinkoInclusions,
+    pachinkoActualsRetained,
+    exclusionPrevented,
+    note: "RETROSPECTIVE SIMULATION — estimates direction/magnitude only. NOT a validation result. Genuine validation requires fresh out-of-sample live A/B rounds.",
+  };
 }
