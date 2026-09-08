@@ -2619,3 +2619,39 @@ Stage Summary:
 - 74 rounds banked (~61 min); data pipeline CLEAN for the first time (tab-reuse: 0 new degraded rows); engine untouched (no code diffs; no reload performed).
 - Leaderboard frozen since pass 4: raw base −1.4pp (artifact-inflated), verified exp +2.9pp (stable), theo floor 75.7% still leads as window rebalances toward bonuses.
 - Validation continues toward 100+; next pass should also reuse the tab (reload ONLY if tab lost) and keep degraded-row sensitivity in the report.
+
+---
+Task ID: 50 (cron monitor — Job ID 369099, pass 6 — FEED OUTAGE DIAGNOSED)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 6). 8-metric extraction + preliminary-analysis update. No code changes.
+
+Work Log:
+- Read worklog: pass 5 (Task 49) ended at n=74; tab-reuse methodology adopted.
+- Tab reuse: NO reload performed (tab still alive). Ledger read: n=74 — UNCHANGED from pass 5 despite 15 min elapsed (76 min total).
+- ANOMALY INVESTIGATED (zero new rounds in 15 min vs ~42s/round cadence):
+  * Page health: visibility=visible, hasFocus=true, ZERO console errors → NOT background-throttling, NOT a page bug.
+  * Polling alive: /api/crazy-time firing every ~1.5s, all HTTP 200 (dev.log confirms, ~15-25ms render times).
+  * ROOT CAUSE: the API response body is an EMPTY ARRAY ([]). Upstream live-feed source has produced ZERO events since ~01:53 +08 (last settled round #75, age 23+ min at check time). External data outage — app and validation pipeline are victims, not causes.
+  * Impact: validation PAUSED (not corrupted). Empty responses cannot create degraded rows. Dedup-by-timestamp prevents recovery dupes.
+- 8-metric snapshot (unchanged from pass 5 — no new rounds to settle):
+  1. Paired rounds: 74 (IDs 2-75)
+  2. Baseline HIT: 50/74 = 67.6%
+  3. Experimental HIT: 49/74 = 66.2%
+  4. Delta: −1 hit (−1.4pp) raw
+  5. MISS→HIT: 3 (#4, #8, #22)
+  6. HIT→MISS: 4 (#12 verified; #24/#45/#67 degraded)
+  7. Theoretical [1,2,5,10]: 56/74 = 75.7%
+  8. MISS RCA: 7 entries (3 displacement saves, 1 dampening loss, 3 degraded)
+- Verified-only (n=70): base 67.1% vs exp 70.0%, Δ +2 hits (+2.9pp) — all standing numbers from Task 48/49 analysis remain the latest word; nothing new to analyze this pass.
+
+Operational guidance logged for future passes (methodology, not code):
+1. FEED-RECOVERY CHECK FIRST: before ledger reads, curl /api/crazy-time?type=recent&size=3 — if still [], report outage and exit early (saves agent-browser work).
+2. EXPECTED ROUND-ID GAP AFTER RECOVERY: ledger IDs will jump at the outage boundary (75 → feed's current event number). This gap is ANTICIPATED and BENIGN — future contiguity checks must treat the outage-boundary jump as expected, not as a data-integrity failure. All integrity invariants (no dupes, ts ascending, no leakage) remain enforceable.
+3. Outage window (~01:53-? +08) should be annotated in any final analysis: rounds during outage are permanently missing from the sample — a coverage gap, not a bias mechanism (feed outage is orthogonal to outcome types).
+4. Tab-reuse continues; reload only if tab lost.
+
+Stage Summary:
+- Validation healthy but PAUSED by external upstream feed outage (zero events since ~01:53 +08); 74 rounds safely banked; zero data corruption risk from the outage itself.
+- First zero-defect diagnosis pass: tab-reuse (no reload) + upstream-vs-app fault isolation confirmed the outage is external.
+- Standing analysis unchanged: verified exp +2.9pp, raw −1.4pp (artifact), theo floor 75.7%; significance still pending (discordant pairs frozen at 7 raw / 4 verified).
+- Next pass: feed-recovery probe first; expect ID gap at recovery boundary; resume analysis updates only when new rounds land.
