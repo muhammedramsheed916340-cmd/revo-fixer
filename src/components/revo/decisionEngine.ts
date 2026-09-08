@@ -1233,7 +1233,7 @@ function scoreCandidates(
     //
     // This ensures rare outcomes need substantially more observations before
     // they can displace high-prior common outcomes like "1" (38.89%) or "2" (24.07%).
-    const SHRINKAGE_K = 40;
+    const SHRINKAGE_K = 30;
 
     // Compute observed count and total N for this outcome.
     // Use the larger of (user rounds, live spins) as the sample.
