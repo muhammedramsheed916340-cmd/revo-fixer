@@ -14,7 +14,6 @@ import {
   WHEEL_SEGMENTS,
   WHEEL_TOTAL_SEGMENTS,
   THEORETICAL,
-  BONUS_NAMES,
   EXPERIMENTAL_CONFIG,
   buildInitial,
   recalibrate,
@@ -162,6 +161,11 @@ const EMPTY_SPINS: import("./aiStats").SpinData[] = [];
 let cachedRounds: RoundResult[] | undefined;
 let cachedRoundsRaw = "";
 
+// Module-level store for the experimental engine's currently-LOCKED prediction
+// names (the shadow A/B mirror of the baseline locked prediction). Written by
+// generatePrediction + selectActualResult, read at settlement time. Not reactive.
+let expLockedNames: string[] = [];
+
 function readRoundHistory(): RoundResult[] {
   if (typeof window === "undefined") return EMPTY_ROUNDS;
   try {
@@ -273,15 +277,28 @@ interface ShadowRow {
   expHit: boolean;
 }
 
+const EMPTY_SHADOW: ShadowRow[] = [];
+let cachedShadow: ShadowRow[] | undefined;
+let cachedShadowRaw = "";
+
 function readShadowLedger(): ShadowRow[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined") return EMPTY_SHADOW;
   try {
     const raw = localStorage.getItem(SHADOW_KEY) ?? "";
-    if (!raw) return [];
+    if (raw === cachedShadowRaw && cachedShadow !== undefined) {
+      return cachedShadow;
+    }
+    cachedShadowRaw = raw;
+    if (!raw) {
+      cachedShadow = EMPTY_SHADOW;
+      return EMPTY_SHADOW;
+    }
     const data = JSON.parse(raw);
-    return Array.isArray(data) ? (data as ShadowRow[]) : [];
+    cachedShadow = Array.isArray(data) ? (data as ShadowRow[]) : EMPTY_SHADOW;
+    return cachedShadow;
   } catch {
-    return [];
+    cachedShadow = EMPTY_SHADOW;
+    return EMPTY_SHADOW;
   }
 }
 
@@ -291,11 +308,15 @@ function writeShadowLedger(rows: ShadowRow[]) {
   } catch {
     /* ignore */
   }
+  cachedShadowRaw = ""; // invalidate cache
+  notifyShadowListeners();
 }
 
 function clearShadowLedger() {
   try {
     localStorage.removeItem(SHADOW_KEY);
+    cachedShadowRaw = ""; // invalidate cache
+    notifyShadowListeners();
   } catch {
     /* ignore */
   }
@@ -316,6 +337,38 @@ function writeExpFlag(on: boolean) {
   } catch {
     /* ignore */
   }
+}
+
+// Subscribers for the feature flag (useSyncExternalStore pattern).
+const expFlagListeners = new Set<() => void>();
+function subscribeExpFlag(cb: () => void): () => void {
+  expFlagListeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === EXP_FLAG_KEY) cb();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    expFlagListeners.delete(cb);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+// Subscribers for the shadow ledger.
+const shadowListeners = new Set<() => void>();
+function subscribeShadow(cb: () => void): () => void {
+  shadowListeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === SHADOW_KEY) cb();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    shadowListeners.delete(cb);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+function notifyShadowListeners() {
+  shadowListeners.forEach((l) => l());
 }
 
 // Representative synthetic 50-round sequence matching the reported fresh
@@ -467,7 +520,7 @@ export function RevoGame() {
     });
     // SHADOW: seed the experimental engine's locked prediction (same history).
     const expEng = buildInitial(allRounds, spins, "experimental");
-    expLockedPredsRef.current = expEng.predictions.map((p) => p.game.name);
+    expLockedNames = expEng.predictions.map((p) => p.game.name);
   }, []);
 
   // AUTO-GENERATE on mount ONLY (no countdown refresh)
@@ -500,34 +553,30 @@ export function RevoGame() {
   // prediction is locked at the same moment as baseline, settled against
   // the same actual, and recorded in `shadowLedger`. The ACTIVE displayed
   // prediction remains the frozen k=30 baseline (unchanged behavior).
-  const [experimentalEnabled, setExperimentalEnabled] = useState(false);
-  const [shadowLedger, setShadowLedger] = useState<ShadowRow[]>([]);
-  // The experimental engine's currently-LOCKED prediction names (mirror of
-  // the baseline `predictions` but computed in experimental mode). Regenerated
-  // alongside baseline after each settlement.
-  const expLockedPredsRef = useRef<string[]>([]);
+  const experimentalEnabled = useSyncExternalStore(
+    subscribeExpFlag,
+    readExpFlag,
+    () => false, // server snapshot
+  );
+  const shadowLedger = useSyncExternalStore(
+    subscribeShadow,
+    readShadowLedger,
+    () => EMPTY_SHADOW, // server snapshot — stable constant
+  );
   // Retrospective diagnostic result (computed on demand).
   const [retroResult, setRetroResult] = useState<RetroDiagnostic | null>(null);
   const [retroSource, setRetroSource] = useState<"live" | "synthetic" | null>(null);
 
-  // Hydration-safe load of the feature flag + persisted shadow ledger.
-  useEffect(() => {
-    setExperimentalEnabled(readExpFlag());
-    setShadowLedger(readShadowLedger());
-  }, []);
-
   const toggleExperimental = useCallback(() => {
-    setExperimentalEnabled((prev) => {
-      const next = !prev;
-      writeExpFlag(next);
-      // When enabling, seed the experimental locked prediction from the
-      // current baseline prediction set so the shadow has a starting point.
-      if (next) {
-        const cur = predictions ?? savedSignals ?? [];
-        expLockedPredsRef.current = cur.map((p) => p.game.name);
-      }
-      return next;
-    });
+    const next = !readExpFlag();
+    writeExpFlag(next);
+    expFlagListeners.forEach((l) => l());
+    // When enabling, seed the experimental locked prediction from the
+    // current baseline prediction set so the shadow has a starting point.
+    if (next) {
+      const cur = predictions ?? savedSignals ?? [];
+      expLockedNames = cur.map((p) => p.game.name);
+    }
   }, [predictions, savedSignals]);
 
   // ============================================================
@@ -562,7 +611,7 @@ export function RevoGame() {
         saveSignals(preds);
         // SHADOW: seed experimental locked prediction too.
         const expEng0 = buildInitial(allRounds, spins, "experimental");
-        expLockedPredsRef.current = expEng0.predictions.map((p) => p.game.name);
+        expLockedNames = expEng0.predictions.map((p) => p.game.name);
         return;
       }
 
@@ -575,7 +624,8 @@ export function RevoGame() {
       const hit = currentPreds.some((p) => p.game.name === game.name);
       // SHADOW: settle the experimental locked prediction against the SAME
       // actual result (both computed from the same pre-result history).
-      const expLockedNames = expLockedPredsRef.current;
+      // `expLockedNames` is the module-level mirror of the experimental
+      // engine's currently-locked prediction names.
       const expHit = experimentalEnabled && expLockedNames.length > 0
         ? expLockedNames.includes(game.name)
         : false;
@@ -651,7 +701,7 @@ export function RevoGame() {
           ? recalibrate(updated, "Shadow recalibration (experimental mode)", spins, "experimental")
           : buildInitial(updated, spins, "experimental");
         const expNextNames = expEng.predictions.map((p) => p.game.name);
-        expLockedPredsRef.current = expNextNames;
+        expLockedNames = expNextNames;
         const row: ShadowRow = {
           ts: Date.now(),
           actual: game.name,
@@ -660,11 +710,9 @@ export function RevoGame() {
           expPreds: expLockedNames,
           expHit,
         };
-        setShadowLedger((prev) => {
-          const next = [...prev, row];
-          writeShadowLedger(next);
-          return next.slice(-200);
-        });
+        // Append to shadow ledger (useSyncExternalStore notifies subscribers).
+        const prevLedger = readShadowLedger();
+        writeShadowLedger([...prevLedger, row].slice(-200));
       }
     },
     [predictions, savedSignals, lastRecalibration, experimentalEnabled],
@@ -727,7 +775,6 @@ export function RevoGame() {
 
   const clearShadow = useCallback(() => {
     clearShadowLedger();
-    setShadowLedger([]);
   }, []);
 
   // NOTE: NO auto-refresh countdown. Prediction is LOCKED until next live result.
@@ -1256,6 +1303,302 @@ export function RevoGame() {
 
         {/* ===== PERFORMANCE DASHBOARD (NEW — unified engine data) ===== */}
         <PerformanceDashboardPanel dashboard={view.dashboard} roundHistory={roundHistory} />
+        {/* ===== SHADOW A/B: baseline (frozen k=30) vs experimental (reliability layer) ===== */}
+        <div className="mt-4 rounded-lg border-2 border-[#a855f7]/30 bg-[#0d1020]/60 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#a855f7]">
+              <i className="fas fa-flask-vial" /> Shadow A/B — Rare-Outcome Reliability Layer
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-[#1e2240] px-2 py-0.5 text-[9px] font-bold uppercase text-[#8899cc]">
+                RELIABILITY_K = {EXPERIMENTAL_CONFIG.reliabilityK}
+              </span>
+              <button
+                type="button"
+                onClick={toggleExperimental}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase transition-colors ${
+                  experimentalEnabled
+                    ? "bg-[#2ed573]/20 text-[#2ed573] hover:bg-[#2ed573]/30"
+                    : "bg-[#1e2240] text-[#8899cc] hover:bg-[#2a2f4d]"
+                }`}
+                aria-pressed={experimentalEnabled}
+              >
+                <span className={`inline-block h-2 w-2 rounded-full ${experimentalEnabled ? "bg-[#2ed573]" : "bg-[#5a6a99]"}`} />
+                {experimentalEnabled ? "EXPERIMENTAL SHADOW ON" : "SHADOW OFF"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-2 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-2 text-[9px] leading-relaxed text-[#8899cc]">
+            <b className="text-[#a855f7]">Root cause (50-round k=30 validation, 78% HIT):</b> 7 of 11 misses
+            involved PACHINKO (3 appearances → +39% deviation) displacing a higher-prior number.
+            Fix: a <b>continuous, generic</b> reliability factor
+            <code className="mx-1 rounded bg-[#0d1020] px-1 text-[#00d4ff]">r = N_obs / (N_obs + {EXPERIMENTAL_CONFIG.reliabilityK})</code>
+            dampens the <b>positive</b> deviation of any outcome resting on few observations.
+            Negative deviations pass through (never inflate unseen rare outcomes). NO hard cutoff,
+            NO PACHINKO ban, NO forced [1,2,5,10]. The active displayed prediction stays the frozen
+            k=30 <b>baseline</b>; experimental runs in <b>shadow</b> on the SAME live rounds.
+          </div>
+
+          {!experimentalEnabled ? (
+            <div className="py-4 text-center text-xs text-[#5a6a99]">
+              <i className="fas fa-toggle-off mb-1 text-xl text-[#5a6a99]" />
+              <div>Shadow A/B is OFF. Enable to run the experimental engine in parallel.</div>
+              <div className="text-[9px] mt-1">Baseline (frozen k=30) remains the active prediction either way.</div>
+            </div>
+          ) : (
+            <>
+              {/* Paired comparison KPIs */}
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-lg font-black text-white">{shadowStats.total}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Paired Rounds</div>
+                </div>
+                <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-2 text-center">
+                  <div className="text-lg font-black text-[#00d4ff]">{Math.round(shadowStats.bRate * 100)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline HIT ({shadowStats.bHits})</div>
+                </div>
+                <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/8 p-2 text-center">
+                  <div className="text-lg font-black text-[#a855f7]">{Math.round(shadowStats.eRate * 100)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental HIT ({shadowStats.eHits})</div>
+                </div>
+                <div className={`rounded border p-2 text-center ${shadowStats.delta >= 0 ? "border-[#2ed573]/30 bg-[#2ed573]/8" : "border-[#ff4757]/30 bg-[#ff4757]/8"}`}>
+                  <div className={`text-lg font-black ${shadowStats.delta >= 0 ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
+                    {shadowStats.delta >= 0 ? "+" : ""}{Math.round(shadowStats.delta * 100)}%
+                  </div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Δ (exp − base)</div>
+                </div>
+              </div>
+
+              {/* Flips */}
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <div className="rounded border border-[#2ed573]/30 bg-[#2ed573]/8 p-2 text-center">
+                  <div className="text-sm font-black text-[#2ed573]">{shadowStats.flipsToHit}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">MISS→HIT (experimental saved)</div>
+                </div>
+                <div className="rounded border border-[#ff4757]/30 bg-[#ff4757]/8 p-2 text-center">
+                  <div className="text-sm font-black text-[#ff4757]">{shadowStats.flipsToMiss}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">HIT→MISS (experimental lost)</div>
+                </div>
+              </div>
+
+              {/* Per-outcome inclusion table */}
+              <div className="mb-3 overflow-x-auto rounded border border-[#1e2240]">
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="bg-[#1e2240] text-[#5a6a99]">
+                      <th className="px-2 py-1 text-left">Outcome</th>
+                      <th className="px-2 py-1 text-right">Actuals</th>
+                      <th className="px-2 py-1 text-right">Base Inc</th>
+                      <th className="px-2 py-1 text-right">Exp Inc</th>
+                      <th className="px-2 py-1 text-right">Δ Inc</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ENGINE_GAMES.map((g) => {
+                      const st = shadowStats.perOutcome[g.name];
+                      const dInc = st.expInc - st.baseInc;
+                      return (
+                        <tr key={g.name} className="border-t border-[#1e2240]">
+                          <td className="px-2 py-1 font-bold text-white">{g.name}</td>
+                          <td className="px-2 py-1 text-right text-[#8899cc]">{st.actuals}</td>
+                          <td className="px-2 py-1 text-right text-[#00d4ff]">{st.baseInc}</td>
+                          <td className="px-2 py-1 text-right text-[#a855f7]">{st.expInc}</td>
+                          <td className={`px-2 py-1 text-right font-bold ${dInc < 0 ? "text-[#2ed573]" : dInc > 0 ? "text-[#ffa502]" : "text-[#5a6a99]"}`}>{dInc > 0 ? "+" : ""}{dInc}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 1/2/5/10 exclusion rates */}
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {(["1", "2", "5", "10"] as const).map((num) => {
+                  const er = shadowStats.exclusionRates[num];
+                  const dExcl = er.exp - er.base;
+                  return (
+                    <div key={num} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                      <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">"{num}" excluded</div>
+                      <div className="text-sm font-black text-white">
+                        {Math.round(er.base * 100)}% <span className="text-[#5a6a99]">→</span> {Math.round(er.exp * 100)}%
+                      </div>
+                      <div className={`text-[8px] font-bold ${dExcl < 0 ? "text-[#2ed573]" : dExcl > 0 ? "text-[#ff4757]" : "text-[#5a6a99]"}`}>
+                        {dExcl < 0 ? "less excluded" : dExcl > 0 ? "more excluded" : "same"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="text-[8px] text-[#5a6a99]">
+                  <i className="fas fa-shield-halved mr-1 text-[#2ed573]" />
+                  Both engines see the SAME pre-result history. No data leakage. Persisted across reloads.
+                </div>
+                <button
+                  type="button"
+                  onClick={clearShadow}
+                  className="rounded bg-[#ff4757]/10 px-2 py-1 text-[9px] font-bold uppercase text-[#ff4757] hover:bg-[#ff4757]/20"
+                >
+                  Clear Ledger
+                </button>
+              </div>
+              {shadowStats.total < 50 && (
+                <div className="mt-2 rounded border border-[#ffa502]/30 bg-[#ffa502]/8 p-2 text-[9px] text-[#ffa502]">
+                  <i className="fas fa-triangle-exclamation mr-1" />
+                  {shadowStats.total}/50 paired rounds. Need 50+ for a meaningful comparison. No mid-test tuning.
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ===== RETROSPECTIVE DIAGNOSTIC (SIMULATION — not a validation result) ===== */}
+        <div className="mt-4 rounded-lg border-2 border-[#ffa502]/30 bg-[#0d1020]/60 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#ffa502]">
+              <i className="fas fa-magnifying-glass-chart" /> Retrospective Diagnostic
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={runRetroLive}
+                className="rounded bg-[#00d4ff]/10 px-2.5 py-1 text-[10px] font-bold uppercase text-[#00d4ff] hover:bg-[#00d4ff]/20"
+              >
+                Replay LIVE rounds ({roundHistory.length})
+              </button>
+              <button
+                type="button"
+                onClick={runRetroSynthetic}
+                className="rounded bg-[#a855f7]/10 px-2.5 py-1 text-[10px] font-bold uppercase text-[#a855f7] hover:bg-[#a855f7]/20"
+              >
+                Replay Synthetic 50
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-2 rounded-lg border border-[#ffa502]/20 bg-[#ffa502]/5 p-2 text-[9px] leading-relaxed text-[#8899cc]">
+            <b className="text-[#ffa502]">SIMULATION ONLY.</b> Replays a result sequence through BOTH engines
+            round-by-round (no leakage) to estimate direction/magnitude of the reliability layer.
+            <b> This is NOT a validation result.</b> Do NOT claim improved accuracy from this test.
+            Genuine validation = the live Shadow A/B above on fresh out-of-sample rounds.
+          </div>
+
+          {retroResult ? (
+            <>
+              <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                Source: {retroSource === "live"
+                  ? `${roundHistory.length} real verified rounds (replayed)`
+                  : "synthetic 50-round representative sample"}
+              </div>
+
+              {/* Headline comparison */}
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-lg font-black text-white">{retroResult.baseline.totalRounds}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Rounds Replayed</div>
+                </div>
+                <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-2 text-center">
+                  <div className="text-lg font-black text-[#00d4ff]">{Math.round(retroResult.baseline.hitRate * 100)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline HIT ({retroResult.baseline.hits}/{retroResult.baseline.totalRounds})</div>
+                </div>
+                <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/8 p-2 text-center">
+                  <div className="text-lg font-black text-[#a855f7]">{Math.round(retroResult.experimental.hitRate * 100)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental HIT ({retroResult.experimental.hits}/{retroResult.experimental.totalRounds})</div>
+                </div>
+                <div className={`rounded border p-2 text-center ${(retroResult.experimental.hits - retroResult.baseline.hits) >= 0 ? "border-[#2ed573]/30 bg-[#2ed573]/8" : "border-[#ff4757]/30 bg-[#ff4757]/8"}`}>
+                  <div className={`text-lg font-black ${(retroResult.experimental.hits - retroResult.baseline.hits) >= 0 ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
+                    {retroResult.flipsToHit > 0 ? "+" : ""}{retroResult.experimental.hits - retroResult.baseline.hits}
+                  </div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Net Δ Hits</div>
+                </div>
+              </div>
+
+              {/* Flip summary */}
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded border border-[#2ed573]/30 bg-[#2ed573]/8 p-2 text-center">
+                  <div className="text-sm font-black text-[#2ed573]">{retroResult.flipsToHit}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">MISS→HIT saved</div>
+                </div>
+                <div className="rounded border border-[#ff4757]/30 bg-[#ff4757]/8 p-2 text-center">
+                  <div className="text-sm font-black text-[#ff4757]">{retroResult.flipsToMiss}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">HIT→MISS lost</div>
+                </div>
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-sm font-black text-[#a855f7]">{retroResult.pachinkoInclusionsRemoved}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">PACHINKO Inc Removed</div>
+                </div>
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-sm font-black text-[#2ed573]">{retroResult.pachinkoActualsRetained}/{retroResult.baseline.pachinkoActuals}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">PACHINKO Actuals Retained</div>
+                </div>
+              </div>
+
+              {/* Per-outcome inclusion comparison */}
+              <div className="mb-3 overflow-x-auto rounded border border-[#1e2240]">
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="bg-[#1e2240] text-[#5a6a99]">
+                      <th className="px-2 py-1 text-left">Outcome</th>
+                      <th className="px-2 py-1 text-right">Actuals</th>
+                      <th className="px-2 py-1 text-right">Base Inc</th>
+                      <th className="px-2 py-1 text-right">Exp Inc</th>
+                      <th className="px-2 py-1 text-right">Base Cov</th>
+                      <th className="px-2 py-1 text-right">Exp Cov</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {retroResult.baseline.perOutcome.map((b, i) => {
+                      const e = retroResult.experimental.perOutcome[i];
+                      return (
+                        <tr key={b.name} className="border-t border-[#1e2240]">
+                          <td className="px-2 py-1 font-bold text-white">{b.name}</td>
+                          <td className="px-2 py-1 text-right text-[#8899cc]">{b.actuals}</td>
+                          <td className="px-2 py-1 text-right text-[#00d4ff]">{b.inclusions}</td>
+                          <td className="px-2 py-1 text-right text-[#a855f7]">{e.inclusions}</td>
+                          <td className="px-2 py-1 text-right text-[#2ed573]">{b.actuals > 0 ? `${b.coveredActuals}/${b.actuals}` : "—"}</td>
+                          <td className="px-2 py-1 text-right text-[#2ed573]">{e.actuals > 0 ? `${e.coveredActuals}/${e.actuals}` : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 1/2/5/10 exclusion rate comparison */}
+              <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {(["1", "2", "5", "10"] as const).map((num) => {
+                  const b = retroResult.baseline.exclusionRates[num] ?? 0;
+                  const e = retroResult.experimental.exclusionRates[num] ?? 0;
+                  const prevented = retroResult.exclusionPrevented[num] ?? 0;
+                  return (
+                    <div key={num} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                      <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">"{num}" excluded</div>
+                      <div className="text-xs font-black text-white">
+                        {Math.round(b * 100)}% <span className="text-[#5a6a99]">→</span> {Math.round(e * 100)}%
+                      </div>
+                      <div className={`text-[8px] font-bold ${prevented > 0 ? "text-[#2ed573]" : "text-[#5a6a99]"}`}>
+                        {prevented > 0 ? `${prevented} exclusions prevented` : "no change"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="rounded-lg border border-[#ffa502]/20 bg-[#ffa502]/5 p-2 text-[9px] italic text-[#ffa502]">
+                <i className="fas fa-circle-info mr-1" />
+                {retroResult.note}
+              </div>
+            </>
+          ) : (
+            <div className="py-4 text-center text-xs text-[#5a6a99]">
+              <i className="fas fa-play mb-1 text-xl text-[#5a6a99]" />
+              <div>Run a retrospective replay to estimate the reliability layer's effect.</div>
+              <div className="text-[9px] mt-1">"Replay LIVE rounds" uses your actual verified history. "Synthetic 50" uses a representative sample.</div>
+            </div>
+          )}
+        </div>
 
         {/* ===== WHEEL BASE-PROBABILITY MODEL (54 segments) ===== */}
         <WheelProbabilityPanel candidateScores={view.candidateScores} />
@@ -1878,302 +2221,6 @@ function PerformanceDashboardPanel({ dashboard, roundHistory: rh }: { dashboard:
           signalWise={signalWiseHitRate}
         />
 
-        {/* ===== SHADOW A/B: baseline (frozen k=30) vs experimental (reliability layer) ===== */}
-        <div className="mt-4 rounded-lg border-2 border-[#a855f7]/30 bg-[#0d1020]/60 p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#a855f7]">
-              <i className="fas fa-flask-vial" /> Shadow A/B — Rare-Outcome Reliability Layer
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-[#1e2240] px-2 py-0.5 text-[9px] font-bold uppercase text-[#8899cc]">
-                RELIABILITY_K = {EXPERIMENTAL_CONFIG.reliabilityK}
-              </span>
-              <button
-                type="button"
-                onClick={toggleExperimental}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase transition-colors ${
-                  experimentalEnabled
-                    ? "bg-[#2ed573]/20 text-[#2ed573] hover:bg-[#2ed573]/30"
-                    : "bg-[#1e2240] text-[#8899cc] hover:bg-[#2a2f4d]"
-                }`}
-                aria-pressed={experimentalEnabled}
-              >
-                <span className={`inline-block h-2 w-2 rounded-full ${experimentalEnabled ? "bg-[#2ed573]" : "bg-[#5a6a99]"}`} />
-                {experimentalEnabled ? "EXPERIMENTAL SHADOW ON" : "SHADOW OFF"}
-              </button>
-            </div>
-          </div>
-
-          <div className="mb-2 rounded-lg border border-[#a855f7]/20 bg-[#a855f7]/5 p-2 text-[9px] leading-relaxed text-[#8899cc]">
-            <b className="text-[#a855f7]">Root cause (50-round k=30 validation, 78% HIT):</b> 7 of 11 misses
-            involved PACHINKO (3 appearances → +39% deviation) displacing a higher-prior number.
-            Fix: a <b>continuous, generic</b> reliability factor
-            <code className="mx-1 rounded bg-[#0d1020] px-1 text-[#00d4ff]">r = N_obs / (N_obs + {EXPERIMENTAL_CONFIG.reliabilityK})</code>
-            dampens the <b>positive</b> deviation of any outcome resting on few observations.
-            Negative deviations pass through (never inflate unseen rare outcomes). NO hard cutoff,
-            NO PACHINKO ban, NO forced [1,2,5,10]. The active displayed prediction stays the frozen
-            k=30 <b>baseline</b>; experimental runs in <b>shadow</b> on the SAME live rounds.
-          </div>
-
-          {!experimentalEnabled ? (
-            <div className="py-4 text-center text-xs text-[#5a6a99]">
-              <i className="fas fa-toggle-off mb-1 text-xl text-[#5a6a99]" />
-              <div>Shadow A/B is OFF. Enable to run the experimental engine in parallel.</div>
-              <div className="text-[9px] mt-1">Baseline (frozen k=30) remains the active prediction either way.</div>
-            </div>
-          ) : (
-            <>
-              {/* Paired comparison KPIs */}
-              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
-                  <div className="text-lg font-black text-white">{shadowStats.total}</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Paired Rounds</div>
-                </div>
-                <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-2 text-center">
-                  <div className="text-lg font-black text-[#00d4ff]">{Math.round(shadowStats.bRate * 100)}%</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline HIT ({shadowStats.bHits})</div>
-                </div>
-                <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/8 p-2 text-center">
-                  <div className="text-lg font-black text-[#a855f7]">{Math.round(shadowStats.eRate * 100)}%</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental HIT ({shadowStats.eHits})</div>
-                </div>
-                <div className={`rounded border p-2 text-center ${shadowStats.delta >= 0 ? "border-[#2ed573]/30 bg-[#2ed573]/8" : "border-[#ff4757]/30 bg-[#ff4757]/8"}`}>
-                  <div className={`text-lg font-black ${shadowStats.delta >= 0 ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
-                    {shadowStats.delta >= 0 ? "+" : ""}{Math.round(shadowStats.delta * 100)}%
-                  </div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Δ (exp − base)</div>
-                </div>
-              </div>
-
-              {/* Flips */}
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <div className="rounded border border-[#2ed573]/30 bg-[#2ed573]/8 p-2 text-center">
-                  <div className="text-sm font-black text-[#2ed573]">{shadowStats.flipsToHit}</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">MISS→HIT (experimental saved)</div>
-                </div>
-                <div className="rounded border border-[#ff4757]/30 bg-[#ff4757]/8 p-2 text-center">
-                  <div className="text-sm font-black text-[#ff4757]">{shadowStats.flipsToMiss}</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">HIT→MISS (experimental lost)</div>
-                </div>
-              </div>
-
-              {/* Per-outcome inclusion table */}
-              <div className="mb-3 overflow-x-auto rounded border border-[#1e2240]">
-                <table className="w-full text-[10px]">
-                  <thead>
-                    <tr className="bg-[#1e2240] text-[#5a6a99]">
-                      <th className="px-2 py-1 text-left">Outcome</th>
-                      <th className="px-2 py-1 text-right">Actuals</th>
-                      <th className="px-2 py-1 text-right">Base Inc</th>
-                      <th className="px-2 py-1 text-right">Exp Inc</th>
-                      <th className="px-2 py-1 text-right">Δ Inc</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ENGINE_GAMES.map((g) => {
-                      const st = shadowStats.perOutcome[g.name];
-                      const dInc = st.expInc - st.baseInc;
-                      return (
-                        <tr key={g.name} className="border-t border-[#1e2240]">
-                          <td className="px-2 py-1 font-bold text-white">{g.name}</td>
-                          <td className="px-2 py-1 text-right text-[#8899cc]">{st.actuals}</td>
-                          <td className="px-2 py-1 text-right text-[#00d4ff]">{st.baseInc}</td>
-                          <td className="px-2 py-1 text-right text-[#a855f7]">{st.expInc}</td>
-                          <td className={`px-2 py-1 text-right font-bold ${dInc < 0 ? "text-[#2ed573]" : dInc > 0 ? "text-[#ffa502]" : "text-[#5a6a99]"}`}>{dInc > 0 ? "+" : ""}{dInc}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 1/2/5/10 exclusion rates */}
-              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(["1", "2", "5", "10"] as const).map((num) => {
-                  const er = shadowStats.exclusionRates[num];
-                  const dExcl = er.exp - er.base;
-                  return (
-                    <div key={num} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
-                      <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">"{num}" excluded</div>
-                      <div className="text-sm font-black text-white">
-                        {Math.round(er.base * 100)}% <span className="text-[#5a6a99]">→</span> {Math.round(er.exp * 100)}%
-                      </div>
-                      <div className={`text-[8px] font-bold ${dExcl < 0 ? "text-[#2ed573]" : dExcl > 0 ? "text-[#ff4757]" : "text-[#5a6a99]"}`}>
-                        {dExcl < 0 ? "less excluded" : dExcl > 0 ? "more excluded" : "same"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="text-[8px] text-[#5a6a99]">
-                  <i className="fas fa-shield-halved mr-1 text-[#2ed573]" />
-                  Both engines see the SAME pre-result history. No data leakage. Persisted across reloads.
-                </div>
-                <button
-                  type="button"
-                  onClick={clearShadow}
-                  className="rounded bg-[#ff4757]/10 px-2 py-1 text-[9px] font-bold uppercase text-[#ff4757] hover:bg-[#ff4757]/20"
-                >
-                  Clear Ledger
-                </button>
-              </div>
-              {shadowStats.total < 50 && (
-                <div className="mt-2 rounded border border-[#ffa502]/30 bg-[#ffa502]/8 p-2 text-[9px] text-[#ffa502]">
-                  <i className="fas fa-triangle-exclamation mr-1" />
-                  {shadowStats.total}/50 paired rounds. Need 50+ for a meaningful comparison. No mid-test tuning.
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* ===== RETROSPECTIVE DIAGNOSTIC (SIMULATION — not a validation result) ===== */}
-        <div className="mt-4 rounded-lg border-2 border-[#ffa502]/30 bg-[#0d1020]/60 p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#ffa502]">
-              <i className="fas fa-magnifying-glass-chart" /> Retrospective Diagnostic
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={runRetroLive}
-                className="rounded bg-[#00d4ff]/10 px-2.5 py-1 text-[10px] font-bold uppercase text-[#00d4ff] hover:bg-[#00d4ff]/20"
-              >
-                Replay LIVE rounds ({roundHistory.length})
-              </button>
-              <button
-                type="button"
-                onClick={runRetroSynthetic}
-                className="rounded bg-[#a855f7]/10 px-2.5 py-1 text-[10px] font-bold uppercase text-[#a855f7] hover:bg-[#a855f7]/20"
-              >
-                Replay Synthetic 50
-              </button>
-            </div>
-          </div>
-
-          <div className="mb-2 rounded-lg border border-[#ffa502]/20 bg-[#ffa502]/5 p-2 text-[9px] leading-relaxed text-[#8899cc]">
-            <b className="text-[#ffa502]">SIMULATION ONLY.</b> Replays a result sequence through BOTH engines
-            round-by-round (no leakage) to estimate direction/magnitude of the reliability layer.
-            <b> This is NOT a validation result.</b> Do NOT claim improved accuracy from this test.
-            Genuine validation = the live Shadow A/B above on fresh out-of-sample rounds.
-          </div>
-
-          {retroResult ? (
-            <>
-              <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
-                Source: {retroSource === "live"
-                  ? `${roundHistory.length} real verified rounds (replayed)`
-                  : "synthetic 50-round representative sample"}
-              </div>
-
-              {/* Headline comparison */}
-              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
-                  <div className="text-lg font-black text-white">{retroResult.baseline.totalRounds}</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Rounds Replayed</div>
-                </div>
-                <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-2 text-center">
-                  <div className="text-lg font-black text-[#00d4ff]">{Math.round(retroResult.baseline.hitRate * 100)}%</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline HIT ({retroResult.baseline.hits}/{retroResult.baseline.totalRounds})</div>
-                </div>
-                <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/8 p-2 text-center">
-                  <div className="text-lg font-black text-[#a855f7]">{Math.round(retroResult.experimental.hitRate * 100)}%</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental HIT ({retroResult.experimental.hits}/{retroResult.experimental.totalRounds})</div>
-                </div>
-                <div className={`rounded border p-2 text-center ${(retroResult.experimental.hits - retroResult.baseline.hits) >= 0 ? "border-[#2ed573]/30 bg-[#2ed573]/8" : "border-[#ff4757]/30 bg-[#ff4757]/8"}`}>
-                  <div className={`text-lg font-black ${(retroResult.experimental.hits - retroResult.baseline.hits) >= 0 ? "text-[#2ed573]" : "text-[#ff4757]"}`}>
-                    {retroResult.flipsToHit > 0 ? "+" : ""}{retroResult.experimental.hits - retroResult.baseline.hits}
-                  </div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Net Δ Hits</div>
-                </div>
-              </div>
-
-              {/* Flip summary */}
-              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded border border-[#2ed573]/30 bg-[#2ed573]/8 p-2 text-center">
-                  <div className="text-sm font-black text-[#2ed573]">{retroResult.flipsToHit}</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">MISS→HIT saved</div>
-                </div>
-                <div className="rounded border border-[#ff4757]/30 bg-[#ff4757]/8 p-2 text-center">
-                  <div className="text-sm font-black text-[#ff4757]">{retroResult.flipsToMiss}</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">HIT→MISS lost</div>
-                </div>
-                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
-                  <div className="text-sm font-black text-[#a855f7]">{retroResult.pachinkoInclusionsRemoved}</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">PACHINKO Inc Removed</div>
-                </div>
-                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
-                  <div className="text-sm font-black text-[#2ed573]">{retroResult.pachinkoActualsRetained}/{retroResult.baseline.pachinkoActuals}</div>
-                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">PACHINKO Actuals Retained</div>
-                </div>
-              </div>
-
-              {/* Per-outcome inclusion comparison */}
-              <div className="mb-3 overflow-x-auto rounded border border-[#1e2240]">
-                <table className="w-full text-[10px]">
-                  <thead>
-                    <tr className="bg-[#1e2240] text-[#5a6a99]">
-                      <th className="px-2 py-1 text-left">Outcome</th>
-                      <th className="px-2 py-1 text-right">Actuals</th>
-                      <th className="px-2 py-1 text-right">Base Inc</th>
-                      <th className="px-2 py-1 text-right">Exp Inc</th>
-                      <th className="px-2 py-1 text-right">Base Cov</th>
-                      <th className="px-2 py-1 text-right">Exp Cov</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {retroResult.baseline.perOutcome.map((b, i) => {
-                      const e = retroResult.experimental.perOutcome[i];
-                      return (
-                        <tr key={b.name} className="border-t border-[#1e2240]">
-                          <td className="px-2 py-1 font-bold text-white">{b.name}</td>
-                          <td className="px-2 py-1 text-right text-[#8899cc]">{b.actuals}</td>
-                          <td className="px-2 py-1 text-right text-[#00d4ff]">{b.inclusions}</td>
-                          <td className="px-2 py-1 text-right text-[#a855f7]">{e.inclusions}</td>
-                          <td className="px-2 py-1 text-right text-[#2ed573]">{b.actuals > 0 ? `${b.coveredActuals}/${b.actuals}` : "—"}</td>
-                          <td className="px-2 py-1 text-right text-[#2ed573]">{e.actuals > 0 ? `${e.coveredActuals}/${e.actuals}` : "—"}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 1/2/5/10 exclusion rate comparison */}
-              <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(["1", "2", "5", "10"] as const).map((num) => {
-                  const b = retroResult.baseline.exclusionRates[num] ?? 0;
-                  const e = retroResult.experimental.exclusionRates[num] ?? 0;
-                  const prevented = retroResult.exclusionPrevented[num] ?? 0;
-                  return (
-                    <div key={num} className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
-                      <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">"{num}" excluded</div>
-                      <div className="text-xs font-black text-white">
-                        {Math.round(b * 100)}% <span className="text-[#5a6a99]">→</span> {Math.round(e * 100)}%
-                      </div>
-                      <div className={`text-[8px] font-bold ${prevented > 0 ? "text-[#2ed573]" : "text-[#5a6a99]"}`}>
-                        {prevented > 0 ? `${prevented} exclusions prevented` : "no change"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="rounded-lg border border-[#ffa502]/20 bg-[#ffa502]/5 p-2 text-[9px] italic text-[#ffa502]">
-                <i className="fas fa-circle-info mr-1" />
-                {retroResult.note}
-              </div>
-            </>
-          ) : (
-            <div className="py-4 text-center text-xs text-[#5a6a99]">
-              <i className="fas fa-play mb-1 text-xl text-[#5a6a99]" />
-              <div>Run a retrospective replay to estimate the reliability layer's effect.</div>
-              <div className="text-[9px] mt-1">"Replay LIVE rounds" uses your actual verified history. "Synthetic 50" uses a representative sample.</div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

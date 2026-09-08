@@ -2158,3 +2158,62 @@ Verification:
 
 Conclusion: The engine already optimizes for maximum real-world Top-4 coverage across all 8 outcomes using the 70-combination subset optimizer. The primary metric is Top-4 Coverage Hit Rate (actual ∈ locked Top-4 / total rounds). No changes needed.
 
+
+---
+Task ID: 44 (user request — RARE-OUTCOME EVIDENCE RELIABILITY LAYER)
+Agent: Z.ai Code
+Task: Implement a continuous, generic sample-size reliability factor that dampens the POSITIVE deviation of rare outcomes resting on few observations. Behind an experimental feature flag. Retrospective diagnostic + live shadow A/B comparison against the frozen k=30 baseline. NO PACHINKO ban, NO forced [1,2,5,10], NO hard cutoff.
+
+Work Log:
+- Read frozen baseline: k=30, evidence 50% / prior 50%, live/user 70/30, 70-combo optimizer ACTIVE, persistence penalty ACTIVE.
+- Confirmed root cause: PACHINKO (3 appearances, N=50, theo=3.7%) → smoothedFreq=5.14% → dev=+39% → evidenceScore=1.39 → score=0.713 > "2" score=0.620. The +39% deviation from 3 observations displaced "2" (24% prior).
+- Designed reliability function: r = N_obs / (N_obs + RELIABILITY_K), RELIABILITY_K=10.
+  - count=3 → r=0.23 (PACHINKO +39% → +9%)
+  - count=5 → r=0.33 (can still enter when deviation genuinely large)
+  - count=20 → r=0.67 (common outcomes barely affected)
+- Applied ONLY to positive deviations (negative pass-through — never inflate unseen rare outcomes).
+- Implemented in decisionEngine.ts:
+  - Added EngineMode type, RELIABILITY_K=10, EXPERIMENTAL_CONFIG.
+  - Added reliability fields to CandidateScore interface (engineMode, effectiveSampleSize, reliability, reliableDeviation).
+  - Threaded `mode` parameter through scoreCandidates → runEngine → recalibrate → buildInitial.
+  - Baseline mode = identity (reliableDeviation = cappedDeviation) → bit-for-bit identical to frozen k=30.
+  - Experimental mode = dampen positive dev by reliability factor.
+  - Added runRetrospectiveDiagnostic() function: replays a sequence through BOTH modes, no leakage.
+- Implemented Shadow A/B in RevoGame.tsx:
+  - Feature flag (localStorage-backed via useSyncExternalStore).
+  - Each live round settled TWICE: baseline (displayed) + experimental (shadow).
+  - Shadow ledger persisted across reloads (last 200 rounds).
+  - Per-outcome inclusion counts, exclusion rates, flips (MISS→HIT / HIT→MISS).
+  - Retrospective diagnostic panel: "Replay LIVE rounds" + "Replay Synthetic 50" buttons.
+  - All panels clearly labeled: "SIMULATION ONLY — NOT a validation result."
+- Fixed lint issues:
+  - Duplicate BONUS_NAMES import (removed from decisionEngine import, kept local).
+  - react-hooks/immutability: replaced useRef with module-level variable (expLockedNames).
+  - react-hooks/set-state-in-effect: replaced useState+useEffect with useSyncExternalStore for hydration-safe localStorage reads.
+  - getServerSnapshot caching: used EMPTY_SHADOW stable constant.
+- Ran retrospective diagnostic on REAL live casino data (70 rounds replayed, 30-spin prior):
+  - Baseline: 47/70 = 67% HIT
+  - Experimental: 50/70 = 71% HIT (+3 net hits)
+  - Flips: 5 MISS→HIT saved, 2 HIT→MISS lost → net +3
+  - PACHINKO inclusions: 34 → 19 (15 removed — the displacement problem)
+  - PACHINKO actuals: 2 | retained by exp: 0 (both PACHINKO rounds had weak evidence — 0-1 prior appearances)
+  - "2" exclusion rate: 27% → 6% (15 exclusions prevented!)
+  - "5" exclusion rate: 40% → 20% (14 exclusions prevented!)
+  - Round-by-round: R3/R10/R12/R38/R63 baseline missed "2"/"5" by picking [PACHINKO,1,5,CRAZY TIME] → experimental included "2"/"5" and HIT.
+- Agent-browser verification:
+  - Page loads cleanly, no console/runtime errors.
+  - Shadow A/B panel renders with toggle (OFF/ON).
+  - Toggling ON works → "EXPERIMENTAL SHADOW ON".
+  - Retrospective Diagnostic panel renders with both replay buttons.
+  - "Replay Synthetic 50" → 80% baseline vs 78% experimental, PACHINKO inc removed: 7.
+  - "Replay LIVE rounds" → produces correct per-outcome table.
+  - SIMULATION ONLY disclaimer present.
+  - Footer sticky at bottom, body scrollable.
+
+Stage Summary:
+- Frozen k=30 baseline is UNCHANGED (active displayed prediction).
+- Experimental reliability layer is BEHIND a feature flag (OFF by default).
+- Retrospective diagnostic on real live data: +3 net hits (67% → 71%), 15 PACHINKO inclusions removed, 15+ "2"/"5" exclusions prevented. 2 PACHINKO actuals lost (evidence was genuinely weak — 0-1 prior appearances).
+- The reliability layer is CONTINUOUS (no hard cutoff), GENERIC (applies to ALL outcomes), and preserves negative deviations (never inflates unseen rare outcomes).
+- Genuine live A/B validation can now begin: enable the shadow, let 50+ fresh live rounds accumulate, compare baseline vs experimental on the SAME rounds.
+- No mid-test tuning. No parameter changes during validation. If experimental doesn't improve genuine out-of-sample performance, revert it.
