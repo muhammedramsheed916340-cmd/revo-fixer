@@ -2986,3 +2986,35 @@ Stage Summary:
 - Steady state: raw window −0.5pp (artifact-carried), lifetime tie standing per Task 57 final analysis; nothing analytically new.
 - FIFO cap now actively aging out flip history — lifetime flip tracking MUST use worklog cross-reference (lifetime M2H: 4,8,22,116,163,164,178; lifetime verified H2M: 12,161,188,200; degraded: 24,45,67 + evicted 6).
 - Protocol continues: metrics-only passes unless p<0.05 either direction or new anomaly. Engine untouched.
+
+---
+Task ID: 59 (cron monitor — Job ID 369099, pass 15 — metrics-only per Task 57/58 protocol)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 15, 04:31 +08). Metrics-only unless McNemar crosses p<0.05 either direction or new degradation/coverage anomaly. No code changes.
+
+Work Log:
+- Read worklog tail: pass 14 (Task 58) at window IDs 22-221 established lifetime cross-reference protocol.
+- Feed probe: ALIVE (ID progression 221→227; 6 new rounds ingested). Tab reused, NO reload — 11th consecutive clean collection pass.
+- Methodology upgrade for sustainability: persisted reusable extractors to scripts/ (extract_ledger.js, panel_text.js, analyze_pass15.py) — future passes run file-based, no inline JS regeneration.
+- Ledger: n=200, window slid to IDs 28-227 (FIFO evicted 22-27: incl. flip row #22 [M2H] and degraded artifact #24 [H2M-gift]; window display now carries only 2 of 4 lifetime degraded rows: #45, #67).
+- New rounds 222-227: 6/6 double-agreement hits (actuals 2,1,2,1,1,1 — number-storm regime persists: '1' ×4, '2' ×2). ZERO new flips, ZERO new degraded rows.
+- Trigger check: (a) McNemar NOT crossed (window verified 4v3 p=1.000; lifetime verified 7v4 p=0.549; lifetime raw 7v7 p=1.000); (b) no anomaly. → METRICS-ONLY continues.
+- Engine freeze: git verified — zero diffs to engine/app code (only untracked monitoring scripts added by this pass).
+
+Metrics (FIFO window n=200, IDs 28-227; panel cross-check matched):
+1. Paired rounds: 200 (clean 198; in-window degraded: #45, #67)
+2. Baseline HIT: 129/200 = 64.5% ledger-raw (panel-matching; includes 2 in-window artifacts) / 127/198 = 64.1% clean
+3. Experimental HIT: 128/200 = 64.0% (= 128/198 = 64.6% clean)
+4. Delta: raw −1 hit (−0.5pp, artifact-carried); clean-only +1 hit (+0.5pp) experimental
+5. MISS→HIT (window): 4 (#116, #163, #164, #178) — lifetime 7 (#22 aged out of window)
+6. HIT→MISS (window): 5 raw (#45, #67 degraded artifacts + #161, #188, #200 verified); verified-only 3 — lifetime 7 (#24 aged out)
+7. Theoretical [1,2,5,10]: 159/200 = 79.5% (clean 157/198 = 79.3%) — still leads both models by ~15pp
+8. MISS RCA: lifetime unchanged (7 displacement saves, 4 verified losses across 3 mechanisms, 3 degraded artifacts); window RCA display omits aged-out #22/#24
+- Agreement streak: 27 consecutive (last flip remains #200; was 21 at pass 14)
+- Avg coverage: base 72.24% / exp 71.68% (layer still trades ~0.6pp coverage for retention)
+
+Stage Summary:
+- Steady state confirmed: raw window delta −0.5pp remains fully explained by 2 in-window reload-era artifacts; clean/verified edge stays +1 hit experimental. Lifetime verdict unchanged (raw tie; verified 7v4 p=0.549).
+- Flip history is now aging out of the FIFO window faster than new flips arrive (0 new in 6 rounds) — lifetime flip accounting is permanently worklog-anchored: M2H {4,8,22,116,163,164,178}, verified H2M {12,161,188,200}, degraded {6,24,45,67}.
+- 27-round agreement streak + persistent number-storm regime ('1'/'2' dominance) means the displacement mechanisms that produced all 14 lifetime flips are dormant; McNemar significance is drifting AWAY, not toward, crossing.
+- Protocol continues: metrics-only passes; escalation triggers unchanged (verified McNemar p<0.05 either direction, or new degraded/coverage anomaly, or 3+ same-direction flips in one regime window). Engine untouched.
