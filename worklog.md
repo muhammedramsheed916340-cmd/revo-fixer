@@ -2406,3 +2406,39 @@ Stage Summary:
 - Validation will accumulate automatically as live Crazy Time results arrive (~30-60s per round).
 - 50+ rounds needed for meaningful comparison; 100+ preferred.
 - Monitoring cron will check progress every 15 minutes.
+
+---
+Task ID: 45 (cron monitor — Job ID 369099)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation progress. Extract stats from the Shadow A/B panel / localStorage ledger. Report validation state. No code changes.
+
+Work Log:
+- Read worklog: confirmed enhanced instrumentation (roundId, coverage, all-8 probs, theoretical benchmark, RCA) was completed in Task 44-followup and is live via dev server hot reload.
+- Verified working tree: decisionEngine.ts UNTOUCHED (engine frozen — only RevoGame.tsx instrumentation + worklog.md are modified, uncommitted by design during the freeze).
+- Opened http://localhost:3000 via agent-browser — no console/runtime errors.
+- Verified localStorage state:
+  - revo_experimentalFlag = "1" (experimental shadow ON)
+  - revo_validationStart = 1788886858749 (2026-09-09 01:00:58 +08)
+  - revo_shadowLedger = accumulating live rounds
+- Extracted validation snapshot (ledger grew 5→7→9 rounds during the check — rounds landing live every ~45-60s):
+  - Paired rounds: 9 (IDs 2-10, contiguous)
+  - Baseline HIT: 2/9 (22%)
+  - Experimental HIT: 4/9 (44%)
+  - Δ (exp − base): +2 hits (+22pp)
+  - MISS→HIT flips: 2 (experimental saved)
+  - HIT→MISS flips: 0 (no regressions)
+  - Theoretical [1,2,5,10]: 9/9 (100%) — every actual so far was a number outcome
+  - Full instrumentation present on every row (roundId, baselineCoverage, expCoverage, all-8 probs both models, theoHit)
+- Integrity checks PASSED:
+  - Round IDs contiguous (2→10, no gaps) — validation began with 1 pre-existing history round, so first recorded ID is 2 (correct)
+  - Duplicate settlements: NONE
+  - Timestamps ascending: YES
+  - Prediction ID integrity: synchronized across both models
+- MISS RCA entries so far: 2 MISS→HIT flips (incl. roundId 4, actual "1" — baseline displaced "1" with rare outcomes, experimental restored it).
+- Early observation (NOT analysis, n=9): all 9 actuals were numbers while the live 30-spin window was bonus-heavy — both models chased recent bonus activity (CASH HUNT 5/6, CRAZY TIME 5/6 inclusions in early rounds); experimental recovered 2 number rounds baseline missed, with 0 regressions. Sample far too small to conclude anything.
+
+Stage Summary:
+- Validation is LIVE and healthy: 9/50 fresh out-of-sample rounds collected, both models settled on the SAME actuals with no leakage and no duplicate settlements.
+- Engine freeze confirmed: decisionEngine.ts unmodified (git-verified); no parameter/tuning changes during test.
+- Instrumentation code (RevoGame.tsx) intentionally left uncommitted during the freeze; commit after validation completes.
+- Next monitoring runs should report progress at ~25 and ~50 rounds; preliminary analysis only at 50+.
