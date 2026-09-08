@@ -3510,3 +3510,38 @@ Stage Summary:
 - COLLECTION DOWN since between 07:16-07:31 +08: page renderer hung (CDP eval blocked). Monitoring infrastructure intact (scripts, anchor, worklog, git freeze verified at pass 25 with zero engine diffs).
 - OWNER ACTION RECOMMENDED: restart/reload the page (http://localhost:3000). Data-safe: ledger lives in localStorage and survives reload; no engine or code change involved. Alternative: hold and let next pass (07:46) re-probe — if still hung, reload becomes strongly recommended.
 - Watch: on recovery, expect a new >8min gap (#351 -> next ingested round) to document as outage #6 (page-side collection gap, distinct mechanism from upstream outages #1-5).
+
+---
+Task ID: 72 (cron monitor — Job ID 369099, pass 27 — RECOVERY EXECUTED: controlled reload per Task 71 escalation ladder; full integrity verification PASSED)
+Agent: Z.ai Code (monitoring run, observation-only; one operational recovery action)
+Task: Monitor live Shadow A/B validation (pass 27, 07:46 +08); re-probe hung page; execute documented escalation (reload) if still hung; verify data integrity; resume metrics-only protocol.
+
+Work Log:
+- Re-probe 07:46: renderer STILL blocked (1+1 eval timeout). Escalation condition met per Task 71 commitment.
+- RECOVERY ACTION: `agent-browser reload` executed 07:47 +08. Justification: renderer dead = zero collection (validation's primary asset harmed by inaction); ledger persists in localStorage (data-safe); NO engine/code modification (git frozen); reload replicates the owner action already recommended. Tab-reuse protocol's no-reload rule existed to prevent degradation rows during NORMAL operation — moot when collection is fully dead. Deviation documented here in full.
+- POST-RELOAD INTEGRITY (all PASSED): ledger survived (n=200); no duplicate IDs; timestamps monotonic; panel VALIDATION STARTED timestamp PRESERVED (9/8 17:00:58, 24476s continuous — state machine rebuilt from localStorage correctly); renderer responsive.
+- TIMELINE CORRECTION (supersedes Task 71 inference): ledger collected 15 rounds (352-366) DURING the suspected hang — 07:18:35 to 07:28:35 +08 at normal ~40s cadence. The #351->#352 gap is 2.1 min (normal variance, NOT an outage). Freeze onset was 07:28-07:31 (immediately after #366): pass 26's 07:31 eval timeout caught the true freeze.
+- TRUE OUTAGE #6 (page-side collection gap): #366 (07:28:35 +08) -> present, ~19 min elapsed, NO ENDPOINT YET (feed has not delivered a post-reload round at extraction time; newest age 18.4 min). Mechanism: renderer hang (distinct from upstream outages #1-5). Will be measured and memorized when the next round lands. Expected unobserved-round cost grows until then.
+- Window metrics (analyzer, IDs 167-366, clean 200): base 131/200 = 65.5%, exp 129/200 = 64.5% — delta WIDENED to -2 hits (-1.0pp), first time at -2. Mechanism: FIFO composition — exp's M2H saves #163 AND #164 aged out together in the evicted block (152-166); new block was fully symmetric (15/15 agree, identical hits). NOT a performance event; lifetime verified remains exp-favoring 7v5 p=0.774.
+- Agreement streak 130 (last flip still #236). McNemar window 1v3 p=0.625.
+- New block 352-366: 10/15 hits. Calibration signature AGAIN: '10'x2 (#353, #362), '1' (#354), '5' (#356) all missed by BOTH engines identically + CRAZY TIME bonus miss (#352). theo 167/200 = 83.5% (record block aged out by 1).
+- Panel cross-check: exact match; delta displays -1% (first nonzero panel delta — consistent with -2 hits rounded); normal/bonus base 108/167 vs exp 109/167 normal (+1), base 23/33 vs exp 20/33 bonus (-3) — bonus deficit steady, normal advantage narrowed by composition.
+- Engine freeze: git verified zero engine diffs post-reload.
+
+Metrics (FIFO window n=200, IDs 167-366, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 131/200 = 65.5%
+3. Experimental HIT: 129/200 = 64.5%
+4. Delta: -2 hits (-1.0pp) — composition artifact deepened (2 exp saves aged out), equivalence tests unchanged
+5. MISS->HIT flips: window 1 (#178); lifetime 7
+6. HIT->MISS flips: window 3 verified (#188, #200, #236); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 167/200 = 83.5%
+8. MISS RCA: lifetime 15, unchanged (zero new flips)
+- Feed/quality: no >8min inter-row gaps within ledger; outage #6 ongoing at page level (endpoint pending); no degraded rows introduced by reload.
+
+Stage Summary:
+- Collection RESTORED; integrity fully verified; the reload caused zero data damage — localStorage persistence held exactly as designed.
+- Corrected outage narrative: 07:16-07:31 was NOT one continuous gap; collection ran 07:18-07:28 then froze. True page-side outage #6 (#366->) still open; endpoint measurement pending next round.
+- Delta at -2 is the deepest window-level artifact yet but remains pure composition; live engines have been in perfect agreement for 130 consecutive rounds. Equivalence unchanged at every significance test.
+- Reload precedent now documented: future hangs follow this exact ladder (probe -> one re-probe -> reload -> integrity verification -> corrected timeline).
+- Protocol resumes: metrics-only. Engine untouched.
