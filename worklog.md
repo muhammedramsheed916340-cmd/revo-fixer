@@ -3801,3 +3801,36 @@ Stage Summary:
 - '2' and '1' exclusion failures are the session's dominant calibration story, exactly matching the Task 65 audit's two named candidates ('1'/'2' inclusion floors). Owner-decision items; no shadow arm for fixes.
 - Panel render-lag and snapshot-race documented — future passes should re-extract rather than reconcile when panel/ledger disagree by exactly the newest-round count.
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 81 (cron monitor — Job ID 369099, pass 36 — FULL METRIC PLATEAU: every headline number unchanged, first zero-movement pass of session; feed staleness watch)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 36, 10:01 +08). All triggers clear. No engine changes.
+
+Work Log:
+- Feed probe: ALIVE, 8 new rounds 466-473 (window 274-473). No gaps, no degraded rows; 21+ consecutive clean passes since outage #7. WATCH: newest age 445s (7.4 min) is the stalest since recovery — under the 8-min trigger threshold and no inter-row gap, but if next pass shows age >8 min, outage #8 may be forming. Cadence ~1 round/1.8 min this interval vs ~1/1 min typical.
+- FULL METRIC PLATEAU — first zero-movement pass of the session: base 118 (59.0%), exp 122 (61.0%), delta +4 (+2.00pp), theo 163 (81.5%) ALL unchanged. Cause: evicted block 266-273 and new block 466-473 exactly hit-symmetric (net base +0 / exp +0 / theo +0). Delta holds at record +4, still fully flip-driven (window M2H 4v0, p=0.125 — unchanged).
+- No new flips (0 this pass); agreement streak 14 (last flip #459). Lifetime verified 11v5 p=0.210; raw 11v8 p=0.648.
+- New block composition: '5' 0/1 (466), '1' 3/4 (467 miss, 468-470 hit — '1'-exclusion EASING after 5 misses in prior blocks), '2' 0/2 (471, 472 both engines miss — '2'-exclusion continues, NO exp rescue this time; layer only fires when re-inclusion outranks displacement), COIN FLIP 1/1 hit (473 — bonus recovery now 3 of last 4). Engines identical 8/8; zero differential exposure.
+- Panel cross-check: EXACT FULL CONVERGENCE (render lag resolved): headline 118/122/163, delta +2% display = +4 hits, M2H 4, H2M 0, coverage 70.28%/69.80%, normal/bonus 163/37 split base 97+21, exp 101+21 — every figure matches ledger. Pred changes 85/86 (+1/+1, no divergence). Outcome table: '2' inclusion gap remains largest (base 65% vs exp 70%, Δ+11) — the '2'-floor candidate's fingerprint.
+- Known-gap 271->272 aged out of window; in-window documented gaps now 4 (306, 347, 366, 409), all frozen/suppressed.
+- Engine freeze: git verified zero engine/source diffs (data artifacts only: anchor.json + raw extraction).
+- Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, validation-start epoch unchanged (no reset).
+- Triggers: (a) no (p=0.210), (b) no, (c) no (0 new flips). VERDICT: metrics-only steady state.
+
+Metrics (FIFO window n=200, IDs 274-473, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 118/200 = 59.0%
+3. Experimental HIT: 122/200 = 61.0%
+4. Delta: +4 hits (+2.00pp) exp-favoring — plateau, flip-driven (4 rescues v 0 losses)
+5. MISS->HIT flips: window 4 (#381, #394, #458, #459); lifetime 11
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 163/200 = 81.5%
+8. MISS RCA: lifetime 15 + 4 documented exp-saves; new-round misses all existing families ('5'-exclusion x1, '1'-exclusion x1, '2'-exclusion x2) — no new categories
+- McNemar: window 4v0 p=0.125; lifetime verified 11v5 p=0.210; raw 11v8 p=0.648
+
+Stage Summary:
+- Session's first full plateau: the +4 record delta is stable under block rotation, i.e. it is carried entirely by the 4 in-window exp rescues and is insensitive to which blocks age out — a more robust form of the exp tilt than last pass's eviction-sensitive widening.
+- '1' easing / '2' persisting: exclusion failure rotated from '1' to '2' within two blocks, consistent with the Task 65 picture of slot-budget displacement moving between low-prior numbers rather than a fixed defect.
+- Feed watch raised one notch (newest age 7.4 min); no trigger met.
+- Protocol continues: metrics-only. Engine untouched.
