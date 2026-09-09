@@ -4554,3 +4554,35 @@ Stage Summary:
 - Window: 2 rescues left (#664, #787). #664 exits at ~864 (~68 rounds); #787 at ~887. Lifetime unwind events: H2M chain only (18v6 p=0.023 still sig; 18v7 p=0.043 still sig; 18v8 p=0.076 crosses — three consecutive H2M now needed; exact analyzer-formula values).
 - Feed: post-hang cadence healthy (12 rounds/15 min). Disruption ledger: 14 events. Owner infra review URGENT.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 105 (cron monitor — Job ID 369099, pass 60 — quiet hold: window 2v0 held, lifetime 18v5 p=0.011 unchanged, 18-round all-agree block, no degraded recurrence)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 60, 16:01 +08). Trigger (a) standing YES (lifetime) -> full analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- Extraction clean: n=200, window 615-814 (18 new rounds 797-814; feed healthy post-hang, latest 30s). Integrity: contiguous, no dupes, no gaps.
+- METRIC-CONVENTION NOTE (no data issue): panel-vs-analyzer apparent base discrepancy (130 vs 131) investigated and resolved — the analyzer's "raw" base deliberately emulates a panel convention (bh_raw = clean + len(degset), line 44: "degraded rows gift baseline a hit"), while the ledger's true hit sum is 130 and the PANEL DISPLAYS 130. Ledger, panel, and clean metric are all mutually consistent; only the analyzer's emulation layer differs. Canonical clean numbers recorded below. Consider aligning the analyzer's raw label in a future maintenance pass (observation-only; not done now).
+- #785 degraded-row watch: NO recurrence — n=1 stands, no clustering; the post-hang-transient hypothesis remains unproven and unclaimed.
+- New rounds 797-814: 18/18 AGREE, both engines 13/18. '5'-heavy block (x7, 6 hit — #797-#799 triple + #802/#803 pair), '2' x4 (3 hit), '1' x3 (2 hit), '10' #808 hit, COIN FLIP #810 miss, CRAZY TIME #812 miss. Theo 15/18. Streak 27 (since #787).
+- Window state: 2v0 [664, #787] p=0.5 HELD; both window rescues still in-window (#664 exits ~maxId 864, 50 rounds away).
+- Panel cross-check: EXACT (130/132 true-count convention, theo 169/200, paired 200, no reset, K=10, SHADOW ON). Coverage base 68.70% / exp 68.66%.
+- Triggers: (a) YES — lifetime 18v5 p=0.011 standing; (b) no; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 615-814; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 130/199 = 65.3% (true count 130/200 incl. degraded-as-miss)
+3. Experimental HIT: 132/200 = 66.0% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring
+5. MISS->HIT flips: window 2 (#664, #787); lifetime 18
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 169/200 = 84.5% (clean 169/199 = 84.9%)
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('2' x1, '1' x1, COIN FLIP x1, CRAZY TIME x1) — no new categories
+- McNemar: window 2v0 p=0.5 (n.s. — mechanical); lifetime verified 18v5 p=0.011 (RECORD, unchanged); raw 18v8 p=0.076
+
+Stage Summary:
+- Second consecutive quiet hold after the rescue-deepening: 27 symmetric rounds since #787, no degraded recurrence, feed stable. The canonical evidence remains lifetime 18v5 p=0.011 with unchanged caveats (sequential testing; raw sensitivity p=0.076).
+- '5' block texture notable: 7 appearances, 6 hits — the slot that was never rescued is also currently the BASE engine's most reliable slot; exclusion pressure rotates as expected.
+- Window rescues #664/#787 both safe for ~50 rounds; the window will hold 2v0 (p=0.5) unless a new rescue (-> 3v0) or the scheduled decay resumes. Lifetime unwind requires 3 consecutive H2M (18v6 p=0.023, 18v7 p=0.043, 18v8 p=0.076 — exact analyzer-formula values).
+- Disruption ledger: 14 events; last 45 min clean. Owner infra review URGENT (standing).
+- Protocol continues. Engine untouched.
