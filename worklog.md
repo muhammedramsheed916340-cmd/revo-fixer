@@ -4947,3 +4947,31 @@ Stage Summary:
 - Monitoring impact remains zero: ledger persisted, panel consistent, evidence frozen (7th consecutive pass). The validation is designed to tolerate exactly this class of feed failure.
 - Next pass: either #17 resolves (resume cadence + formal gap registration + window roll) or it sets a new all-session record (>35.1 min). If the latter, consider a console probe per the stop-loss forensics ladder (renderer already verified healthy twice this outage).
 - Disruption ledger: 17 confirmed. Degraded frozen (#785). Protocol continues. Engine untouched.
+
+---
+Task ID: 118 (cron monitor — Job ID 369099, pass 73 — DISRUPTION #17 sets NEW ALL-SESSION RECORD: 48.4+ min silence (prev 35.1); 3rd zero-round pass; console probe CLEAN; renderer healthy; evidence static 4th pass)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 73, 19:16 +08). Trigger (a) standing YES (lifetime record) + (b) YES (record-breaking outage ongoing) -> full analysis. Engine unchanged (git freeze clean; HEAD d006e73 cron artifact commit).
+
+Work Log:
+- DISRUPTION #17 — NEW ALL-SESSION RECORD: zero new rounds 3rd consecutive pass; latest ts age 2904s (~48.4 min), surpassing the previous record (35.1 min). #949 last landed 18:28:27 +08; outage ongoing at pass close. 4th event in the escalating clustering band (15.0 / 26.3 / 33.4 / 48.4+ min across ~3 h of feed operation).
+- FORENSICS LADDER EXECUTED (per pass-72 commitment): (1) renderer probe — panel EXACT and stable (base 127/200, exp 129/200, M2H 2, H2M 0, theo 160/200, validation start preserved, K=10, SHADOW ON); (2) CONSOLE PROBE — CLEAN: zero errors/exceptions/websocket failures; only routine Next.js dev-server Fast Refresh HMR cycles (183-282ms rebuilds, normal dev churn). Verdict: app fully healthy, HMR active, page rendering current state — silence is 100% upstream. Reload NOT warranted (nothing to recover; ledger intact and consistent with panel).
+- All evidence metrics STATIC 4th consecutive pass: base clean 127/199 = 63.8%, exp 129/200 = 64.5%, delta clean +2 (+1.01pp), M2H 2v0 [#787,#844] p=0.5, H2M 0, theo 160/200 = 80.0%, lifetime 19v5 p=0.007 (record) / raw 19v8 p=0.052, streak 105. Degraded frozen (#785 sole).
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing; (b) YES — record-breaking outage ongoing; (c) no. VERDICT: ESCALATE — full analysis EXECUTED (forensics ladder + static-state verification above).
+
+Metrics (FIFO window n=200, IDs 750-949; clean n=199 — #785 excluded; UNCHANGED 4th pass):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 127/199 = 63.8% (raw 128/200 = 64.0%)
+3. Experimental HIT: 129/200 = 64.5% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 160/200 = 80.0% (clean 80.4%)
+8. MISS RCA: no new rounds — nothing to classify; lifetime 15 families + 9 exp-saves stand
+- McNemar: window 2v0 p=0.5 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- The outage picture has crystallized and it is NOT normal feed jitter: 4 disruptions in ~3 h (15.0, 26.3, 33.4, 48.4+ min — strictly escalating), all upstream, all zero-loss, renderer/console exonerated twice each. This is an upstream provider/scheduler stability problem, not an app defect. Owner infrastructure review is the single most urgent action item (standing since pass 61, now with 4 quantified data points).
+- Validation-side: fully resilient by design — the ledger, panel, and evidence chain are unaffected; the moment rounds resume, the 949->950 gap will auto-register and the window rolls mechanically. The evidence state (19v5 p=0.007 / delta +2 / 2v0 / streak 105) is intact and paused, not degraded.
+- Next pass: resume watch + formal gap registration; if still silent, re-verify renderer (3rd) — reload remains available but unnecessary while console/panel stay clean.
+- Disruption ledger: 17 confirmed (#17 record-holder, ongoing). Degraded frozen. Protocol continues. Engine untouched.
