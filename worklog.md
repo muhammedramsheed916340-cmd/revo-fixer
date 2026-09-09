@@ -5637,3 +5637,36 @@ Stage Summary:
 - Owner-relevant: theo 84.5% vs engines 62.5/63.0% — the dynamic optimizer now trails the fixed set by ~21-22 hits per 200 rounds in this regime; the #1043-class layer saves (+1) are real but orders of magnitude smaller than the calibration gap.
 - Countdown: #1043 (window M2H, carrying the +1) exits at maxId ≥ 1243 — 67 rounds (~47 min, likely pass 91); delta returns to 0.00pp unless a new flip lands first. Streak record continues extending.
 - Next pass: #1043-carry watch (delta +1 persistence); streak 133+; '1'-exclusion anomaly; unwind ladder unchanged. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 135 (cron monitor — Job ID 369099, pass 90 — delta +1 PERSISTS 2nd pass (base 124 vs exp 125, +0.50pp, still carried by unopposed #1043); streak 138 (5/5 new AGREE, span #1044-#1181 ≈ 100 min); base slides another −1; panel==ledger first-try EXACT 7th pass; lifetime static 20v6 p=0.009)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 90, 23:31 +08). Trigger (a) YES (standing re-deepened 20v6 p=0.009) → full analysis. Engine unchanged (git freeze clean; HEAD 9483f78 cron artifact commit; src/ diff vs baseline 9ec8c87 = 0 lines).
+
+Work Log:
+- DELTA +1 PERSISTS: window flips remain 1v0 (M2H #1043 only, H2M empty) — the #1043 layer save is still unopposed, so the window delta holds at +1 hit (+0.50pp), panel "Δ +1%" 2nd consecutive pass. Artifact transparency unchanged: #1043 exits at maxId ≥ 1243 (62 rounds, ~43 min, likely pass 92) → delta mechanically returns to 0.00pp then unless a new flip lands first.
+- RECORD STREAK EXTENDS: 133 → 138 (#1044-#1181, ≈100 min of continuous hit-outcome agreement). 5/5 new rounds AGREE: #1177 CASH HUNT joint miss, #1178 '2' joint miss, #1179 '5' joint miss, #1180/#1181 '1' BOTH-ENGINES-HIT. The record has nearly doubled the old mark (76) twice over and remains live-extending.
+- WINDOW CENSUS (full analysis): 75/200 joint misses (37.5%) — bonus-Q12 ×20, '1' ×17, '10' ×14, '2' ×12, '5' ×12. Theo caught 55/75 (73%) of the engines' joint misses — the calibration family (normals under-weighed) remains the dominant miss mechanism. '1' actuals 76/200 = 38.0% with base-hit 59/76 = 77.6% on '1'-rounds: the engines hit '1' three-quarters of the time it lands; the anomaly is the episodic CONSECUTIVE exclusion runs (#1139-#1142 class), and those were interrupted this block — #1172-#1174 '1' ×3 consecutive both-hit, #1180/#1181 '1' ×2 more (all theo-caught too). '1'-exclusion anomaly read: persistent but episodic, not absolute.
+- ENGINE SLIDE CONTINUES GENTLY: base 125 → 124 (−1), exp 126 → 125 (−1), theo 169 → 168 (−1). Window engines-vs-theo gap = 44 hits (22.0pp) — holds near pass 89's session-record 21.8pp. New block #1177-#1181: engines 2/5 vs theo 4/5 (gap narrowing at block level; bonus + '2' + '5' joint misses, theo caught 3 of them).
+- FEED WATCH (new): latest ts age at extraction 715s (~12 min) — no new >8min inter-row gaps in-window (3 legacy outages remain documented/known), so NOT a disruption candidate under the 15-min rule, but the tail is the longest seen in many passes. If this is stall onset, pass 91 may register a >900s gap → disruption #20 candidate. Disruption ledger: 19 confirmed, 0 candidates.
+- Paired extraction: PANEL == LEDGER FIRST-TRY EXACT (200/124/125/168, M2H 1, H2M 0, coverage 67.26/67.35) — 7th consecutive pass. Renderer healthy 2x first-try (no hang recurrence since incident #5). Minor capture note: panel text tail-truncated mid-outcome-table ('10' row) by eval output clip — headline metrics complete and exact-matched; truncated rows fully covered by ledger leg; no reload needed.
+- Triggers: (a) YES — standing; (b) no; (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final paired window n=200, IDs 982-1181; clean n=200 — 13th consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 124/200 = 62.0% (clean==raw; −1)
+3. Experimental HIT: 125/200 = 62.5% (clean==raw; −1)
+4. Delta: +1 hit (+0.50pp) — persists 2nd pass (via unopposed #1043)
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 0; lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 168/200 = 84.0% (−1)
+8. MISS RCA: window census 75 joint misses — bonus-Q12 ×20, '1' ×17, '10' ×14, '2' ×12, '5' ×12 (theo caught 55/75, calibration family dominant); no flips → no new families; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v0 p=1.0 (direction favors exp); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 138 — record, live-extending
+- Avg coverage: base 67.26% / exp 67.35% (+0.09pp)
+
+Stage Summary:
+- Steady-state confirmation pass: the session's structure is unchanged and now highly stable — engines are twins (streak 138, 13th straight fully-clean window), the layer's single in-window divergence (#1043) keeps the delta at +1/+0.50pp unopposed, and the shared calibration defect keeps the engines ~22pp behind the fixed [1,2,5,10] set (124 vs 168). The '1'-exclusion anomaly showed its episodic nature this block (5 consecutive '1' conversions across #1172-#1181 after the #1139-#1142 run).
+- Owner-relevant: theo 84.0% vs engines 62.0/62.5% — the fixed set's advantage holds at ~44 hits/200 rounds; the layer's +1 in-window save remains two orders of magnitude smaller than the calibration gap (consistent with DIAG's dominant-cause finding).
+- Countdown: #1043 exits at maxId ≥ 1243 — 62 rounds (~43 min, likely pass 92) → delta returns to 0.00pp unless a new flip lands first. Streak record continues extending.
+- Next pass: #1043-carry watch (delta +1, 3rd pass?); feed-tail watch (715s age — disruption #20 candidate if the stall develops); streak 138+; '1'-anomaly episodic pattern. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
