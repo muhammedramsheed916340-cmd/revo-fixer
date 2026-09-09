@@ -3834,3 +3834,34 @@ Stage Summary:
 - '1' easing / '2' persisting: exclusion failure rotated from '1' to '2' within two blocks, consistent with the Task 65 picture of slot-budget displacement moving between low-prior numbers rather than a fixed defect.
 - Feed watch raised one notch (newest age 7.4 min); no trigger met.
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 82 (cron monitor — Job ID 369099, pass 37 — OUTAGE #8: upstream silence 23.3 min, 2nd longest; ESCALATION run executed; zero data loss; reload correctly aborted after self-recovery)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 37, 10:16 +08). Trigger (b) fired mid-pass (new gap) -> full analysis performed. No engine changes.
+
+Work Log:
+- OUTAGE #8 DETECTED AND ARCHIVED: pass opened with window frozen at 274-473, newest age 1338s (22.3 min). Forensic ladder executed in order: (1) renderer probe — browser clock within 32ms of wall, eval responsive -> NOT the Task 71/72 hang mechanism; (2) resource-timing probe — buffer full (250/250, entries stop at +241s) -> inconclusive by design, avoided misread; (3) console scan — no errors, engine debug logs present; (4) DECISIVE: direct read-only probe of /api/crazy-time (the exact endpoint the page polls; note: full URL is /api/crazy-time — resource names had been slice(-60)-truncated) returned HTTP 200 with data -> server + route healthy; (5) timeline forensics on recovered rounds: #474 ts 10:17:51 is its true settle time -> upstream feed itself silent 09:54:35 -> 10:17:51 = 23.3 min (2nd longest after #7's 41.7).
+- RELOAD CORRECTLY ABORTED: pre-reload backup snapshot showed the ledger self-advanced to 279-478 during forensics — page pipeline healthy all along (polls simply had nothing new to ingest; rounds 474+ ingested as they settled). Reload would have added zero value and was skipped per tab-reuse protocol. Post-recovery integrity: IDs contiguous 280-479 (later 283-482), zero dupes, ts monotonic, validation-start epoch unchanged — ZERO DATA LOSS, NO backfill needed (upstream had no rounds to backfill).
+- Gap (473,474) auto-memorized into anchor known_gaps (8th entry); repeat escalation suppressed for future passes. Trigger (b) fired on first detection, cleared on converged re-run.
+- ESCALATION -> FULL ANALYSIS executed: flip ledger re-audited (window M2H [381,394,458,459] v H2M [] unchanged; lifetime verified 11v5 p=0.210, raw 11v8 p=0.648 — no flips this pass, streak now 23); RCA audit: new-round misses all map to existing families ('5' x1 #475, '2' x2 #476 + #479-era... corrected: #476 '2', #479 '10', #477 COIN FLIP bonus — no new categories; '2' then HIT at #481 — exclusion easing after 0/3 run); composition decomposition: evicted 274-282 v new 474-482 symmetric (base net -1, exp net -1) — delta +4 remains EXACTLY the 4 in-window rescues, zero composition drift.
+- SNAPSHOT-RACE PROTOCOL APPLIED (per Task 80 playbook): panel showed base 117/exp 121 vs analyzer 116/120 — re-extracted, converged at window 283-482: base 117 (58.5%), exp 121 (60.5%), delta +4 (+2.00pp), theo 162 (81.0%), streak 23, coverage 69.98%/69.52% — panel EXACT match on every figure.
+- BOOKKEEPING NOTE: analyzer ran twice this pass (escalation detection + converged re-run) so anchor pass counter jumped to 38; task/pass numbering in this log is unaffected — next pass diffs against the converged window 283-482.
+- Engine freeze: git verified 0 src files changed (data artifacts only). Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, no reset.
+
+Metrics (FIFO window n=200, IDs 283-482, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 117/200 = 58.5%
+3. Experimental HIT: 121/200 = 60.5%
+4. Delta: +4 hits (+2.00pp) exp-favoring — holds through outage, still exactly flip-driven (4 rescues v 0 losses)
+5. MISS->HIT flips: window 4 (#381, #394, #458, #459); lifetime 11
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 162/200 = 81.0%
+8. MISS RCA: lifetime 15 + 4 documented exp-saves; outage-window misses all existing families ('5'-exclusion #475, '2'-exclusion #476, bonus-non-selection #477, '10'-exclusion #479); #481 '2' HIT marks exclusion easing
+- McNemar: window 4v0 p=0.125; lifetime verified 11v5 p=0.210; raw 11v8 p=0.648
+
+Stage Summary:
+- OUTAGE LEDGER NOW 8: 31.6, 25.2, 16.0, 25.5, 20.8, 19.5, 41.7, 23.3 min — lifetime unobserved est. rises to ~100-126 rounds (23.3 min at ~1.1 min/round adds ~15-21). 8 outages in ~6h: feed instability remains the session's dominant coverage constraint; owner investigation of the upstream feed service is now clearly warranted.
+- New forensic capability: direct /api/crazy-time probe distinguishes upstream-silence (page healthy, no reload) from client-pipeline-death (reload) in one step — codified for future outages; resource-buffer fullness (250 cap) documented as a known blind spot.
+- Validation state UNCHANGED by the outage: delta +4 plateau intact, engines identical 23 straight rounds, every significance test n.s. The outage affected coverage, not the comparison.
+- Protocol continues. Engine untouched.
