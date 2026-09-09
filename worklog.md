@@ -5503,3 +5503,36 @@ Stage Summary:
 - '10' is emerging as this window's signature joint-miss (3x, all theo-caught): the engines' ranker consistently excludes '10' — matching DIAG's exclusion accounting ('10' excluded at 50% of its landings).
 - Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 51 rounds away (~36 min): likely during pass 86-87; its exit mechanically moves window flips to 1v0 (p=0.5). #1043 exits at maxId ≥ 1243 (139 rounds).
 - Next pass: streak record watch (61 → 76); #955 exit mechanics; unwind ladder unchanged (2 consecutive H2M → 20v7 p=0.018). Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 131 (cron monitor — Job ID 369099, pass 86 — RENDERER-HANG INCIDENT #5 (CDP Runtime.evaluate stall, reload zero-loss recovery, ledger gap 459s sub-grade, NO disruption registered); 14/14 new AGREE, streak 75 — ONE round short of record 76; parity 139/139 9th pass; lifetime static 20v6 p=0.009)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 86, 22:31 +08). Trigger (a) YES (standing re-deepened 20v6 p=0.009) → full analysis. Engine unchanged (git freeze clean; HEAD dbb169a cron artifact commit; src/ diff vs baseline = 0 lines).
+
+Work Log:
+- RENDERER-HANG INCIDENT #5 (recovered, zero loss): first paired extraction at ~22:32 FAILED — `CDP command timed out: Runtime.evaluate` on ledger eval, panel eval never ran, `get url` probe also timed out (EXIT 124) while `console` probe READ FINE (optimizer debug logs visible) — the app was logging but the evaluate channel was stalled. Recovery per protocol: `reload` at ~22:38 → URL responsive, post-reload paired extraction FIRST-TRY CLEAN.
+- ZERO-LOSS VERIFIED STRUCTURALLY: ledger advanced #1104 → #1118 with NO ID jump (#1117 → #1118 consecutive) and NO new >8min gap; ledger gap #1117→#1118 = 459s = 7.65 min (below the 15.0-min registration grade → NOT registered as disruption #20; renderer-hang signature event #5, sub-grade). Streak integrity preserved — the 75-run is genuine and continuous.
+- 14/14 new rounds AGREE (#1105-#1118) → streak 61 → 75 (since #1043). RECORD WATCH: one more agree round (#1119) TIES the all-session record 76; #1120 sets a new record 77 — likely within ~1-2 min of extraction close.
+- Window 905-1104 → 919-1118 (14 evictions 905-918). Both engines 140 → 139 (−1); theo 170 → 169 (−1).
+- New-block texture: cold patch #1107-#1113 — 6 joint misses in 7 rounds, INCLUDING '1' joint-missed twice (#1107, #1108 — rare: the engines' own dominant normal excluded during a bonus-seeking peak; theo caught both) plus '5'/'10' joint misses (theo-caught) and #1111 COIN FLIP both-miss incl. theo (Q12). Then 5 straight both-hit #1114-#1118. #1116 COIN FLIP both-hit (CF now converted 2 of its last 4 landings).
+- Paired extraction post-reload: PANEL == LEDGER FIRST-TRY EXACT (200/139/139/169, M2H 1, H2M 1) — 3rd consecutive pass. Panel rebuilt from localStorage on reload: identical numbers, further evidence of persistence integrity.
+- Triggers: (a) YES — standing; (b) YES — renderer-hang incident investigated (sub-grade, zero-loss); (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final paired window n=200, IDs 919-1118; clean n=200 — 9th consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 139/200 = 69.5% (clean==raw)
+3. Experimental HIT: 139/200 = 69.5% (clean==raw)
+4. Delta: +0 hits (+0.00pp) — parity holds 9th pass
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 169/200 = 84.5%
+8. MISS RCA: joint misses #1107/#1108 '1' (theo-caught — notable: dominant normal excluded), #1110/#1113 '5', #1112 '10' (theo-caught), #1111 COIN FLIP (Q12-unavoidable); no flips → no new families; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 75 (since #1043) — record 76 tie at #1119, new record 77 at #1120
+- Avg coverage: base 68.05% / exp 68.13% (+0.08pp)
+
+Stage Summary:
+- Incident ledger update: renderer-hang signature events now 5 for the session (4 previously registered among the 19 confirmed disruptions; this one SUB-GRADE and unregistered — 7.65 min ledger gap, zero ID loss, recovery via reload ~6 min after first failed probe). Renderer remains the dominant local failure mode; upstream was silent-or-absent during the gap (no ID jump → cannot distinguish upstream silence from recording stall; the conservative read is co-incident or renderer-side).
+- Evidence static through the incident: 20v6 p=0.009 / 20v9 p=0.061; parity 139/139 9th pass; streak 75 intact.
+- Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 37 rounds away (~26 min), likely pass 87; exit moves window flips to 1v0 (p=0.5). Streak record likely BROKEN before next pass (needs #1119 + #1120 to agree).
+- Next pass: STREAK RECORD VERIFICATION (76 tie / 77 new record); #955 exit mechanics; unwind ladder unchanged. Disruption ledger: 19 confirmed, 0 candidates (incident #5 sub-grade). Degraded set: EMPTY. Protocol continues. Engine untouched.
