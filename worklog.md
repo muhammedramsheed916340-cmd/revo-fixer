@@ -3736,3 +3736,35 @@ Stage Summary:
 - Equivalence state unchanged: verified 9v5 exp-tilted (p=0.424), delta +1 composition-driven, streak 34.
 - Session reliability watch: 7 outages / ~5h with the record set in the final hour — recommend the owner investigate the upstream feed service when convenient; monitoring continues to document each gap automatically.
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 79 (cron monitor — Job ID 369099, pass 34 — #236 ages out; catastrophic miss storm hits BOTH engines equally; delta +2 widest exp-favoring)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 34, 09:31 +08). All triggers clear. No engine changes.
+
+Work Log:
+- Feed probe: ALIVE, 18 new rounds 429-446 (window 247-446, newest age 0.0 min). 19th... 20th consecutive clean pass, zero degraded rows, no gaps.
+- #236 (LAST lifetime H2M in window) AGED OUT with evicted block 229-246 — as forecast in Tasks 74/75. Window flips now M2H [381, 394] vs H2M [] (2v0 p=0.500). The exp-favoring window delta mechanically widened as predicted; lifetime ledger unchanged (9v5 verified p=0.424).
+- CATASTROPHIC MISS STORM (block 429-446): BOTH engines 4/18 (22%) — worst block of the session. Normals 4/14: '10' 0/4 (439, 440, 443 all missed), '1' 2/5 (437, 438, 445 missed — '1'-exclusion is NEW depth: the most-included normal now being displaced), '5' 1/3 (433, 434 missed), '2' 1/3 (432 missed); bonus 0/4 (CASH HUNT x2, CRAZY TIME, COIN FLIP). theo 14/14 on applicable rounds. The Task 65 calibration failure mode at maximum intensity: bonus probability surge displacing even '1'.
+- Engines IDENTICAL throughout (18/18 agree, same 4 hits) — pure calibration exposure, zero layer differential. Streak 52 (last flip #394).
+- Window: base 120/200 = 60.0%, exp 122/200 = 61.0% — delta +2 hits (+1.0pp) exp-favoring, WIDEST YET. Composition: #236 exit (-1 H2M) + evicted asymmetry (base 12 vs exp 11) + symmetric storm block. theo 166/200 = 83.0% unchanged (theo +0).
+- Panel cross-check: exact match (200 paired, 60%/61%, delta +1%); normal/bonus base 101/166 vs exp 103/166 normal (+2, the two saves), base 19/34 vs exp 19/34 bonus — bonus split EQUAL for the first time (composition).
+- Engine freeze: git verified zero engine diffs.
+
+Metrics (FIFO window n=200, IDs 247-446, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 120/200 = 60.0%
+3. Experimental HIT: 122/200 = 61.0%
+4. Delta: +2 hits (+1.0pp) exp-favoring — widest yet, composition-driven (#236 exit + eviction asymmetry)
+5. MISS->HIT flips: window 2 (#381, #394); lifetime 9
+6. HIT->MISS flips: window 0 (all aged out); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 166/200 = 83.0%
+8. MISS RCA: lifetime 15 + 2 documented exp-saves; base misses in-block all match existing families ('10'-exclusion x4, '1'-exclusion x3 NEW DEPTH, '5'-exclusion x2, '2'-exclusion x1, bonus-non-selection x4) — '1'-exclusion cluster is the audit's worst-case scenario materializing
+- McNemar: window 2v0 p=0.500; lifetime verified 9v5 p=0.424; raw 9v8 p=1.000
+
+Stage Summary:
+- Regime at maximum hostility: 4/18 block for both engines; floor's dominance at its widest local margin (83.0% vs ~60%).
+- Delta +2 exp-favoring is exactly the predicted mechanical consequence of #236's exit — NOT a performance shift; live engines identical for 52 straight rounds. Equivalence unchanged at every significance test.
+- '1'-exclusion appearing (3x in one block) marks the deepest calibration failure observed — strengthens the Task 65 candidate list ('1'/'2' inclusion floors) if the owner ever chooses to act.
+- Watch: further storms hit both engines symmetrically; no A/B action possible from regime alone. Trigger (c) remains armed.
+- Protocol continues: metrics-only. Engine untouched.
