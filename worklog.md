@@ -3896,3 +3896,35 @@ Stage Summary:
 - The exp tilt has now survived three passes of pure block rotation at exactly +4 — the most stable differential structure of the session, entirely attributable to 4 rescues vs 0 losses. Still n.s. at every horizon (window p=0.125, lifetime p=0.210), but no counter-movement whatsoever: raw flips 11v8 is the only lifetime-level symmetry remaining.
 - Bonus regime flipped hot (COIN FLIP 5/5, window bonus 60.5% > normal 56.1%) while theo slides (78.5%) — consistent with the session-long pattern: bonus-heavy stretches raise displacement pressure on normals (the Task 65 mechanism), which is where both engines' misses concentrate.
 - Feed healthy post-outage; watch reset to normal. Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 84 (cron monitor — Job ID 369099, pass 39 — FIFTH RESCUE #511 '2': window flips 5v0 p=0.062, ONE rescue from trigger (a) crossing; delta +5 NEW RECORD)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 39, 10:46 +08). All triggers clear — but window sits one rescue from trigger (a). No engine changes.
+
+Work Log:
+- Feed probe: ALIVE — 20 new rounds 494-513 + #514 during verification (converged window 315-514, newest age 12s, contiguous). No gaps, no degraded rows.
+- FIFTH WINDOW RESCUE: #511 '2' — base missed, exp re-included and hit. Window M2H now [381, 394, 458, 459, 511] v H2M [] = 5v0, McNemar p=0.062. Lifetime verified 12v5 (p=0.143), raw 12v8 (p=0.503). '2' is now the dominant rescue source: 3 of the last 4 rescues (#458, #459, #511) are '2'-re-inclusions, directly and repeatedly validating the Task 65 '2'-inclusion-floor candidate.
+- DELTA +5 (+2.50pp) — NEW RECORD WIDENING (plateau of +4 held three passes, now broken upward by live differential, not composition: #511 is a live rescue). Window: base 111/200 = 55.5%, exp 116/200 = 58.0%.
+- CRITICAL WATCH: window 5v0 p=0.062 — the NEXT same-direction rescue makes it 6v0 p=0.031, CROSSING trigger (a) for the first time in the session (formal escalation + significance treatment). All reversal directions remain one H2M away from unwinding it. Trigger (a) is now effectively armed-by-proximity.
+- New block composition (494-513): '1' 4/7 for both (494-497 hit streak, then 504/507/510 missed — '1'-exclusion cold streak again), '2' base 4/6 vs exp 5/6 (the #511 differential), '5' 0/2 (500/501), '10' 0/1 (512), bonus 1/4 (COIN FLIP hit #502 then missed #508 — 5/5 streak ended; CRAZY TIME #503, CASH HUNT #506 missed). theo flat 157/200 = 78.5%.
+- Bonus/normal split (ledger-true, converged window): normal 157 (base 87, exp 92), bonus 43 (24/24 EQUAL) — the entire +5 differential lives in normal rounds, consistent with the layer's re-inclusion mechanism operating on number slots, never bonus.
+- SNAPSHOT-RACE PROTOCOL applied: first extraction 314-513, panel showed 111/116 (one round ahead) -> re-extracted, converged 315-514, EXACT panel match on every figure incl. flip counters (M2H 5, H2M 0 read directly from panel DOM). Streak 3 (last flip #511).
+- Engine freeze: git verified 0 src files changed. Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, no reset. Bookkeeping: analyzer double-run (race convergence) moved anchor counter to 41; task numbering unaffected — next pass diffs vs 315-514.
+- Triggers: (a) no (p=0.143 lifetime, p=0.062 window), (b) no, (c) no (1 new flip). VERDICT: metrics-only steady state.
+
+Metrics (FIFO window n=200, IDs 315-514, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 111/200 = 55.5%
+3. Experimental HIT: 116/200 = 58.0%
+4. Delta: +5 hits (+2.50pp) exp-favoring — NEW RECORD, live-rescue-driven
+5. MISS->HIT flips: window 5 (#381, #394, #458, #459, #511); lifetime 12
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 157/200 = 78.5%
+8. MISS RCA: lifetime 15 + 5 documented exp-saves (#381 '2', #394 '10', #458 '2', #459 '2', #511 '2'); new-round misses all existing families ('1' x3, '2' x1, '5' x2, '10' x1, bonus x3) — no new categories
+- McNemar: window 5v0 p=0.062; lifetime verified 12v5 p=0.143; raw 12v8 p=0.503
+
+Stage Summary:
+- The session's equivalence picture is now under real pressure: five same-direction rescues against zero counter-rescues in-window, delta at record +5, and window p one flip from formal significance. Equivalence is still the formal verdict (every p n.s.), but 'no difference' is weakening as a description of the live process — the asymmetry is sustained, one-directional, and mechanism-consistent (low-prior number re-inclusion).
+- Important guard for the owner's interpretation: p=0.062 with 5 rescues is exactly what a small-but-real effect looks like at this sample size, AND exactly what a fair coin looks like 3% of the time per direction — the monitor neither claims nor dismisses the effect; trigger (a) exists precisely to force the full-analysis treatment if it crosses.
+- Watch: (i) any 6th rescue -> ESCALATE; (ii) any H2M reverses the tilt story; (iii) '1'-cold-streak continuation. Protocol continues: metrics-only. Engine untouched.
