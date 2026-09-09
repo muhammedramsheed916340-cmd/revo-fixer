@@ -1,15 +1,15 @@
 {
-  "pass": 93,
-  "task": 137,
-  "min_id": 802,
-  "max_id": 1001,
+  "pass": 94,
+  "task": 138,
+  "min_id": 820,
+  "max_id": 1019,
   "n": 200,
-  "base_raw": 135,
-  "exp_raw": 135,
-  "theo_raw": 160,
-  "base_clean": 135,
-  "exp_clean": 135,
-  "theo_clean": 160,
+  "base_raw": 137,
+  "exp_raw": 137,
+  "theo_raw": 161,
+  "base_clean": 137,
+  "exp_clean": 137,
+  "theo_clean": 161,
   "clean_n": 200,
   "m2h_window": [
     844
@@ -20,7 +20,7 @@
   "h2m_verified_window": [
     955
   ],
-  "streak": 46,
+  "streak": 64,
   "last_flip": 955,
   "lifetime_m2h": [
     4,
@@ -63,8 +63,8 @@
     45,
     67
   ],
-  "coverage_base": 70.46,
-  "coverage_exp": 70.47,
+  "coverage_base": 70.72,
+  "coverage_exp": 70.74,
   "known_gaps": [
     [
       75,

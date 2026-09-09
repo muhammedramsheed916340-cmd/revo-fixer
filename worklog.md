@@ -5095,3 +5095,33 @@ Stage Summary:
 - The session's most-telegraphed event (#787 exit) executed exactly on forecast, and with it the window's exp advantage went to true zero: 135/135, +0.00pp, 1v1. The validation now rests ENTIRELY on the lifetime verified-flip ledger (19v6, p=0.015 nominal / raw 19v9 p=0.087 n.s.) — an honest position: the layer's in-window performance is indistinguishable from baseline, and its cumulative case rests on 19 saves vs 6 verified losses accrued over 1000 rounds. Owner framing: parity in-window, nominal-significant lifetime, prominent raw-sensitivity caveat, sequential-testing and post-hoc caveats standing. No superiority verdict — owner's call.
 - Both headline risks for the evidence have names and schedules: (1) TWO more consecutive lifetime H2M would exit significance (19v7 p=0.029 -> 19v8 p=0.052); (2) any M2H rescue re-deepens (19v5 p=0.007). #844 (the window's last rescue) exits ~#1044 (~43 rounds out) — next mechanical window move, no evidence impact.
 - Feed stable post renderer-hang #4 (one 8-min sub-threshold spell, resolved; 116s age). Renderer healthy this pass (no hang). Degraded set: EMPTY in-window (lifetime count stands at 1). Disruption ledger: 17 confirmed, no #18. Protocol continues. Engine untouched.
+
+---
+Task ID: 123 (cron monitor — Job ID 369099, pass 78 — PARITY HOLDS: 18/18 new AGREE, delta +0.00pp second pass (137/137); streak 64; lifetime 19v6 p=0.015 unchanged; feed clean, renderer healthy)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 78, 20:31 +08). Trigger (a) YES (standing nominal significance) -> full analysis. Engine unchanged (git freeze clean; only monitoring artifacts; HEAD 37d6527 cron artifact commit).
+
+Work Log:
+- PARITY HOLDS SECOND CONSECUTIVE PASS: 18 new rounds (#1002-#1019) all AGREE, both engines 13/18. Window rolled 802-1001 -> 820-1019 (evictions 802-819). Delta stays +0.00pp — raw counts EQUAL at 137/137 = 68.5% both. The in-window zero-differential state is now stable across two passes and 33 consecutive AGREE rounds.
+- Streak 64 (since #955) — 4th longest of session; extended through both the #787 eviction boundary and this pass. Lifetime flips UNCHANGED: verified 19v6 p=0.015 / raw 19v9 p=0.087. Window 1v1 [#844 saved | #955 lost] p=1.0. No new flips — the H2M-sequence exitwatch (2 consecutive H2M to exit) did NOT advance; any rescue still re-deepens.
+- Block rotation note: '1' cooled sharply 3/6 in this block (#1008/#1010/#1012 misses) after 7/7 last block; '2' now hot 7/7 (#1002,#1003,#1005,#1009,#1013,#1018,#1019); '5' 1/2, '10' 1/1 (#1006), COIN FLIP 1/2 (#1014 miss), CASH HUNT 1/1 (#1004). Theo 161/200 = 80.5% (+1 net: evicted theo -1, new +2... net +1 per analyzer). Window composition: 3rd consecutive FULLY-CLEAN window (n=200, no degraded).
+- Bonus/normal composition shifted: base bonus 22/39 (56%) vs exp 21/39 (54%) — base now leads bonus; exp leads normal 116/161 (72%) vs 115/161 (71%); the two cancel to the zero delta. Coverage base 70.72% vs exp 70.74% (parity). Pred changes: base 85 vs exp 88.
+- Feed: fully healthy — 18 rounds in ~15 min (~50s cadence), latest ts age 77s, ZERO inter-row gaps >8min (the 986->987 spell is now documented/excluded). No disruption #18. Renderer: healthy, no hang, extraction converged first try both panel and ledger (no snapshot race, no reload needed).
+- Triggers: (a) YES — lifetime 19v6 p=0.015 standing (nominal); (b) no; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED (parity verification + rolling analysis above).
+
+Metrics (FIFO window n=200, IDs 820-1019; clean n=200 — third consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 137/200 = 68.5% (clean==raw)
+3. Experimental HIT: 137/200 = 68.5% (clean==raw) — EQUAL to baseline
+4. Delta: +0 hits (+0.00pp) — parity holds
+5. MISS->HIT flips: window 1 (#844); lifetime 19
+6. HIT->MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 161/200 = 80.5%
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves + 1 exp-loss; new-round misses (#1007 '5', #1008/#1010/#1012 '1', #1014 COIN FLIP) all existing families — no new categories
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 19v6 p=0.015 (unchanged); raw 19v9 p=0.087 (unchanged)
+- Agreement streak: 64 (since #955)
+
+Stage Summary:
+- The validation has settled into a stable parity regime in-window: 137/137, +0.00pp, 1v1 flips, three fully-clean windows, 33 consecutive AGREE rounds. The evidence differential remains entirely the lifetime verified-flip ledger (19v6 p=0.015 nominal / 19v9 p=0.087 raw n.s.) — unchanged for the 2nd pass since the #787 exit. The layer is behaving exactly as designed on both sides: symmetric in-window, cumulative saves as the differentiator.
+- Movers: (1) #844 — the window's LAST rescue — exits ~#1044 (~25 rounds out; window flips then go 0v1, a cosmetic-only change but the window will carry zero exp-favoring flips for the first time); (2) any M2H rescue re-deepens lifetime to 19v5 p=0.007; (3) two consecutive lifetime H2M exit significance (19v7 p=0.029 -> 19v8 p=0.052).
+- Feed stable post-hang #4; no new disruptions (ledger: 17). Degraded set: EMPTY in-window (lifetime 1). Owner infrastructure items stand (upstream stability; renderer hang root-cause x4). Protocol continues. Engine untouched.
