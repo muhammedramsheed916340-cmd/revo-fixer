@@ -4215,3 +4215,35 @@ Stage Summary:
 - Lifetime 16v5 p=0.027 (window-independent) remains the number of record; the ONLY unwind event is a new H2M (16v6 -> p=0.058). None observed; window H2M 0 for 8+ consecutive passes.
 - Feed: 17 rounds/15 min hot streak, zero disruptions this pass (11 events total). Owner infra review overdue.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 94 (cron monitor — Job ID 369099, pass 49 — ⭐ EIGHTH RESCUE #664 '5': FIRST-EVER '5' slot rescue, landed exactly as #458/#459 aged out; window held 6v0 p=0.031; lifetime DEEPENED 17v5 p=0.017 new record)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 49, 13:16 +08). Trigger (a) standing YES -> full analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- Extraction clean first attempt: n=200, window 472-671 (15 new rounds 657-671; feed hot ~1 min cadence continues). Integrity: contiguous, no dupes, no gaps, latest 19s. Known-gaps exclusions all working (473, 520, 628).
+- ⭐ THE PROJECTED UNWIND MET ITS COUNTERWEIGHT: #458 AND #459 aged out (double eviction of window rescues) — but the EIGHTH rescue landed MID-BLOCK: #664, actual '5' (ts in-block), base missed, exp HIT. Window would have gone 5v0 (p=0.0625 n.s.); instead the new flip replaced one eviction net: window now 6v0, p=0.031 — STILL SIGNIFICANT. Lifetime ledger DEEPENED to 17v5 p=0.017 (was 16v5 p=0.027) — NEW RECORD DEPTH, the strongest canonical evidence of the entire session.
+- ⭐ '5' SLOT RESCUED FOR THE FIRST TIME EVER: standing composition note ('5' never rescued, 7x'2' + 2x'10' + 7 early-session) is now obsolete — lifetime 17 rescues = 7x'2' + 2x'10' + 7 early-session + 1x'5' (#664). The layer's exclusion-reinclusion mechanism has now demonstrated differential value on EVERY normal slot except '1' (the highest-prior slot, where exclusions are rare/weak — consistent with the reliability layer's design: it only damps low-observation deviations). '1' remains the only never-rescued slot.
+- Block detail 657-671: 14/15 agree, 1 M2H (#664), 0 H2M, 0 degraded. Both engines 8/15 in-block. '5' appeared 3x (#663/#668 both-miss, #664 exp-only hit); '1' x6 (5 hit), '2' x2 hit, hot cadence continues.
+- Panel cross-check: EXACT (119/125, M2H 6, H2M 0, theo 161/200, paired 200, no reset, K=10, SHADOW ON). Git freeze clean.
+- Triggers: (a) YES — window 6v0 p=0.031 + lifetime 17v5 p=0.017 (deepened); (b) no; (c) no (1 new flip). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 472-671, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 119/200 = 59.5%
+3. Experimental HIT: 125/200 = 62.5%
+4. Delta: +6 hits (+3.00pp) exp-favoring — dipped +7 -> +6 via eviction composition (2 rescues left window, 1 entered)
+5. MISS->HIT flips: window 6 (#511, #532, #554, #562, #590, #664); lifetime 17
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 161/200 = 80.5%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('5' x2, '1' x1, COIN FLIP x1, CASH HUNT x1) — no new categories
+- McNemar: window 6v0 p=0.031 (held via #664); lifetime verified 17v5 p=0.017 (NEW RECORD); raw 17v8 p=0.108
+- Coverage: base 68.86% / exp 68.72%; streak reset to 7 (last flip #664)
+
+Stage Summary:
+- The session's central dynamic repeated with perfect timing: mechanical eviction drained 2 window rescues (#458/#459) and the layer answered with a fresh rescue (#664) BEFORE significance could decay — window held at 6v0 p=0.031, lifetime deepened to 17v5 p=0.017. The renewable-resource pattern is now 3-for-3 (#381->#394, #394->#590, #458/#459->#664).
+- '5' rescue closes the composition gap: every low-prior normal slot ('2', '5', '10') has now shown the differential; '1' never rescued (exclusion pressure concentrates on rare outcomes, per design intent).
+- Next window rescue eviction: #511 exits when maxId reaches 710 (~39 rounds); #532 at ~731. If no 9th rescue lands, unwind resumes 6v0 -> 5v0 (p=0.0625 n.s.). The 5 remaining window rescues: #511, #532, #554, #562, #590.
+- Lifetime 17v5 p=0.017 is window-independent; ONLY unwind event is a new H2M (17v6 -> p=0.035 still significant; a SECOND new H2M to 17v7 -> p=0.064 would cross out — exact analyzer-formula values). Window H2M 0 for 9+ consecutive passes.
+- Protocol continues. Engine untouched.
