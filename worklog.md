@@ -5319,3 +5319,54 @@ Stage Summary:
 - The experimental reliability layer's PACHINKO-only dampening is well-motivated but NARROW: the over-prediction problem is broader (all bonuses). This explains why exp == base in the current window (138/138) — the layer touches only one of four over-predicted bonuses.
 - Pooled meta-analysis (395 rounds, diagnostic only) confirms: COIN FLIP is the dominant displacer pool-wide, '1'/'2'/'5' are roughly equally excluded, and the gap is ~15.4pp (slightly wider than the current 12pp window). Directional, not inferential.
 - Engine untouched. Git freeze clean. This was analysis-only per the strict no-modify directive.
+
+---
+Task ID: 126 (cron monitor — Job ID 369099, pass 81 — NEW RESCUE #1043 M2H: reliability layer's razor-thin save (12.1% vs 12.1% tie flipped by 0.1pp dampening); lifetime verified 20v6 p=0.009 RE-DEEPENED; delta parity holds 139/139)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 81, 21:16 +08). Trigger (a) YES + (c) YES (new M2H flip) -> full analysis. Engine unchanged (git freeze clean; HEAD 301df3c cron artifact commit). NOTE: this pass coincided with a user-commission deep diagnostic (Task 126-DIAG, next section) — extractions shared, findings cross-referenced.
+
+Work Log:
+- M2H EVENT #20 (lifetime), VERIFIED #7: #1043 actual '2' — base ['1','5','CASH HUNT','COIN FLIP'] MISS; exp ['1','5','CASH HUNT','2'] HIT. PROB-LEVEL DETAIL (unique in session — prob vectors available): base bpr('2') = bpr(COIN FLIP) = 12.1% EXACT TIE; the reliability layer's dampening of COIN FLIP's positive deviation (12.1% -> 12.1% base vs exp epr('2') 12.2% > epr(CF) 12.1%) flipped the tie and kept '2'. The layer's designed mechanism, executing at 0.1pp resolution. RCA: '2' displaced by CF/CH inclusion; empirical '2' rate ~29% vs modeled 12.1% (calibration compression, see DIAG).
+- Evidence RE-DEEPENED one rung: lifetime verified 20v6 p=0.009 (was 19v6 p=0.015); raw 20v9 p=0.061. Window flips 1v1 [#1043 | #955] p=1.0 — #844 exited mechanically as forecast (3rd scheduled exit executed on time).
+- Window 832-1031 -> 861-1060 (29 new rounds #1032-#1060, evictions 832-860): 28/29 AGREE; the one flip IS #1043. Both engines 15/29. Theo 167/200 = 83.5% (+5 — hot normal block: '2' 8/9, '1' 7/9). Base 139/200 = 69.5%, exp 139/200 = 69.5%, delta +0.00pp — parity holds 4th pass. Streak reset 76 -> 17 (since #1043). #1048 CASH HUNT both-hit (bonus converted).
+- Feed: fully healthy (29 rounds in ~15 min, ~31s cadence, latest age 139s, zero gaps). Renderer healthy. No disruption #19.
+- Panel == ledger EXACT (139/139/167, M2H 1, H2M 1; K=10, SHADOW ON, validation start preserved). First-extraction convergence 4th time in 6 passes.
+- Triggers: (a) YES — re-deepened significance; (b) no; (c) YES — new flip. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 861-1060; clean n=200 — fifth consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 139/200 = 69.5% (clean==raw)
+3. Experimental HIT: 139/200 = 69.5% (clean==raw)
+4. Delta: +0 hits (+0.00pp) — parity holds
+5. MISS->HIT flips: window 1 (#1043); lifetime 20
+6. HIT->MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 167/200 = 83.5%
+8. MISS RCA: lifetime 15 families + 10 exp-saves + 1 exp-loss; #1043 fully explained (layer tie-flip); no new categories
+- McNemar: window 1v1 p=1.0; lifetime verified 20v6 p=0.009 (re-deepened); raw 20v9 p=0.061
+- Agreement streak: 17 (since #1043)
+
+Stage Summary:
+- The layer's first observable tie-break save (#1043) is the cleanest mechanistic demonstration of the experimental design all session — and it arrived with prob vectors attached. Evidence re-deepened to 20v6 p=0.009 (one rung below the all-session record rung 20v5 p=0.004 equivalent). Window parity (139/139) now static 4 passes; the lifetime asymmetry carries all evidential weight. Unwind ladder: 2 consecutive H2M would re-weaken (20v7 p=0.018 -> 20v8 p=0.033 -> ...); any further M2H deepens toward record.
+- Deep diagnostic (Task 126-DIAG, next section) established the structural context for both engines' parity: both share the same score architecture; the layer differs on only ~3% of rounds — hence tied hit rates with tiny flip asymmetry. See DIAG for the full theoretical-baseline gap analysis (dominant cause: probability compression/calibration, NOT the reliability layer).
+- Disruption ledger: 18 confirmed. Degraded set: EMPTY in-window. Protocol continues. Engine untouched.
+
+---
+Task ID: 126-DIAG (user commission — READ-ONLY diagnostic: exact source of the dynamic-baseline vs [1,2,5,10] gap; NO engine/code changes)
+Agent: Z.ai Code (diagnostic run, observation-only)
+Task: User-commissioned deep diagnosis. Find the exact source of the 12pp gap (dynamic 138/200 = 69% vs theoretical 162/200 = 81%, pinned clean window 832-1031); per-MISS 12-question attribution; per-outcome inclusion/coverage/miss accounting; swap-set hit rates; expected-vs-actual coverage; calibration; pooled meta-analysis (individual windows separated from pool). NO code/model changes, no tuning on these rounds.
+
+Work Log:
+- DATA: pooled 35 ledger snapshots (28-306 + 637-1060; 703 unique rounds; 6497 duplicate checks, 0 mismatches; gap 307-636 absent from snapshots). Prob vectors (bpr/epr) available for 88-306 + 853-1060 (427 rounds); pinned window covered 179/200 (853-1031). Engine pipeline read from src/components/revo/decisionEngine.ts (READ-ONLY) to map attribution stages.
+- GAP DECOMPOSITION (pinned window): theo 162 = all normal rounds (162); base hit 118/162 normal (72.8%) + 20/38 bonus (52.6%). Gap 24 rounds = 44 normal-round misses - 20 bonus-round hits. SWAP LEDGER: base set != [1,2,5,10] in 199/200 rounds (!); gain 20 / cost 44 / push 118 / both-miss 17; net -24 == the whole gap.
+- EXCLUSION ACCOUNTING (cost rounds): '1' excluded 13x (17% of its landings), '2' 14x (24%), '5' 12x (71%), '10' 5x (50%). Avg Top-4 composition: 2.27 normals + 1.74 bonuses. Displacers (prob-covered 36 cost rounds): COIN FLIP 18, CASH HUNT 8, CRAZY TIME 6, PACHINKO 4. Bonus inclusion vs landing: PACHINKO incl 50.5% vs lands 4.5%; CF 58.5% vs 8.0%.
+- 12-QUESTION ATTRIBUTION (36 prob-covered cost rounds): Q6 rare-outcome evidence 0 (layer would NOT flip any cost round; epr==bpr — N_obs inflated by live spins -> r≈1); Q7 recent-frequency 7 (lower bound; live recency invisible); Q8 live/user blend not per-round isolable (structural co-contributor); Q9 persistence 1 (#948); Q10 optimizer = mechanism in 100% (amplifier, not root); Q11 calibration PRIMARY 28/36; Q12 unavoidable = the 38 bonus rounds themselves (base caught 20 = its only legitimate edge).
+- CALIBRATION (THE DOMINANT CAUSE): modeled vs empirical — '1' 15.4% vs 40.2% (-24.8pp), '2' 14.9% vs 29.1% (-14.1pp); PACHINKO 2.59x over, CRAZY TIME 2.36x, CASH HUNT 2.18x, '10' 1.88x, '5' 1.45x, COIN FLIP 1.15x. Multi-class Brier 0.148. DECISION-LEVEL INVERSION: optimizer claims coverage edge over theo set in 98-99% of rounds, modeled +18.8/+20.3pp (early/recent) -> ACTUAL delta -23.3/-11.7pp (32-44pp total decision error). Aggregate selected-set coverage accidentally matches (70.6% modeled vs 70.7% actual) while composition is wrong — theo set modeled 50.6% vs actual 82.2%.
+- ROOT MECHANISM (code-read): score = 0.5*(1+relativeDev) + 0.5*prior gives the deviation term a CONSTANT 0.5 absolute weight regardless of rarity -> rarity-inverted scores; SHRINKAGE_K=30 (Laplace) and RELIABILITY_K=10 both assume small N, but live spins inflate sampleN/combinedCount into the hundreds -> both safeguards inert; 70-combo optimizer faithfully maximizes coverage over the compressed, mis-ranked distribution.
+- CROSS-CHECKS: pattern reproduces in ALL 30 individual windows (cost 41-67 vs gain 13-28) and both pooled segments (early 28-306: base 63.4% vs theo 81.7%, cost 83/gain 32; recent 637-1052: base 66.8% vs theo 82.5%, cost 100/gain 35). Exp engine diverges from base on only ~3% of rounds (6/200 window) — hence 138==138 parity with tiny flip asymmetry (#844 rescue / #955 loss / #1043 rescue post-window). #1043 live demonstration: layer flipped a 12.1%-vs-12.1% tie by 0.1pp dampening.
+- LIMITATIONS: Q7 proxy lower bound (live spins not in ledger); prob subset 179/200; pool gap 307-636; pooled results are diagnostic meta-analysis over overlapping windows, NOT a fresh validation; no parameter tuning performed.
+
+Stage Summary:
+- DOMINANT CAUSE (quantified): relative miscalibration between normals and bonuses — normals underestimated 0.38-0.51x, bonuses overestimated 1.9-2.6x — produced by the constant-weight relative-deviation scoring term plus sample-size safeguards (k=30 Laplace, K=10 reliability) that were calibrated for a 30-round user-history world and silently neutralized once live spins enlarged the effective sample. The optimizer converts this into a per-round swap deficit: pays 44 normal hits to win 20 bonus hits (window); ~2.2:1 adverse exchange rate, stable across all eras.
+- NOT the cause: the reliability layer (0 engagement in cost rounds — it only differs on ~3% of rounds and nets +1 lifetime flip rung), persistence penalty (1/36), single-round luck (reproduced in all 30 windows), and the optimizer mechanism itself (faithful to its inputs).
+- RECOMMENDED NEXT INVESTIGATIONS (no code changes): (1) log/verify liveN vs user-round N at prediction time to confirm N_obs inflation (would explain both inert safeguards); (2) build an offline replay harness to decompose score components per round (evidence vs prior vs signals) and test alternative dev-weightings COUNTERFACTUALLY on FRESH out-of-time rounds only; (3) standing swap-P&L-per-displacer dashboard (COIN FLIP is the top churn source now, not PACHINKO); (4) revisit safeguard constants' effective sample-size basis (both keyed to counts that no longer describe the data regime); (5) note the fixed-set benchmark itself is not sacred (COIN FLIP out-landed '10' in-window and in recent pool) — any future fix should target relative calibration, not hard-coded sets (per owner's own constraint).
+- Artifacts: scripts/diag_top4_gap.py, scripts/diag_top4_coverage.py, scripts/data/diag_top4_result.json. Engine untouched (git freeze verified pre/post).

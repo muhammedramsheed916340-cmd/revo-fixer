@@ -1,0 +1,1053 @@
+{
+ "pinned_window": {
+  "ids": "832-1031",
+  "swap_cost": [
+   832,
+   834,
+   835,
+   836,
+   837,
+   842,
+   843,
+   844,
+   865,
+   870,
+   872,
+   887,
+   904,
+   907,
+   908,
+   914,
+   915,
+   921,
+   938,
+   939,
+   943,
+   944,
+   945,
+   946,
+   948,
+   949,
+   950,
+   952,
+   953,
+   958,
+   961,
+   976,
+   979,
+   981,
+   986,
+   989,
+   993,
+   999,
+   1000,
+   1007,
+   1008,
+   1010,
+   1012,
+   1030
+  ],
+  "swap_gain": [
+   838,
+   850,
+   853,
+   854,
+   855,
+   860,
+   869,
+   901,
+   902,
+   942,
+   955,
+   956,
+   959,
+   960,
+   972,
+   973,
+   983,
+   990,
+   1004,
+   1017
+  ],
+  "miss_detail": [
+   [
+    832,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    0,
+    false
+   ],
+   [
+    833,
+    "CRAZY TIME",
+    [],
+    [
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    1,
+    false
+   ],
+   [
+    834,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "COIN FLIP",
+     "CASH HUNT",
+     "CRAZY TIME"
+    ],
+    2,
+    false
+   ],
+   [
+    835,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    3,
+    false
+   ],
+   [
+    836,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    4,
+    false
+   ],
+   [
+    837,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    5,
+    false
+   ],
+   [
+    839,
+    "COIN FLIP",
+    [],
+    [
+     "CRAZY TIME"
+    ],
+    0,
+    true
+   ],
+   [
+    842,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    0,
+    false
+   ],
+   [
+    843,
+    "10",
+    [
+     "10"
+    ],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    1,
+    false
+   ],
+   [
+    844,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    2,
+    false
+   ],
+   [
+    848,
+    "PACHINKO",
+    [],
+    [
+     "CRAZY TIME"
+    ],
+    0,
+    false
+   ],
+   [
+    864,
+    "COIN FLIP",
+    [],
+    [
+     "PACHINKO",
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    865,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    1,
+    false
+   ],
+   [
+    870,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    872,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    0,
+    false
+   ],
+   [
+    878,
+    "CRAZY TIME",
+    [],
+    [
+     "COIN FLIP"
+    ],
+    0,
+    false
+   ],
+   [
+    883,
+    "COIN FLIP",
+    [],
+    [
+     "CRAZY TIME"
+    ],
+    0,
+    false
+   ],
+   [
+    887,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    0,
+    true
+   ],
+   [
+    892,
+    "PACHINKO",
+    [],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    0,
+    false
+   ],
+   [
+    896,
+    "COIN FLIP",
+    [],
+    [
+     "PACHINKO",
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    899,
+    "CASH HUNT",
+    [],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    0,
+    false
+   ],
+   [
+    900,
+    "CASH HUNT",
+    [],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    1,
+    false
+   ],
+   [
+    904,
+    "10",
+    [
+     "10"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    907,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    908,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    1,
+    true
+   ],
+   [
+    909,
+    "PACHINKO",
+    [],
+    [
+     "CASH HUNT"
+    ],
+    2,
+    false
+   ],
+   [
+    914,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "PACHINKO"
+    ],
+    0,
+    false
+   ],
+   [
+    915,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "PACHINKO",
+     "CRAZY TIME"
+    ],
+    1,
+    false
+   ],
+   [
+    921,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    938,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "PACHINKO",
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    939,
+    "10",
+    [
+     "10"
+    ],
+    [
+     "PACHINKO"
+    ],
+    1,
+    false
+   ],
+   [
+    940,
+    "PACHINKO",
+    [],
+    [],
+    2,
+    true
+   ],
+   [
+    941,
+    "COIN FLIP",
+    [],
+    [
+     "PACHINKO"
+    ],
+    3,
+    false
+   ],
+   [
+    943,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    0,
+    true
+   ],
+   [
+    944,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    1,
+    false
+   ],
+   [
+    945,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    2,
+    false
+   ],
+   [
+    946,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    3,
+    false
+   ],
+   [
+    947,
+    "CASH HUNT",
+    [],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    4,
+    true
+   ],
+   [
+    948,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    5,
+    true
+   ],
+   [
+    949,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    6,
+    false
+   ],
+   [
+    950,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP",
+     "CASH HUNT"
+    ],
+    7,
+    false
+   ],
+   [
+    952,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    0,
+    false
+   ],
+   [
+    953,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    1,
+    false
+   ],
+   [
+    958,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    0,
+    true
+   ],
+   [
+    961,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    0,
+    true
+   ],
+   [
+    976,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "CASH HUNT",
+     "CRAZY TIME"
+    ],
+    0,
+    false
+   ],
+   [
+    979,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "CASH HUNT",
+     "CRAZY TIME"
+    ],
+    0,
+    false
+   ],
+   [
+    981,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "CASH HUNT",
+     "CRAZY TIME"
+    ],
+    0,
+    false
+   ],
+   [
+    982,
+    "COIN FLIP",
+    [],
+    [
+     "CRAZY TIME"
+    ],
+    1,
+    false
+   ],
+   [
+    986,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "COIN FLIP"
+    ],
+    0,
+    true
+   ],
+   [
+    989,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "COIN FLIP"
+    ],
+    0,
+    false
+   ],
+   [
+    993,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    0,
+    false
+   ],
+   [
+    999,
+    "10",
+    [
+     "10"
+    ],
+    [
+     "COIN FLIP"
+    ],
+    0,
+    false
+   ],
+   [
+    1000,
+    "10",
+    [
+     "10"
+    ],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    1,
+    false
+   ],
+   [
+    1007,
+    "5",
+    [
+     "5"
+    ],
+    [
+     "PACHINKO",
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    1008,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "CASH HUNT"
+    ],
+    1,
+    false
+   ],
+   [
+    1010,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    1012,
+    "1",
+    [
+     "1"
+    ],
+    [
+     "PACHINKO",
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    1014,
+    "COIN FLIP",
+    [],
+    [
+     "CASH HUNT"
+    ],
+    0,
+    false
+   ],
+   [
+    1026,
+    "CRAZY TIME",
+    [],
+    [
+     "PACHINKO",
+     "COIN FLIP"
+    ],
+    0,
+    false
+   ],
+   [
+    1027,
+    "COIN FLIP",
+    [],
+    [
+     "PACHINKO",
+     "CRAZY TIME"
+    ],
+    1,
+    true
+   ],
+   [
+    1030,
+    "2",
+    [
+     "2"
+    ],
+    [
+     "COIN FLIP",
+     "CRAZY TIME"
+    ],
+    0,
+    false
+   ]
+  ]
+ },
+ "prob_attribution": [
+  {
+   "id": 865,
+   "actual": "5",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 870,
+   "actual": "2",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 872,
+   "actual": "2",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 887,
+   "actual": "1",
+   "displacer": "CRAZY TIME",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 904,
+   "actual": "10",
+   "displacer": "CASH HUNT",
+   "class": "Q7 recent-frequency (displacer hot in last 5)"
+  },
+  {
+   "id": 907,
+   "actual": "2",
+   "displacer": "CASH HUNT",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 908,
+   "actual": "1",
+   "displacer": "CASH HUNT",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 914,
+   "actual": "2",
+   "displacer": "PACHINKO",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 915,
+   "actual": "2",
+   "displacer": "CRAZY TIME",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 921,
+   "actual": "5",
+   "displacer": "CASH HUNT",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 938,
+   "actual": "1",
+   "displacer": "PACHINKO",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 939,
+   "actual": "10",
+   "displacer": "PACHINKO",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 943,
+   "actual": "2",
+   "displacer": "COIN FLIP",
+   "class": "Q7 recent-frequency (displacer hot in last 5)"
+  },
+  {
+   "id": 944,
+   "actual": "2",
+   "displacer": "COIN FLIP",
+   "class": "Q7 recent-frequency (displacer hot in last 5)"
+  },
+  {
+   "id": 945,
+   "actual": "2",
+   "displacer": "COIN FLIP",
+   "class": "Q7 recent-frequency (displacer hot in last 5)"
+  },
+  {
+   "id": 946,
+   "actual": "1",
+   "displacer": "COIN FLIP",
+   "class": "Q7 recent-frequency (displacer hot in last 5)"
+  },
+  {
+   "id": 948,
+   "actual": "1",
+   "displacer": "COIN FLIP",
+   "class": "Q9 persistence penalty (N was incumbent, engine on streak)"
+  },
+  {
+   "id": 949,
+   "actual": "1",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 950,
+   "actual": "2",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 952,
+   "actual": "5",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 953,
+   "actual": "5",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 958,
+   "actual": "2",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 961,
+   "actual": "1",
+   "displacer": "PACHINKO",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 976,
+   "actual": "5",
+   "displacer": "CRAZY TIME",
+   "class": "Q7 recent-frequency (displacer hot in last 5)"
+  },
+  {
+   "id": 979,
+   "actual": "5",
+   "displacer": "CRAZY TIME",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 981,
+   "actual": "2",
+   "displacer": "CRAZY TIME",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 986,
+   "actual": "2",
+   "displacer": "COIN FLIP",
+   "class": "Q7 recent-frequency (displacer hot in last 5)"
+  },
+  {
+   "id": 989,
+   "actual": "5",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 993,
+   "actual": "2",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 999,
+   "actual": "10",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 1000,
+   "actual": "10",
+   "displacer": "COIN FLIP",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 1007,
+   "actual": "5",
+   "displacer": "CASH HUNT",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 1008,
+   "actual": "1",
+   "displacer": "CASH HUNT",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 1010,
+   "actual": "1",
+   "displacer": "CASH HUNT",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 1012,
+   "actual": "1",
+   "displacer": "CASH HUNT",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  },
+  {
+   "id": 1030,
+   "actual": "2",
+   "displacer": "CRAZY TIME",
+   "class": "Q11 calibration/blend residual (both engines displace)"
+  }
+ ],
+ "pooled_ids": "28-1060"
+}
