@@ -4061,3 +4061,34 @@ Stage Summary:
 - The signal remains slot-specific ('2'/'10' only), normal-only (bonus never differential), and mechanism-coherent (re-inclusion of under-included low-prior normals — exactly the layer's design intent).
 - Imminent: #381's window exit begins the mechanical unwind of the window stat within minutes; the lifetime 15v5 is permanent regardless.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 89 (cron monitor — Job ID 369099, pass 44 — MECHANICAL UNWIND STEP 1: #381 aged out, window 7v0 p=0.016; lifetime 15v5 p=0.041 PERMANENT; #394 exits within ~8 rounds)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 44, 12:01 +08). Trigger (a) standing-state. No engine changes.
+
+Work Log:
+- Feed probe: ALIVE — 16 new rounds 571-586 (window 387-586, newest age 51s, contiguous). No gaps, no degraded rows.
+- UNWIND STEP 1 CONFIRMED (as projected in Tasks 87/88): #381 (oldest window flip) aged out with evicted block 371-386. Window M2H now [394, 458, 459, 511, 532, 554, 562] = 7v0, p=0.016 (was 8v0 p=0.008). Still significant; delta eased +8 -> +7 (+3.50pp): base 103/200 = 51.5%, exp 110/200 = 55.0%. Decomposition exact: delta change -1 = the #381 window exit; evictions/new non-flip hits symmetric (base -3, exp -3). theo 162/200 = 81.0% unchanged.
+- LIFETIME LEDGER UNCHANGED AND WINDOW-INDEPENDENT: verified 15v5 p=0.041, raw 15v8 p=0.210. The window unwind does not touch it — the lifetime crossing stands permanently in the record.
+- NEXT UNWIND: #394 exits when min_id passes 394 — currently 387, 8 rounds away (~7-8 min): window drops to 6v0 p=0.062 (n.s.) within ~2 passes unless a new rescue lands first.
+- New block 571-586 (cold but SYMMETRIC): base 4/16, exp 4/16 — '2' 0/3 (575/577/578), '5' 0/3, '1' 3/5, bonus 2/4 (PACHINKO x2 hit, CRAZY TIME miss, COIN FLIP split). Engines identical 16/16; zero differential exposure. Streak 24 (last flip #562).
+- Panel cross-check: EXACT (103/110/162, M2H 7, H2M 0 from DOM) — no race. Engine freeze: git verified 0 src files changed. Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, no reset. Anchor counter 48.
+- Triggers: (a) YES — standing crossing (7v0 p=0.016); (b) no; (c) no (0 new flips). VERDICT: ESCALATE — standing-state analysis (unwind tracking + block audit).
+
+Metrics (FIFO window n=200, IDs 387-586, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 103/200 = 51.5%
+3. Experimental HIT: 110/200 = 55.0%
+4. Delta: +7 hits (+3.50pp) exp-favoring — eased by #381 window exit, composition-clean
+5. MISS->HIT flips: window 7 (#394, #458, #459, #511, #532, #554, #562); lifetime 15
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 162/200 = 81.0%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-block misses all existing families ('2' x3, '5' x3, '1' x2, bonus x2) — no new categories
+- McNemar: window 7v0 p=0.016 (standing); lifetime verified 15v5 p=0.041; raw 15v8 p=0.210
+
+Stage Summary:
+- The projected unwind is running exactly on schedule: window significance is a renewable resource that old flips drain; the lifetime ledger is where the crossing lives permanently. 15v5 p=0.041 is now the number of record.
+- In-block behavior unremarkable and symmetric (4/16 both engines, cold normals, hot PACHINKO) — the layer's differential remains entirely historical (the 15 verified rescues), with no fresh evidence this pass.
+- Watch: #394's exit (mechanical, imminent); any 9th rescue (window re-cross to 8v0 via new flip is still possible while 394 remains); any H2M (lifetime 15v5 -> 15v6 p=0.066, unwinds the lifetime crossing — the ONLY event that can erase the permanent ledger's significance).
+- Protocol continues. Engine untouched.
