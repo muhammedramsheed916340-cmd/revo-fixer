@@ -5005,3 +5005,32 @@ Stage Summary:
 - In-window known-gaps map: 756, 775, 836, 913, 949 boundaries — all documented, all zero-loss. The '1' quad and hot/cold blocks all survived across the outage boundary with the streak intact at 110.
 - Evidence state: 8th consecutive pass unchanged (19v5 p=0.007 / delta +2 / 2v0). Movers unchanged (new rescue, 3-consecutive H2M, #787 exit ~#987 -> ~33 rounds out).
 - Disruption ledger: 17 confirmed. Degraded frozen. Protocol continues. Engine untouched.
+
+---
+Task ID: 120 (cron monitor — Job ID 369099, pass 75 — FIRST H2M after 110-round streak: #955 PACHINKO (base HIT, exp MISS — layer's dampening trade-off made visible); lifetime verified 19v6 p=0.015 (one rung weaker); delta clean +1)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 75, 19:46 +08). Trigger (a) YES — significance CHANGED (weakened one rung) -> full analysis. Engine unchanged (git freeze clean; HEAD 06c862b cron artifact commit).
+
+Work Log:
+- H2M EVENT #9 (lifetime), VERIFIED #6: #955 actual PACHINKO — base ['1', COIN FLIP, '2', PACHINKO] HIT; exp ['1', COIN FLIP, '2', '5'] MISS. The reliability layer replaced slot-4 PACHINKO with '5' — the EXACT mirror image of rescues #787/#844 (slot-4 replacement, opposite direction). RCA: PACHINKO is the original root-cause outcome (few observations, +39% positive deviation); the layer's r = N_obs/(N_obs+10) dampening pushed it out of the exp panel, and PACHINKO landed (base in-window form 4/7). This is the designed trade-off made visible: the layer trades rare-outcome upside for reliability elsewhere. Coverage on the round: base 0.544 vs exp 0.547 — exp coverage was NOT lower; composition differed.
+- Evidence WEAKENED one rung (honest reporting): lifetime verified 19v6 p=0.015 (was 19v5 p=0.007 — the pass-63-record rung consumed); lifetime raw 19v9 p=0.087 (raw sensitivity now clearly non-significant). Window 2v1 [#787,#844 saved | #955 lost] p=1.0. Unwind ladder remaining: 2 more consecutive H2M (19v7 p=0.029, 19v8 p=0.052 exit). A single M2H re-deepens.
+- Delta narrowed: clean +2 -> +1 (+0.50pp) — mechanical (the H2M removed one exp-favoring hit). Base clean 136/199 = 68.3%, exp 137/200 = 68.5%. theo 160/200 = 80.0%. Streak reset 110 -> 19 (since #955). The 110-round all-agree record ended by an exp-UNFAVORING flip — symmetry note: the two longest streaks both began with exp-favoring rescues.
+- Post-#17 feed: healthy at fast cadence (14s age, no gaps). 20 new rounds this pass (#955-#974): '1' 11/12 both engines (9... verified 10/11), PACHINKO 2/3 base vs 1/3 exp (the asymmetry IS #955), '2' 2/3, COIN FLIP 2/2, '10' 1/1, '5' 0/2. Snapshot-race handled by protocol: three extraction rounds until matched simultaneous convergence (ledger 775-974 == panel EXACT: 136/137/160, M2H 2, H2M 1; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved).
+- Triggers: (a) YES — significance changed (weakened); (b) no; (c) no (1 new flip). VERDICT: ESCALATE — full analysis EXECUTED (forensics + convergence above).
+
+Metrics (FIFO window n=200, IDs 775-974; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 136/199 = 68.3% (raw 137/200 = 68.5%)
+3. Experimental HIT: 137/200 = 68.5% (clean==raw)
+4. Delta: clean +1 hit (+0.50pp) exp-favoring — narrowed from +2 by #955 H2M
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 160/200 = 80.0% (clean 80.4%)
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves + 1 exp-loss; #955 miss fully explained (PACHINKO dampening trade-off) — no unexplained categories
+- McNemar: window 2v1 p=1.0 (n.s.); lifetime verified 19v6 p=0.015 (weakened from 0.007, still nominally significant); raw 19v9 p=0.087 (non-significant — sensitivity caveat now prominent)
+
+Stage Summary:
+- The first H2M in 110 rounds arrived precisely as the design predicts it should: the layer's dampening of PACHINKO (the root-cause rare outcome) cost a hit when PACHINKO landed. The evidence ledger moved DOWN one rung honestly: 19v6 p=0.015 verified (nominally significant), 19v9 p=0.087 raw (non-significant). Both engines had drifted up to 68.3/68.5 pre-flip; the raw hit counts are now EQUAL (137/137 raw) — the entire differential is the verified-flip asymmetry.
+- Position for owner: the canonical evidence remains nominally significant but has consumed the first unwind rung; the raw-sensitivity caveat is now prominent (p=0.087). Sequential-testing and post-hoc caveats unchanged. No superiority verdict — owner's call. Watch: 2 consecutive H2M would exit significance; any M2H re-deepens.
+- The symmetry of the session is striking: 19 saves vs 9 losses (6 of the 9 verified), longest streaks bookended by exp-favoring flips, and the single verified loss is the designed consequence of the original root-cause fix. The layer is behaving exactly as specified on both sides of the ledger.
+- Feed healthy post-#17 (14s). Degraded frozen (#785). #787 exit ~#987 (~13 rounds out — window composition note: its exit will make window 1v1 mechanically). Protocol continues. Engine untouched.
