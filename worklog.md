@@ -5536,3 +5536,36 @@ Stage Summary:
 - Evidence static through the incident: 20v6 p=0.009 / 20v9 p=0.061; parity 139/139 9th pass; streak 75 intact.
 - Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 37 rounds away (~26 min), likely pass 87; exit moves window flips to 1v0 (p=0.5). Streak record likely BROKEN before next pass (needs #1119 + #1120 to agree).
 - Next pass: STREAK RECORD VERIFICATION (76 tie / 77 new record); #955 exit mechanics; unwind ladder unchanged. Disruption ledger: 19 confirmed, 0 candidates (incident #5 sub-grade). Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 132 (cron monitor — Job ID 369099, pass 87 — ALL-SESSION RECORD SHATTERED: agreement streak 89 (old record 76, set pass 80); #1119 tied, #1120 broke, +13 more and running; 14/14 new AGREE; parity 134/134 10th pass (both engines −5 on 6 joint misses, theo caught 5/6); lifetime static 20v6 p=0.009; panel==ledger first-try EXACT 4th pass running)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 87, 22:46 +08). Trigger (a) YES (standing re-deepened 20v6 p=0.009) → full analysis. Engine unchanged (git freeze clean; HEAD f202603 cron artifact commit; src/ diff vs baseline = 0 lines).
+
+Work Log:
+- STREAK RECORD MILESTONE: streak 75 → 89 (since #1043, spanning #1044-#1132 ≈ 62 min of continuous hit-outcome agreement). #1119 = tie at 76; #1120 = new record 77; #1119-#1132 all agreed — the record now stands at 89 and is LIVE (every further agree round extends it). Old record: 76 (set pass 80, spanning disruption #18 boundary).
+- FEED STEADY: #1119-#1132 (14 rounds) at 34-159s cadence, max gap 159s, zero >8min gaps, latest age 29s. No post-incident recurrence. Disruption ledger: 19 confirmed, 0 candidates.
+- Paired extraction: PANEL == LEDGER FIRST-TRY EXACT (200/134/134/168, M2H 1, H2M 1) — 4th consecutive pass. Renderer healthy 2x first-try (no hang recurrence after incident #5's reload).
+- Window 919-1118 → 933-1132 (14 evictions 919-932). Both engines 139 → 134 (−5); theo 169 → 168 (−1). Engines 8/14 on the new block vs theo 13/14 — the gap mechanism running hot while agreement persists.
+- Joint misses (6): #1119/#1120 '2' (theo caught both), #1121 CASH HUNT (Q12-unavoidable, theo also missed), #1124/#1130 '10' (theo caught — '10' now 5 joint-misses in 3 windows), #1127 '1' (theo caught — 3rd '1' joint miss in 2 windows; the dominant normal is no longer safe from exclusion). No flips → no new RCA families.
+- '1' actuals 79/200 = 39.5% — hot block 4th consecutive pass; regime-shift read unchanged.
+- Triggers: (a) YES — standing + record milestone; (b) no; (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final paired window n=200, IDs 933-1132; clean n=200 — 10th consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 134/200 = 67.0% (clean==raw)
+3. Experimental HIT: 134/200 = 67.0% (clean==raw)
+4. Delta: +0 hits (+0.00pp) — parity holds 10th pass
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 168/200 = 84.0%
+8. MISS RCA: joint misses #1119/#1120 '2', #1124/#1130 '10', #1127 '1' (all theo-caught — calibration family) + #1121 CASH HUNT (Q12); lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 89 — NEW ALL-SESSION RECORD (old 76), live-extending
+- Avg coverage: base 67.14% / exp 67.22% (+0.08pp)
+
+Stage Summary:
+- RECORD PASS: the layer's hit-outcome divergence has now been ZERO for 89 consecutive rounds (since the #1043 save). The experimental engine's value proposition remains the lifetime asymmetry (20v6 p=0.009); the record streak simultaneously demonstrates (a) the two engines' near-identity on the current feed and (b) that no H2M unwind has occurred since #955 — the evidence ladder is stable.
+- Divergence-of-texture note: agreement streak 89 coexists with a −5 slide in BOTH engines' hit rates (67.0%, lowest window level since the pinned-window era) — the engines agree with each other while jointly missing normal-dominant stretches ('2'/'10'/'1' exclusions; theo 84.0%). Window-level engines-vs-theo gap now 17pp (134 vs 168), wider than the pinned-window 12pp — consistent with the DIAG pooled gap 15.4pp direction.
+- Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 23 rounds (~16 min), likely DURING pass 88; exit moves window flips to 1v0 (p=0.5). #1043 (window M2H) exits at maxId ≥ 1243 (111 rounds).
+- Next pass: #955 EXIT VERIFICATION (window flips 1v0, p=0.5 — first time the window will have zero H2M since #955 landed); streak extension watch (89+); unwind ladder unchanged. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
