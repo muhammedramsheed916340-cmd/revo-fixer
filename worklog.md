@@ -3545,3 +3545,38 @@ Stage Summary:
 - Delta at -2 is the deepest window-level artifact yet but remains pure composition; live engines have been in perfect agreement for 130 consecutive rounds. Equivalence unchanged at every significance test.
 - Reload precedent now documented: future hangs follow this exact ladder (probe -> one re-probe -> reload -> integrity verification -> corrected timeline).
 - Protocol resumes: metrics-only. Engine untouched.
+
+---
+Task ID: 73 (cron monitor — Job ID 369099, pass 28 — OUTAGE #6 closed (19.5 min); NEW FLIP #381 M2H — first A/B divergence in 131 rounds)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 28, 08:01 +08); measure outage #6 endpoint; full analysis per trigger (b) + new-flip documentation. No engine changes.
+
+Work Log:
+- Outage #6 CLOSED and measured: #366 (07:29:41 +08) -> #367 (07:49:08 +08) = 19.5 min. Feed resumed ~2 min after the 07:47 reload. Gap auto-memorized as [366,367]; lifetime outage ledger now 6: 31.6m, 25.2m, 16.0m, 25.5m, 20.8m, 19.5m (two page-side-class mechanisms among them). Lifetime unobserved est. ~70-90 rounds.
+- NEW FLIP #381 (M2H — EXPERIMENTAL SAVE): actual '2'; base Top-4 excluded '2' -> MISS; exp reliability-adjusted Top-4 kept '2' -> HIT. FIRST A/B divergence since #236: the 130-round perfect agreement streak ENDED (streak reset to 2). Same save signature as all prior M2H events (excluded normal re-included by the layer): lifetime M2H [4, 8, 22, 116, 163, 164, 178, 381].
+- Lifetime flip balance: raw now 8v8 (perfectly symmetric); verified 8v5 exp-favoring (p=0.581). McNemar window 1v3 p=0.625.
+- Window (IDs 184-383, clean 200): base 129/200 = 64.5%, exp 127/200 = 63.5% — delta HOLDS at -2 (-1.0pp); new block eviction-symmetric (both -2 raw hits) so the artifact persists.
+- theo 161/200 = 80.5% — LOWEST in the recorded window series (prior range 81.5-84.0%). Cause: bonus-heavy new block (6 bonus in 17: CRAZY TIME x3, PACHINKO x2, COIN FLIP x1; engines 4/6, theo 0/6 not covered) + miss-heavy normals (base 5/11, exp 6/11; '10'x2 missed, '2'x2-of-3 missed, '1' 4/5).
+- New block 367-383 detail: 367 CRAZY TIME miss, 368 CRAZY TIME hit, 369 '1' miss, 370-373 mixed, 374/375 PACHINKO hit x2, 376 COIN FLIP miss, 377 CRAZY TIME hit, 378 '2' miss, 379 '10' miss, 380 '1' hit, 381 '2' BASE-MISS/EXP-HIT (the save), 382 '1' hit, 383 '10' miss.
+- Calibration signature continues: 16/17 new rounds agreed; the single divergence is the layer doing exactly its designed job (re-including a dampened-credible normal that base excluded).
+- Panel cross-check: exact match (200 paired, 65%/64%, theo 81% (161/200)); normal/bonus base 102/161 vs exp 103/161 normal, base 27/39 vs exp 24/39 bonus — bonus deficit -3 steady, normal +1 (includes the save).
+- Engine freeze: git verified zero engine diffs.
+
+Metrics (FIFO window n=200, IDs 184-383, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 129/200 = 64.5%
+3. Experimental HIT: 127/200 = 63.5%
+4. Delta: -2 hits (-1.0pp), unchanged (composition artifact; note exp's new save #381 will enter the +side as the window slides)
+5. MISS->HIT flips: window 1 (#381 — NEW); lifetime 8
+6. HIT->MISS flips: window 3 verified (#188, #200, #236); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 161/200 = 80.5% (series low)
+8. MISS RCA: lifetime 15 + #381 exp-save documented (base-miss cause: '2' exclusion, same family as 23 prior '2'-exclusion misses); RCA ledger for base misses unchanged this window (base misses in-block: 367 bonus, 369/371/378/379/383 normals — all match existing taxonomy families; no new category)
+- McNemar: window 1v3 p=0.625; lifetime verified 8v5 p=0.581; raw 8v8 p=1.000
+- Feed/quality: outage #6 gap flagged, documented, memorized; no degraded rows; cadence normal post-resumption (14s newest age).
+
+Stage Summary:
+- Two structural events this pass: (1) outage #6 archived — collection fully healthy again; (2) #381 breaks the 130-round tie streak with an exp SAVE — the first live evidence since #236 of the layer's designed mechanism (normal re-inclusion) producing a measurable win.
+- Equivalence verdict unchanged: raw 8v8, verified 8v5 (p=0.581) — both n.s.; the layer's lifetime ledger remains exp-tilted among verified events.
+- theo at 80.5% (series low) + engines 4/6 on bonus + base 5/11 on normals: the Task 65 calibration story (bonus displacement + '10'/'2' exclusion) keeps compounding in both directions.
+- Watch: whether #381's save persists in-window (will lift exp delta as old misses age) and whether more flips follow (streak reset means flip clustering is possible — monitor trigger (c) 3+ same-direction).
+- Protocol continues: metrics-only. Engine untouched.
