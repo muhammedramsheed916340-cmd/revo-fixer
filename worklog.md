@@ -5603,3 +5603,37 @@ Stage Summary:
 - Owner-relevant summary line: theo 83.5% vs engines 67.0% on identical information — the fixed [1,2,5,10] set is outperforming the dynamic optimizer by ~17 hits per 200 rounds in the current regime, consistent with DIAG's dominant-cause finding (probability compression: normals underestimated, bonuses overestimated).
 - Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 2 rounds; WILL roll off early in pass 89's window → window flips 1v0 (p=0.5). #1043 (window M2H) exits at maxId ≥ 1243 (90 rounds).
 - Next pass: #955 EXIT VERIFICATION (flips 1v0); '1'-exclusion anomaly continuation watch; streak 110+; unwind ladder unchanged. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 134 (cron monitor — Job ID 369099, pass 89 — FIRST POSITIVE WINDOW DELTA OF THE SESSION: base 125 vs exp 126 (+1 hit, +0.50pp), panel displays "+1%" — the #1043 layer save is now UNOPPOSED in-window after #955 rolled off (window flips 1v0, p=1.0); streak 133; base −9 slide (engines 11/23 vs theo 19/23 on block); lifetime static 20v6 p=0.009)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 89, 23:16 +08). Trigger (a) YES (standing re-deepened 20v6 p=0.009) → full analysis. Engine unchanged (git freeze clean; HEAD bc00327 cron artifact commit; src/ diff vs baseline = 0 lines).
+
+Work Log:
+- #955 EXIT VERIFIED (forecast executed): evictions 954-976 include #955 — window H2M now EMPTY, flips 1v0 (M2H #1043 only), p=1.0. First window since #955 landed with zero H2M.
+- FIRST POSITIVE WINDOW DELTA OF THE SESSION: base 125/200 = 62.5% vs exp 126/200 = 63.0% — delta +1 hit (+0.50pp), panel Δ line now displays "+1%". Mechanism: the #1043 reliability-layer save is the ONLY engine divergence in-window and is no longer offset by the #955 loss. NOTE (artifact transparency): the +1 is entirely carried by #1043, which exits at maxId ≥ 1243 (67 rounds, ~47 min) — unless a new flip lands, delta mechanically returns to 0.00pp then. The lifetime asymmetry (20v6) remains the durable evidence; the window +1 is its current in-window shadow.
+- RECORD STREAK EXTENDS: 110 → 133 (since #1043; #1044-#1176, ~88 min of continuous agreement). 23/23 new AGREE.
+- DEEPEST ENGINE SLIDE: base 134 → 125 (−9), exp 134 → 126 (−8) — engines 11/23 (47.8%) vs theo 19/23 (82.6%) on the block. Window engines-vs-theo gap now ~43.5 hits (~21.8pp) — wider still than pass 88's session-record 33pp. The calibration defect is being stress-tested to new extremes by the normal-dominant feed.
+- '1' EXCLUSION ANOMALY PERSISTS: 4 more '1' joint misses (#1155/#1157/#1158/#1166, all theo-caught) — session '1' joint-miss count now 11, all while '1' remains the top actual (~39.5% window). Also '10' ×3, '5' ×1, '2' ×1 (theo-caught); 3 bonus Q12s (#1156 PACHINKO, #1162 COIN FLIP, #1164 CASH HUNT — theo also missed all). #1163 COIN FLIP both-hit (bonus conversion); #1176 '10' both-hit (first '10' conversion in many windows).
+- FEED STEADY: 23 rounds, zero new >8min gaps (only the 3 documented legacy outages in-window), latest age 43s. Disruption ledger: 19 confirmed, 0 candidates.
+- Paired extraction: PANEL == LEDGER FIRST-TRY EXACT (200/125/126/169, M2H 1, H2M 0) — 6th consecutive pass; panel independently confirms Δ +1%.
+- Triggers: (a) YES — standing; (b) no; (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final paired window n=200, IDs 977-1176; clean n=200 — 12th consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 125/200 = 62.5% (clean==raw; −9 deepest slide)
+3. Experimental HIT: 126/200 = 63.0% (clean==raw)
+4. Delta: +1 hit (+0.50pp) — FIRST POSITIVE WINDOW DELTA (via #1043, unopposed after #955 exit)
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 0; lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 169/200 = 84.5% (+2)
+8. MISS RCA: 12 joint misses — '1' x4, '10' x3, '5' x1, '2' x1 (theo-caught, calibration family) + 3 bonus Q12s; no flips → no new families; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v0 p=1.0 (direction favors exp); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 133 — record, live-extending
+- Avg coverage: base 67.57% / exp 67.65% (+0.08pp)
+
+Stage Summary:
+- Session firsts this pass: positive window delta (+1/+0.50pp, panel "+1%"), zero-H2M window (1v0), and the deepest engine slide (−9) — all while the record streak extends to 133. The story is coherent: the two engines are twins (133 agreements), the layer's single divergence (#1043) now stands alone in-window, and the shared calibration defect is widening against theo (21.8pp window gap).
+- Owner-relevant: theo 84.5% vs engines 62.5/63.0% — the dynamic optimizer now trails the fixed set by ~21-22 hits per 200 rounds in this regime; the #1043-class layer saves (+1) are real but orders of magnitude smaller than the calibration gap.
+- Countdown: #1043 (window M2H, carrying the +1) exits at maxId ≥ 1243 — 67 rounds (~47 min, likely pass 91); delta returns to 0.00pp unless a new flip lands first. Streak record continues extending.
+- Next pass: #1043-carry watch (delta +1 persistence); streak 133+; '1'-exclusion anomaly; unwind ladder unchanged. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
