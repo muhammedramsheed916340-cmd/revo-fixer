@@ -4772,3 +4772,33 @@ Stage Summary:
 - '10' texture: 2/2 this block both engines — the rarest slot (8 actuals in 200) hitting at 62.5% in-window, far above its 40% theoretical prior; another data point that the reliability layer's restraint on rare outcomes (negative deviations pass through) matches observed behavior.
 - Feed fully healthy 2 passes post-outage; disruption ledger 15; no degraded recurrence.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 112 (cron monitor — Job ID 369099, pass 67 — quiet hold #3 post-record: streak 65 sets NEW SESSION RECORD (prev 55); headline frozen at delta +2 / 2v0 / lifetime 19v5 p=0.007)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 67, 17:46 +08). Trigger (a) standing YES (lifetime record) -> full analysis. Engine unchanged (git freeze clean; HEAD 236dc0c cron artifact commit).
+
+Work Log:
+- Extraction clean first attempt: n=200, window 710-909 (19 new rounds 891-909, evictions 691-709). Integrity: contiguous, no dupes, no gaps; degraded set frozen (#785 sole). Feed very healthy (5s age) — third consecutive fully-clean pass, fastest cadence of the post-outage period.
+- New rounds 891-909: 19/19 AGREE, both engines 11/19 (cooling together). Composition: '1' x9 (6 hit), '2' x5 (3 hit), CASH HUNT x4 (1 hit), COIN FLIP x2 (1 hit), PACHINKO x2 (0 hit), '10' x1 miss (theo-hit). Theo 12/19 (evicted 691-709 were theo-rich 18/19 -> theo slid to 80.0%, composition effect, symmetric). Evicted hits: 9 base/9 exp (composition, symmetric).
+- NEW SESSION RECORD — agreement streak 65 (since #844 flip), surpassing the prior 55-round record (pre-#844 block). The two longest all-agree streaks of the session both ended/start with exp-favoring flips (#787, #844) — symmetry of the layer's engagement pattern.
+- Headline metrics FROZEN for 3rd pass: base clean 133/199 = 66.8%, exp 135/200 = 67.5%, delta clean +2 (+1.01pp), M2H 2v0 [#787,#844] p=0.5, H2M 0, lifetime 19v5 p=0.007 (record) / raw 19v8 p=0.052.
+- Panel cross-check: EXACT (base 133 clean / exp 135 / theo 160 / M2H 2 / H2M 0; paired 200; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved). No snapshot-race. Stale runs 29/30.
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing; (b) no; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 710-909; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 133/199 = 66.8% (raw 134/200 = 67.0%)
+3. Experimental HIT: 135/200 = 67.5% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 160/200 = 80.0% (clean 80.4%; -6 from evicting theo-rich block, composition)
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves; new-round misses (#892/#909 PACHINKO, #896 COIN FLIP, #899/#900 CASH HUNT, #904 '10', #907 '2', #908 '1') all existing families — no new categories
+- McNemar: window 2v0 p=0.5 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- Third consecutive quiet hold with a new texture record: 65 straight symmetric rounds — the engines are tracking each other through a hot phase (33 rounds ago: 15/19) and a cooling phase (11/19) without a single divergence. The experimental layer has made NO intervention for 65 rounds — it is dormant by design (reliability factors see no exclusion-pressure candidate to promote).
+- PACHINKO 0/2 this block brings its in-window form to 3/6, still symmetric both engines. Bonus-heavy composition drove theo down to 80.0% — noted as composition, not engine drift.
+- Feed healthy 3 passes post-outage (5s age, fast cadence); disruption ledger 15; degraded frozen. #787 exit at ~#987 is ~78 rounds out; #844 ~#1044.
+- Protocol continues. Engine untouched.
