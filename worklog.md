@@ -5186,3 +5186,136 @@ Stage Summary:
 - Validation-side: the parity regime (138/138, +0.00pp, 1v1) is now static across 3 passes and 45 consecutive AGREE rounds spanning an outage boundary. Lifetime ledger untouched (19v6 p=0.015 nominal / 19v9 p=0.087 raw n.s.). The layer and baseline remain behaviorally indistinguishable in-window; the cumulative-flip asymmetry is the entire case — owner's call, caveats standing.
 - Movers: #844 (last in-window rescue) exits ~#1044 — 13 rounds out; window flips go 0v1 then (cosmetic). Any M2H rescue re-deepens to 19v5 p=0.007; two consecutive lifetime H2M exit significance (19v7 -> 19v8 p=0.052).
 - Disruption ledger: 18 confirmed (#18 closed 24.4 min). Degraded set: EMPTY in-window (lifetime 1). Protocol continues. Engine untouched.
+---
+Task ID: 126-DIAG (user-requested diagnostic — NO code/model changes; analysis-only)
+Agent: Z.ai Code (diagnostic run, observation-only)
+Task: Decompose the 12pp gap between dynamic Top-4 (138/200=69%) and theoretical [1,2,5,10] (162/200=81%) on the current clean window (IDs 832-1031). 12-point per-MISS attribution + pooled meta-analysis. Engine untouched (git freeze clean).
+
+Work Log:
+- Wrote scripts/diagnose_gap.py (read-only; reads extracted ledger JSON; does NOT touch engine/model). Ran on current window 832-1031 (n=200) + prob-augmented full ledger 853-1052 (per-outcome probs bpr/epr) + pooled 9 historical snapshots (deduplicated by ID).
+
+=== INDIVIDUAL-WINDOW RESULTS (IDs 832-1031, n=200 — the user's stated window) ===
+- Base 138/200=69.0% | Exp 138/200=69.0% | Theo 162/200=81.0% | GAP = 24 rounds = 12.0pp
+
+2x2 DECOMPOSITION (theo x base) — THE GAP ANATOMY:
+  A  both HIT (normal landed, included)        : 118  (dynamic agreed with theo and won)
+  B  theo HIT, base MISS (normal EXCLUDED)    : 44   <- GAP SOURCE (+)  [theo would have won, dynamic lost]
+  C  base HIT bonus, theo MISS                 : 20   <- GAP REDUCER (-) [dynamic won a bonus theo couldn't]
+  D  both MISS (bonus landed, neither had)     : 18   <- unavoidable (bonus round, both engines wrong)
+  Net gap = B - C = 44 - 20 = 24  (reconciles exactly: theo-base = 24)
+
+TOP-4 INCLUSION RATE (how often each normal appears in the baseline Top-4):
+  '1' : 164/200 = 82.0%   (but '1' lands 76/200 = 38.0% of the time)
+  '2' : 155/200 = 77.5%   (lands 59/200 = 29.5%)
+  '5' :  79/200 = 39.5%   (lands 17/200 =  8.5%)
+  '10':  55/200 = 27.5%   (lands 10/200 =  5.0%)
+  -> '1' and '2' together are included in only ~60% of rounds jointly, yet they land 67.5% of the time. The model chronically under-includes the two most frequent normals.
+
+ACTUAL-RESULT COVERAGE (landed count + base HIT + theo HIT):
+  '1'        : 76 (38.0%) | base 63/76= 82.9% | theo 76/76=100%
+  '2'        : 59 (29.5%) | base 45/59= 76.3% | theo 59/59=100%
+  '5'        : 17 ( 8.5%) | base  5/17= 29.4% | theo 17/17=100%
+  '10'       : 10 ( 5.0%) | base  5/10= 50.0% | theo 10/10=100%
+  PACHINKO   :  9 ( 4.5%) | base  5/9 = 55.6% | theo  0/9 =  0%
+  COIN FLIP  : 16 ( 8.0%) | base  8/16= 50.0% | theo  0/16=  0%
+  CRAZY TIME :  6 ( 3.0%) | base  3/6 = 50.0% | theo  0/6 =  0%
+  CASH HUNT  :  7 ( 3.5%) | base  4/7 = 57.1% | theo  0/7 =  0%
+  -> The 44 gap-source misses break down by excluded normal: '1'=13, '2'=14, '5'=12, '10'=5.
+  -> The 20 gap-reducer hits: dynamic caught a bonus that theo structurally cannot.
+
+DYNAMIC Top-4 vs [1,2,5,10]:
+  bp == [1,2,5,10]: 1/200 = 0.5%  | HIT 0/1 = 0.0%
+  bp != [1,2,5,10]: 199/200 = 99.5% | HIT 138/199 = 69.3%
+  -> The dynamic model essentially NEVER plays the pure [1,2,5,10] set; it swaps at least one normal for a bonus in 199/200 rounds.
+
+BONUS DISPLACER TALLY (when a normal was excluded from the Top-4):
+  COIN FLIP   : 32 displacements
+  PACHINKO    : 22 displacements
+  CASH HUNT   : 20 displacements
+  CRAZY TIME  : 14 displacements
+  -> COIN FLIP (not PACHINKO) is the single largest displacer. PACHINKO is 2nd.
+
+PER-MISS 12-POINT ATTRIBUTION (62 baseline MISSes; structural inference + prob data where available):
+  Q1-4  Was 1/2/5/10 excluded? — per excluded-normal tally above ('1' excl 13, '2' excl 14, '5' excl 12, '10' excl 5).
+  Q5    Which selected outcome displaced the missed normal? — see displacer tally; COIN FLIP dominant.
+  Q6    Rare-outcome evidence (PACHINKO)? — YES in 22/44 gap-source misses (PACHINKO was a displacer). This is the documented root cause (PACHINKO +39% deviation in the original 50-round k=30 validation).
+  Q7    Recent-frequency/optimizer (other bonus)? — INFERRED YES in 22/44 (non-PACHINKO bonus displaced a normal). Cannot confirm recent-frequency specifically without engine internals.
+  Q8    Live/user blending? — NOT DETERMINABLE from ledger (no provenance field).
+  Q9    Persistence penalty? — NOT DETERMINABLE from ledger (no penalty field).
+  Q10   70-combination optimizer? — MECHANISM confirmed: in 27/44 gap-source misses the actual normal was RANK-5 (the optimizer's next pick, excluded by one position). The optimizer faithfully ranks by probability; it is the mechanism, but the inputs (probabilities) are the problem (see Q11).
+  Q11   Probability calibration? — YES, DOMINANT (see calibration table below).
+  Q12   Unavoidable random? — YES for 18/62 misses (bonus landed, theo also missed; structurally unpredictable for a [1,2,5,10]-style model). NO for the 44 gap-source misses (a normal landed and was excluded — avoidable).
+
+MARGINAL OPTIMIZER CUTOFF (27/44 gap-source misses — actual normal was rank-5, just outside top-4):
+  Examples (id, actual, p_actual, edge-in, p_edge, margin):
+    #887 '1' p=0.1262 (rank5) | edge '10' p=0.1324 (rank4) | margin 0.0062  <- TRUE knife-edge
+    #908 '1' p=0.1046 (rank5) | edge '10' p=0.1056 (rank4) | margin 0.0010  <- TRUE knife-edge
+    #915 '2' p=0.1119 (rank5) | edge PACHINKO p=0.1406 (rank4) | margin 0.0287
+    #938 '1' p=0.0821 (rank5) | edge PACHINKO p=0.1318 (rank4) | margin 0.0497
+    #870 '2' p=0.0471 (rank5) | edge '5' p=0.1687 (rank4) | margin 0.1216  <- confidently wrong rank
+    #872 '2' p=0.0455 (rank5) | edge CRAZY TIME p=0.1006 (rank4) | margin 0.0551
+  -> 27/44 = 61% of gap-source misses are rank-5 exclusions. The optimizer is making knife-edge calls on MIS-calibrated probabilities.
+
+EXPECTED vs ACTUAL COVERAGE:
+  Avg expected coverage (sum of 4 selected probs): 70.25%
+  Actual HIT rate (base): 69.00%
+  Calibration gap (expected - actual): +1.25pp (mildly optimistic at the aggregate level)
+  -> CRITICAL: the SUM is near-calibrated, but the individual probabilities are MIS-calibrated in a way that cancels at the aggregate level while corrupting the RANKING (see below).
+
+PER-OUTCOME CALIBRATION (prob-augmented subset, 179 rounds, IDs 853-1031; pattern confirmed on full 853-1052 window n=200):
+  Outcome     avg_predicted  empirical_freq  error
+  '1'              15.5%          39.5%      -24.0pp   <- MASSIVELY under-predicted (lands 2.5x its model prob)
+  '2'              14.9%          30.5%      -15.6pp   <- under-predicted (lands 2.0x its model prob)
+  '5'              10.6%           7.5%       +3.1pp   <- mildly over
+  '10'              9.4%           4.5%       +4.9pp   <- over
+  PACHINKO        18.2%           3.5%      +14.7pp   <- over-predicted ~5x its landing rate
+  COIN FLIP       15.7%           8.0%       +7.7pp   <- over ~2x
+  CRAZY TIME      21.8%           2.0%      +19.8pp   <- MASSIVELY over (predicted 10x its landing rate!)
+  CASH HUNT       21.2%           4.5%      +16.7pp   <- over ~5x
+  -> THE SMOKING GUN: the model over-predicts ALL FOUR bonuses (esp. CRAZY TIME +19.8pp, CASH HUNT +16.7pp, PACHINKO +14.7pp) and under-predicts '1' by -24pp and '2' by -15.6pp. The optimizer then ranks bonuses above '1'/'2', displacing the two most frequent normals.
+  -> Avg bonus slots in top-4: 1.71 / 4 (the model dedicates ~43% of every Top-4 to bonuses, yet bonuses land only 19% of the time).
+
+RANK OF ACTUAL OUTCOME in baseline probability ordering (n=200, prob window):
+  rank 1: 50 (25.0%) | rank 2: 36 (18.0%) | rank 3: 34 (17.0%) | rank 4: 22 (11.0%) | rank 5: 39 (19.5%) | rank 6: 14 (7.0%) | rank 7: 5 (2.5%)
+  -> 71% of actuals fall in ranks 1-4 (the model's HIT zone). But 19.5% fall at rank-5 — the single largest miss bucket, bigger than ranks 6-7 combined. These are the recoverable rounds if calibration improved.
+
+=== POOLED META-ANALYSIS (DIAGNOSTIC ONLY — NOT a fresh validation) ===
+- 9 historical snapshots deduplicated by round ID -> 395 unique rounds (IDs 637-1031, ~6 h of observation).
+- Base HIT 264/395 = 66.8% | Exp HIT 266/395 = 67.3% | Theo HIT 325/395 = 82.3% | Gap = 61 rounds = 15.4pp.
+- 2x2: A=230 (both hit normal), B=95 (theo hit, base MISS), C=34 (base hit bonus, theo MISS), D=36 (both MISS). Net = B-C = 95-34 = 61. Reconciles.
+- Gap-source (B=95) by excluded normal: '2'=31, '1'=28, '5'=27, '10'=9. Pooled spreads exclusions across '1'/'2'/'5' more evenly than the current window (which is '2'-heavy).
+- Gap-source by displacer: COIN FLIP=68, PASHINKO=43, CASH HUNT=44, CRAZY TIME=33. COIN FLIP is the dominant displacer pool-wide (consistent with current window).
+- bp == [1,2,5,10] in only 8/395 = 2.0% of pooled rounds (HIT 5/8=62.5%); bp != theo in 387/395 = 98.0% (HIT 259/387=66.9%). The dynamic model almost never plays the pure normal set, and when it does it underperforms (small n).
+- CAVEAT: pooled windows overlap in time (FIFO); deduplication by ID removes double-counting but the rounds are temporally clustered, not a random sample. Treat as directional, not inferential. Exp vs base in pooled: +2 hits (66.8% vs 67.3%), consistent with the lifetime 19v6 verified-flip ledger.
+
+=== DOMINANT-CAUSE SYNTHESIS ===
+The 12pp gap (24 rounds) decomposes as: B=44 (normal excluded and landed) minus C=20 (bonus hit that theo couldn't catch).
+
+DOMINANT CAUSE = Q11 PROBABILITY MISCALIBRATION, with Q10 (optimizer) as the mechanism and Q6 (PACHINKO rare-outcome) as a secondary contributor.
+  - The model systematically OVER-predicts all four bonus outcomes (CRAZY TIME +19.8pp, CASH HUNT +16.7pp, PACHINKO +14.7pp, COIN FLIP +7.7pp) and UNDER-predicts the two actual-dominant normals ('1' -24.0pp, '2' -15.6pp).
+  - Because the 70-combination optimizer ranks outcomes by these (mis)calibrated probabilities, it selects ~1.7 bonus slots per Top-4 (43% of capacity) on outcomes that land only 19% of the time, displacing '1'/'2' which land 67.5% of the time.
+  - 27/44 (61%) of the gap-source misses are rank-5 exclusions — the actual normal was the optimizer's NEXT pick, excluded by one position. These are the recoverable rounds; a better-calibrated ranking would promote them into the Top-4.
+  - The aggregate coverage (70.25%) is near-calibrated (gap +1.25pp) because the bonus over-predictions and '1'/'2' under-predictions happen to cancel in the SUM — but they DO NOT cancel in the RANKING, which is what drives the optimizer. This is a classic "well-calibrated in aggregate, mis-calibrated in distribution" pattern.
+
+SECONDARY CAUSE = Q6 RARE-OUTCOME EVIDENCE (PACHINKO specifically).
+  - The original root-cause analysis identified PACHINKO (+39% positive deviation) as the primary rare-outcome inflater. This diagnostic confirms PACHINKO is over-predicted (+14.7pp) and accounts for 22/44 displacements. BUT the inflation generalizes: CRAZY TIME and CASH HUNT are over-predicted even MORE than PACHINKO, yet they were not flagged in the original root-cause analysis. The experimental reliability layer currently dampens PACHINKO only; the over-prediction of CRAZY TIME/CASH HUNT is UNADDRESSED by the shadow layer (which is why exp == base at 138/138 in this window — the layer's PACHINKO dampening helped on #955 but the broader bonus inflation is untouched).
+
+TERTIARY = Q12 UNAVOIDABLE (18/62 misses, 29%).
+  - These are bonus-landing rounds where neither engine nor [1,2,5,10] can win. Structurally inherent to a 4-slot model on an 8-outcome wheel; not a defect.
+
+NOT THE CAUSE (ruled out structurally):
+  - Q8 (live/user blending) and Q9 (persistence penalty): NOT DETERMINABLE from the ledger (no provenance/penalty fields). Cannot be confirmed or ruled out — flag for engine-internal investigation.
+  - Q7 (recent-frequency): INFERRED possible for non-PACHINKO bonus displacements, but the pattern (ALL bonuses over-predicted, not just recently-hot ones) points more to calibration than recent-frequency. The fact that CRAZY TIME (empirically only 2-6%) is predicted at 21.8% is not explainable by recent-frequency (it hasn't been hot); it is a calibration/prior issue.
+
+=== RECOMMENDED NEXT INVESTIGATIONS (NO production code changes — diagnosis only) ===
+1. PROBABILITY CALIBRATION AUDIT (highest priority): trace WHY the model assigns CRAZY TIME ~21.8% and CASH HUNT ~21.2% when they land 2-4.5%. These are 5-10x over-predictions — far beyond any reasonable recent-frequency signal. Likely culprits to inspect (engine internals): the prior/base-rate table fed to the calibrator, the blending weight between historical and live, and whether the calibration step has a sign error or an unbounded inflation path for low-frequency bonuses. [Do NOT tune on these same rounds — use a held-out window.]
+2. '1'/'2' DEFLATION AUDIT: trace WHY '1' is predicted at 15.5% when its wheel base rate is ~25% and it is landing at 39.5%. Even vs base rate this is a 10pp under-prediction. Inspect: persistence penalty (is it over-penalizing '1' for its own frequency?), recent-frequency window (is it too short / too long, missing the '1' dominance?), and any normalization that shifts mass from '1'/'2' to bonuses.
+3. RANK-5 RECOVERABILITY: 19.5% of actuals sit at rank-5. A calibration fix that promotes ~half of these into the top-4 would close ~10-12 of the 24-round gap. Quantify the rank-4/rank-5 probability margin distribution to set a calibration-improvement target (current margins range 0.001 to 0.122; the knife-edge cases at <0.01 are the cheapest wins).
+4. GENERALIZE THE RELIABILITY LAYER (future experiment, not this diagnostic): the experimental layer currently dampens PACHINKO only. The calibration table shows CRAZY TIME/CASH HUNT are MORE over-predicted than PACHINKO. A generalized reliability factor (the layer already uses the generic r = N_obs/(N_obs+10) form) may already address them if applied uniformly — but this is a hypothesis for a FUTURE experiment with a fresh validation window, NOT a change to make on these rounds (post-hoc tuning risk).
+5. REGIME CHECK: confirm whether the current '1' rate (38-39.5%) is a temporal anomaly or a persistent shift. If the model is calibrated to a long-run '1' rate of ~25%, the -24pp "error" partly reflects regime, not pure miscalibration. Pull the model's training-history '1' rate to partition the error into (regime component) vs (genuine miscalibration component).
+
+Stage Summary:
+- DIAGNOSIS COMPLETE (no code changes): the 12pp gap is NOT caused by the optimizer making bad choices on good probabilities, nor by unavoidable bonus randomness. It is caused by MISCALIBRATED PROBABILITIES — specifically a systematic inflation of all four bonus outcomes (esp. CRAZY TIME +19.8pp, CASH HUNT +16.7pp) and a deflation of '1' (-24pp) and '2' (-15.6pp). The optimizer faithfully ranks by these probabilities, placing ~1.7 bonus slots per Top-4 and excluding the actual-dominant normals. 61% of the gap-source misses are rank-5 (one position out) — recoverable with better calibration.
+- The experimental reliability layer's PACHINKO-only dampening is well-motivated but NARROW: the over-prediction problem is broader (all bonuses). This explains why exp == base in the current window (138/138) — the layer touches only one of four over-predicted bonuses.
+- Pooled meta-analysis (395 rounds, diagnostic only) confirms: COIN FLIP is the dominant displacer pool-wide, '1'/'2'/'5' are roughly equally excluded, and the gap is ~15.4pp (slightly wider than the current 12pp window). Directional, not inferential.
+- Engine untouched. Git freeze clean. This was analysis-only per the strict no-modify directive.
