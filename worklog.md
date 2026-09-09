@@ -5034,3 +5034,34 @@ Stage Summary:
 - Position for owner: the canonical evidence remains nominally significant but has consumed the first unwind rung; the raw-sensitivity caveat is now prominent (p=0.087). Sequential-testing and post-hoc caveats unchanged. No superiority verdict — owner's call. Watch: 2 consecutive H2M would exit significance; any M2H re-deepens.
 - The symmetry of the session is striking: 19 saves vs 9 losses (6 of the 9 verified), longest streaks bookended by exp-favoring flips, and the single verified loss is the designed consequence of the original root-cause fix. The layer is behaving exactly as specified on both sides of the ledger.
 - Feed healthy post-#17 (14s). Degraded frozen (#785). #787 exit ~#987 (~13 rounds out — window composition note: its exit will make window 1v1 mechanically). Protocol continues. Engine untouched.
+
+---
+Task ID: 121 (cron monitor — Job ID 369099, pass 76 — RENDERER HANG #4: CDP dead ~13 min, reload per ladder -> 4-for-4 ZERO-LOSS; degraded #785 evicted (first fully-clean window n=200); evidence 19v6 p=0.015 unchanged)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 76, 20:01 +08). Trigger (a) YES (standing) + renderer hang forensics -> full analysis. Engine unchanged (git freeze clean; HEAD 7ec23c1 cron artifact commit).
+
+Work Log:
+- RENDERER HANG #4 (session's 4th): extraction failed 2x (CDP Runtime.evaluate timeout 30s+90s); trivial eval probe (1+1) ALSO timed out — full main-thread hang, not slowness. Onset ~19:56 (after #986 landed; page state frozen mid-session), detected at 20:01-20:03, ~13 min total.
+- FORENSICS LADDER EXECUTED: renderer probe FAIL -> (console unreachable — same hang) -> RELOAD per protocol. RESULT: 4-FOR-4 ZERO-LOSS — ledger intact (n=200), validation start 9/8 17:00:58 preserved, K=10 + SHADOW ON preserved, panel==ledger EXACT post-reload (136/137/160, M2H 2, H2M 1; stale 27/27). No data corruption, no reset, no re-pair.
+- Window rolled substantially across hang+recovery: 775-974 -> 787-986 (12 new rounds #975-#986, evictions 775-786). **Degraded row #785 EVICTED: first FULLY-CLEAN window of the session (clean n=200; the #785 exclusion convention retires).**
+- New rounds: 12/12 AGREE, both 6/12. Composition: '1' x4 (4 hit), '5' x3 (1 hit), '2' x3 (1 hit), COIN FLIP x2 (1 hit). Theo 9/12. Delta held clean +1 (+0.50pp). Streak 31 (since #955). Lifetime 19v6 p=0.015 / raw 19v9 p=0.087 unchanged. Window 2v1 [#787,#844 | #955] p=1.0.
+- #787 EXITHWATCH: minId is now exactly #787 — the NEXT round landing (987) evicts the session's oldest in-window rescue, mechanically making the window 1v1 [#844 | #955] with NO evidence change.
+- Feed note: latest ts age 438s at extraction (~7.3 min, just under threshold) — a leading-edge quiet spell co-incident with the hang window; either the renderer hang masked arrivals or another upstream silence was forming. CONFIRM NEXT PASS whether post-reload rounds flow (disruption #18 candidate).
+- Triggers: (a) YES — lifetime standing; (b) renderer hang #4 (recovered); (c) no. VERDICT: ESCALATE — full analysis EXECUTED (ladder + recovery verification + rolling analysis above).
+
+Metrics (FIFO window n=200, IDs 787-986; clean n=200 — NO degraded rows in window):
+1. Paired rounds: 200 (ALL CLEAN — #785 rotated out)
+2. Baseline HIT: 136/200 = 68.0%
+3. Experimental HIT: 137/200 = 68.5% (clean==raw)
+4. Delta: +1 hit (+0.50pp) exp-favoring — held
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 160/200 = 80.0%
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves + 1 exp-loss; new-round misses (#976/#979 '5', #981 '2', #982 COIN FLIP, #986 '2') existing families — no new categories
+- McNemar: window 2v1 p=1.0 (n.s.); lifetime verified 19v6 p=0.015 (unchanged); raw 19v9 p=0.087
+
+Stage Summary:
+- Renderer hang #4 followed the exact signature of #1-#3 (main-thread freeze, CDP dead, zero data impact) and the reload extended the streak to 4-for-4 zero-loss recoveries. The hang began right after #986 landed and overlapped a quiet feed spell — the renderer-hang and upstream-silence failure modes may be correlated (both plausibly downstream of the same upstream instability). Owner action items: (1) upstream feed stability (4 outages incl. 61-min record); (2) renderer hang root-cause (4 incidents, all dev-mode Fast Refresh context suspected).
+- Session bookkeeping milestone: the window is fully clean for the first time (n=200, #785 gone) — from here the clean==raw convention is exact with no exclusions.
+- Evidence unchanged: 19v6 p=0.015 verified / 19v9 p=0.087 raw / delta +1 / window 2v1. Next movers: #787 exit (imminent — next landing), any rescue (re-deepens), 2 more consecutive H2M (would exit significance), disruption #18 confirmation.
+- Degraded set: EMPTY in-window (785 rotated out; lifetime count stands at 1). Protocol continues. Engine untouched.
