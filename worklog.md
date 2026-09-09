@@ -4400,3 +4400,32 @@ Stage Summary:
 - Only lifetime unwind events: H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 14+ consecutive passes.
 - Feed: 99 rounds since last disruption — but leading-edge silence 492s forming at extraction time; watch for disruption #12 next pass.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 100 (cron monitor — Job ID 369099, pass 55 — ⚠️ DISRUPTION #12 IN PROGRESS: upstream silence ~24 min and ongoing (longest of the validation era); ledger frozen 557-756, ZERO state change; page alive, no data loss evidence)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 55, 14:46 +08). Trigger (a) standing YES (lifetime) -> full analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- ⚠️ DISRUPTION #12 (10th upstream silence, 12th event overall) CONFIRMED ONGOING: last pass flagged a leading-edge silence (latest age 492s); this pass the ledger is FROZEN — identical range 557-756 across two extractions 20s apart, latest age 1433s (~24 min). #756 settled 14:23:54 +08; no #757 for ~24 min. This is the LONGEST upstream silence of the validation era (session record 41.7 min was pre-validation). Page fully responsive (evals instant both extractions -> NOT a renderer hang).
+- Data-loss exposure: NONE so far — IDs contiguous through 756, no evidence upstream produced rounds the page missed; on resume, the proven size=30 poll catch-up pattern (Tasks 90/92) should backfill with zero loss. CONFIRM CONTIGUITY AT #757 NEXT PASS.
+- Metrics COMPLETELY UNCHANGED (analyzer re-run for the record): window 557-756 clean 200, base 131/200 = 65.5%, exp 134/200 = 67.0%, delta +3 (+1.50pp), window 3v0 [562, #590, #664] p=0.25, lifetime 17v5 p=0.017 (record), raw 17v8 p=0.108, theo 166/200 = 83.0%, streak 92 (frozen).
+- Panel cross-check: consistent with frozen ledger (131/134, M2H 3, H2M 0); validation start unchanged 9/8 17:00:58 (no reset); K=10, SHADOW ON. Git freeze clean.
+- Triggers: (a) YES — lifetime 17v5 p=0.017 standing; (b) no NEW in-ledger gap (the silence is leading-edge, not yet an inter-row gap; will register when #757 lands if >8 min — it already is, so expect a known-gap registration next pass); (c) no. VERDICT: ESCALATE — full analysis EXECUTED (state re-verified, no change).
+
+Metrics (FIFO window n=200, IDs 557-756, clean 200 — CARRYOVER, no new rounds):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 131/200 = 65.5%
+3. Experimental HIT: 134/200 = 67.0%
+4. Delta: +3 hits (+1.50pp) — unchanged
+5. MISS->HIT flips: window 3 (#562, #590, #664); lifetime 17
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 166/200 = 83.0%
+8. MISS RCA: no new rounds -> no new misses; families unchanged
+- McNemar: window 3v0 p=0.25 (n.s.); lifetime verified 17v5 p=0.017 (RECORD, unchanged); raw 17v8 p=0.108
+
+Stage Summary:
+- The validation is in its longest feed silence of the era (~24 min, ongoing). All statistics frozen; the unwind clock is ALSO frozen (no evictions can occur without new rounds) — #562 remains in-window with 6-round margin, #590 at 34, #664 at 108. The window's 3v0 state and the lifetime 17v5 record are both intact.
+- Recovery expectations per playbook: on resume, backfill burst (near-simultaneous poll batches), possible >8min inter-row gap registration (628->629 precedent), zero data loss if IDs contiguous. If #757 shows an ID jump instead, that is the first real data-loss event of the session — full forensics then.
+- Feed ledger: 10 upstream silences + 2 renderer hangs = 12 events. Silence count within validation era now includes two >10 min events (10.4 min at 12:33, current ~24 min). Owner infra review URGENT — this is now the dominant data-coverage constraint of the validation.
+- Protocol continues. Engine untouched.
