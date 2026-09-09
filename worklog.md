@@ -4337,3 +4337,35 @@ Stage Summary:
 - Only lifetime unwind events: H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 12+ consecutive passes; lifetime H2M unchanged since #236 (out of window long ago).
 - Feed: 73 rounds since last disruption (11 events). Hot cadence sustained ~1 h. Owner infra review overdue.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 98 (cron monitor — Job ID 369099, pass 53 — unwind continues: #532 out, window 4v0 p=0.125 n.s.; lifetime 17v5 p=0.017 unchanged; streak 82 new session record)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 53, 14:16 +08). Trigger (a) standing YES (lifetime) -> full analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- Extraction clean first attempt: n=200, window 546-745 (15 new rounds 731-745; hot cadence sustained ~1.3 h). Integrity: contiguous, no dupes, no gaps, latest 19s.
+- UNWIND STEP 2 ON SCHEDULE: #532 aged out (no 9th rescue) -> window 4v0 [554, #562, #590, #664], p=0.125 n.s. Zero new flips either direction; 15/15 new rounds agree.
+- New block texture 731-745: '1' x8 (7 hit, incl. #736-#741 six-straight), '2' x4 (3 hit), CASH HUNT x3 (2 hit — #743/#744 back-to-back hits), '5' #745 both-miss. Both engines 12/15 — symmetric hot block.
+- Snapshot-race (minor): panel 128/132 vs ledger 129/133, theo equal at 167 -> re-extracted, converged: #746 ('5', both-miss, theo-hit) settled + #546 (both-hit) evicted. Canonical window 547-746: base 128/200 = 64.0%, exp 132/200 = 66.0%, theo 167/200 = 83.5% — panel then matched EXACTLY.
+- Panel cross-check: invariants all consistent (M2H 4, H2M 0, paired 200, no reset, K=10, SHADOW ON). Coverage base 70.09% / exp 70.03%.
+- Triggers: (a) YES — lifetime 17v5 p=0.017 standing; (b) no; (c) no (0 new flips, streak 82 — NEW SESSION RECORD). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 547-746, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 128/200 = 64.0%
+3. Experimental HIT: 132/200 = 66.0%
+4. Delta: +4 hits (+2.00pp) exp-favoring — decayed +5 -> +4 via #532 eviction (composition only)
+5. MISS->HIT flips: window 4 (#554, #562, #590, #664); lifetime 17
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 167/200 = 83.5%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('2' x1, '5' x1, CASH HUNT x1) — no new categories
+- McNemar: window 4v0 p=0.125 (n.s. — mechanical); lifetime verified 17v5 p=0.017 (RECORD, unchanged); raw 17v8 p=0.108
+
+Stage Summary:
+- Unwind proceeding exactly on the published schedule: 7v0 -> 6v0 -> 5v0 -> 4v0 as #458/#459/#511/#532 drained with one replacement (#664). Window now n.s. with a wide margin; no new differential evidence in 82 consecutive symmetric rounds.
+- The canonical number remains lifetime verified 17v5 p=0.017 — window-independent, unchanged, with unchanged caveats. Monitor position: no superiority verdict; owner's call.
+- NEXT EVICTIONS: #554 exits at maxId 754 (8 rounds), #562 at ~762, #590 at ~790, #664 at ~864. Without new rescues the window drains fully within ~2 h at hot cadence; any single new rescue would partially re-credit it (4v0 needs only one more flip pair member to reach 5v0 p=0.0625).
+- Only lifetime unwind events: H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 13+ consecutive passes.
+- Feed: 88 rounds since last disruption (11 events) — longest clean stretch of the session. Owner infra review overdue.
+- Protocol continues. Engine untouched.
