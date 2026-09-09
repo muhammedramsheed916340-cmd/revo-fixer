@@ -4459,3 +4459,34 @@ Stage Summary:
 - Disruption ledger: 10 upstream silences + 2 renderer hangs = 12 events. Two of the last three silences are >10 min (10.4 min, 35.1 min) — the feed's stability is DEGRADING within the validation era, not improving. Owner infra review URGENT (standing since pass ~44).
 - Watch next pass: #562 exit (2 rounds) -> window 2v0 (p=0.5); then #590 at ~790, #664 at ~864. Only lifetime unwind remains the H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 15+ consecutive passes.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 102 (cron monitor — Job ID 369099, pass 57 — unwind step 4: #562 out, window 2v0 p=0.5 n.s.; lifetime 17v5 p=0.017 unchanged; streak 111; leading-edge silence 246s forming again)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 57, 15:16 +08). Trigger (a) standing YES (lifetime) -> full analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- Extraction clean: n=200, window 576-775 (15 new rounds 761-775). Integrity: contiguous, no dupes, no in-ledger gaps. NOTE: latest age 246s — another leading-edge silence forming (below 8-min threshold); watch next pass for disruption #13.
+- UNWIND STEP 4 ON SCHEDULE: #562 aged out (no 10th rescue) -> window 2v0 [590, #664], p=0.5 n.s. Zero new flips; 15/15 new rounds agree.
+- New block texture 761-775 (cold): both engines 6/15. '1' x7 (3 hit), '5' x3 (1 hit), '2' x2 (0 hit), COIN FLIP x2 (2 hit), CASH HUNT x1 hit. Theo 11/15. Fully symmetric.
+- Panel cross-check: EXACT (127/129, M2H 2, H2M 0, theo 166/200, paired 200, no reset, K=10, SHADOW ON). Coverage base 70.31% / exp 70.25%.
+- Triggers: (a) YES — lifetime 17v5 p=0.017 standing; (b) no; (c) no (0 new flips, streak 111 — new session record). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 576-775, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 127/200 = 63.5%
+3. Experimental HIT: 129/200 = 64.5%
+4. Delta: +2 hits (+1.00pp) exp-favoring — decayed +3 -> +2 via #562 eviction (composition only)
+5. MISS->HIT flips: window 2 (#590, #664); lifetime 17
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 166/200 = 83.0%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('1' x4, '5' x2, '2' x2) — no new categories
+- McNemar: window 2v0 p=0.5 (n.s. — mechanical); lifetime verified 17v5 p=0.017 (RECORD, unchanged); raw 17v8 p=0.108
+
+Stage Summary:
+- Unwind step 4 complete: the window has now drained to its last 2 rescues (#590, #664) from the peak of 7 — all mechanical, zero new flips in 111 consecutive symmetric rounds. The window statistic is now statistically empty (2v0 p=0.5); it has no remaining evidentiary content.
+- The canonical evidence remains lifetime verified 17v5 p=0.017 — window-independent, unchanged for 5 passes, caveats unchanged, no superiority verdict, owner's call.
+- NEXT EVICTIONS: #590 exits at maxId 790 (15 rounds), #664 at ~864. The window will be COMPLETELY empty of flips within ~1-1.5 h absent new rescues; a single new rescue resets the count to 1v0 (p=1.0) — the window cannot regain nominal significance without a rapid rescue cluster, which the session has never produced (max 1 rescue per block).
+- Only lifetime unwind events: H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 16+ consecutive passes.
+- Feed: leading-edge silence 246s forming at extraction (watch #13). Disruption ledger: 12 events.
+- Protocol continues. Engine untouched.
