@@ -5370,3 +5370,33 @@ Stage Summary:
 - NOT the cause: the reliability layer (0 engagement in cost rounds — it only differs on ~3% of rounds and nets +1 lifetime flip rung), persistence penalty (1/36), single-round luck (reproduced in all 30 windows), and the optimizer mechanism itself (faithful to its inputs).
 - RECOMMENDED NEXT INVESTIGATIONS (no code changes): (1) log/verify liveN vs user-round N at prediction time to confirm N_obs inflation (would explain both inert safeguards); (2) build an offline replay harness to decompose score components per round (evidence vs prior vs signals) and test alternative dev-weightings COUNTERFACTUALLY on FRESH out-of-time rounds only; (3) standing swap-P&L-per-displacer dashboard (COIN FLIP is the top churn source now, not PACHINKO); (4) revisit safeguard constants' effective sample-size basis (both keyed to counts that no longer describe the data regime); (5) note the fixed-set benchmark itself is not sacred (COIN FLIP out-landed '10' in-window and in recent pool) — any future fix should target relative calibration, not hard-coded sets (per owner's own constraint).
 - Artifacts: scripts/diag_top4_gap.py, scripts/diag_top4_coverage.py, scripts/data/diag_top4_result.json. Engine untouched (git freeze verified pre/post).
+
+---
+Task ID: 127 (cron monitor — Job ID 369099, pass 82 — ZERO-ROUND PASS: disruption #19 CANDIDATE forming, silence 13.8 min ongoing (below 15.0-min registration grade); renderer healthy 2x first-try; evidence fully static 139/139/167, lifetime 20v6 p=0.009)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 82, 21:31 +08). Trigger (a) YES (standing re-deepened significance) -> full analysis. Engine unchanged (git freeze clean; HEAD 48c15f5 cron artifact commit).
+
+Work Log:
+- ZERO-ROUND PASS: ledger UNCHANGED from pass 81 (minId 861, maxId 1060). #1060 last landed 21:22:34 +08; latest ts age 826s = 13.8 min at extraction and ONGOING. Below the 15.0-min registration grade -> logged as DISRUPTION #19 CANDIDATE (forming, not yet registered). If confirmed next pass, escalation curve: 15.0 -> 26.3 -> 33.4 -> 48.4 -> 61.0 -> 24.4 -> #19.
+- FORENSICS (lite): ledger + panel extractions BOTH first-try clean — renderer healthy, CDP alive; signature = pure upstream silence (#17/#18 mode, NOT the renderer-hang mode). No reload warranted.
+- Evidence FULLY STATIC (3rd consecutive zero-change pass): base 139/200 = 69.5%, exp 139/200 = 69.5%, delta +0.00pp, window 1v1 [#1043 | #955] p=1.0, theo 167/200 = 83.5%, streak 17 (frozen), lifetime verified 20v6 p=0.009 / raw 20v9 p=0.061. Panel == ledger EXACT (139/139/167, M2H 1, H2M 1; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved).
+- Movers frozen by the outage: H2M unwind watch did NOT advance (no new flips); streak-17 accumulation paused; theo's 83.5% window rate (hot normal block) paused mid-run.
+- Triggers: (a) YES — lifetime 20v6 p=0.009 standing; (b) no (13.8 min below threshold, noted); (c) no. VERDICT: ESCALATE — full analysis EXECUTED (outage-candidate verification + static-state confirmation).
+
+Metrics (FIFO window n=200, IDs 861-1060; clean n=200 — UNCHANGED, zero new rounds):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 139/200 = 69.5% (clean==raw)
+3. Experimental HIT: 139/200 = 69.5% (clean==raw)
+4. Delta: +0 hits (+0.00pp) — parity holds 5th pass
+5. MISS->HIT flips: window 1 (#1043); lifetime 20
+6. HIT->MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 167/200 = 83.5%
+8. MISS RCA: no new rounds — nothing to classify; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 20v6 p=0.009 (unchanged); raw 20v9 p=0.061 (unchanged)
+- Agreement streak: 17 (since #1043, frozen)
+
+Stage Summary:
+- Disruption #19 candidate forming (13.8 min, ongoing) — would be the 7th upstream outage in ~6.5 h if confirmed; renderer exonerated again (2x first-try). Owner infrastructure case unchanged (frequency-based).
+- Evidence paused, not degraded: 20v6 p=0.009 verified / 20v9 p=0.061 raw; window parity 139/139 static across 3 passes now. On resume: gap auto-registers, window rolls mechanically.
+- Context note: pass 81's companion diagnostic (Task 126-DIAG) established the structural parity context — both engines share the score architecture and differ on ~3% of rounds; the lifetime flip asymmetry (now 20v6) carries all evidential weight.
+- Next pass: #19 confirmation (>= 15 min) or closure (rounds resumed + gap registration + window roll + flip check). Disruption ledger: 18 confirmed + 1 candidate. Degraded set: EMPTY. Protocol continues. Engine untouched.
