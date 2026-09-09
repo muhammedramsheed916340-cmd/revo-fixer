@@ -5670,3 +5670,34 @@ Stage Summary:
 - Owner-relevant: theo 84.0% vs engines 62.0/62.5% — the fixed set's advantage holds at ~44 hits/200 rounds; the layer's +1 in-window save remains two orders of magnitude smaller than the calibration gap (consistent with DIAG's dominant-cause finding).
 - Countdown: #1043 exits at maxId ≥ 1243 — 62 rounds (~43 min, likely pass 92) → delta returns to 0.00pp unless a new flip lands first. Streak record continues extending.
 - Next pass: #1043-carry watch (delta +1, 3rd pass?); feed-tail watch (715s age — disruption #20 candidate if the stall develops); streak 138+; '1'-anomaly episodic pattern. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 136 (cron monitor — Job ID 369099, pass 91 — FEED STALL: DISRUPTION CANDIDATE #20 (ONGOING, unbounded): zero new rounds in the full 15-min pass interval, latest ts age 1611s (26.9 min) > 900s registration tier; window frozen at 982-1181 with ALL metrics identical to pass 90; renderer excluded as cause (healthy 2x first-try, panel wall-clock progressing); delta +1 frozen 3rd pass, streak 138 frozen)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 91, 23:46 +08). Trigger (a) YES (standing 20v6 p=0.009) → full analysis; trigger (b) formally "no" on the analyzer's inter-row check but MANUAL STALL REGISTRATION executed per the 15-min last-age tier (analyzer measures inter-row gaps only; an unresumed stall has no closing row to bound the gap). Engine unchanged (git freeze clean; HEAD 5d5ec2e cron artifact commit; src/ diff vs baseline 9ec8c87 = 0 lines).
+
+Work Log:
+- FEED STALL DETECTED — DISRUPTION CANDIDATE #20 (ONGOING): pass-90 extraction closed at maxId 1181 with latest age 715s (flagged as watch item). This pass, 14.9 min later: ledger `now` advanced 896s but maxId is STILL 1181 — zero new rounds in the entire inter-pass interval. Latest ts age at extraction: 1611s (26.9 min), above the 15-min (900s) disruption registration tier. The stall began immediately after #1181 (last feed ts ≈ 23:19 +08). Candidate status (not yet confirmed) because the 19 confirmed disruptions are all BOUNDED inter-row gaps; this one is unbounded until the feed resumes — bounding + confirmation expected at pass 92 if resumption occurs.
+- RENDERER EXCLUDED AS CAUSE: both evals (ledger + panel) returned first-try in milliseconds; panel wall-clock fields progressed correctly ("VALIDATION STARTED 82000s ago" vs 81104s last pass — exactly the 896s inter-pass delta). This is a FEED-SIDE stall (upstream data source), not a renderer hang. Incident #5 precedent does not apply. Console forensics: last OPTIMIZER DEBUG block corresponds to the #1181-era computation (engine idle since — consistent with no new rounds to process); 8 blank error events (✗, empty text) in the error buffer — fetch-failure signature, matching the documented legacy outage signature; no new JS exceptions.
+- WINDOW FROZEN: diff vs anchor = 0 new rounds, 0 evictions — the 200-round window is byte-identical to pass 90 (982-1181). All 8 metrics unchanged: base 124/200 = 62.0%, exp 125/200 = 62.5%, delta +1 (+0.50pp), theo 168/200 = 84.0%, M2H 1 (#1043), H2M 0, coverage 67.26/67.35%. Streak 138 FROZEN (not extended — no rounds to agree on; last flip remains #1043). Delta +1 persists 3rd pass but is frozen, not re-earned.
+- Paired extraction: PANEL == LEDGER FIRST-TRY EXACT (200/124/125/168, M2H 1, H2M 0) — 8th consecutive pass, on a frozen window (strongest possible consistency check: two independent reads 15 min apart, identical). Panel capture again tail-truncated mid-'10'-row (same benign eval output clip as pass 90; headline complete; ledger covers the tail).
+- Triggers: (a) YES — standing; (b) MANUAL YES — stall candidate #20 registered (analyzer's automated check remains inter-row-only and reports none, correctly); (c) no. VERDICT: ESCALATE — full analysis EXECUTED (window census carried over unchanged from pass 90: 75 joint misses, bonus-Q12 ×20 / '1' ×17 / '10' ×14 / '2' ×12 / '5' ×12, theo caught 55/75).
+
+Metrics (final paired window n=200, IDs 982-1181 — FROZEN vs pass 90; clean n=200 — 13th consecutive fully-clean window, count not extended):
+1. Paired rounds: 200 (ALL CLEAN; 0 new)
+2. Baseline HIT: 124/200 = 62.0% (frozen)
+3. Experimental HIT: 125/200 = 62.5% (frozen)
+4. Delta: +1 hit (+0.50pp) — frozen 3rd pass (via unopposed #1043)
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 0; lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 168/200 = 84.0% (frozen)
+8. MISS RCA: unchanged (75 joint misses; calibration family dominant); no new rounds → no new families; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v0 p=1.0; lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 138 — record, FROZEN (not extended; zero new rounds)
+- Avg coverage: base 67.26% / exp 67.35% (frozen)
+
+Stage Summary:
+- First stall-class event since the disruption ledger's last confirmations: the feed went silent immediately after #1181 (~23:19 +08) and remained silent through the entire pass interval (26.9 min at extraction). The monitoring pipeline behaved exactly as designed: renderer health ruled out first (panel wall-clock progressing, evals instant), stall localized to the feed, candidate #20 registered without disturbing the ledger or engines.
+- No validation-state change: the frozen window means the +1 delta (via #1043), the 138-round streak, and the ~22pp engines-vs-theo gap all carry over verbatim. The #1043 exit countdown (maxId ≥ 1243) is ALSO frozen at 62 rounds — it cannot advance until the feed resumes.
+- Owner-relevant: 26.9 min of feed silence is the longest stall of the monitored era if confirmed; the ledger's localStorage durability means zero data risk — the window will slide normally on resumption, and the #1181→#1182 gap will be measured and bounded for the disruption ledger.
+- Next pass: RESUMPTION WATCH — if new rounds arrive: (1) bound the #1181→#1182 gap → disruption #20 confirmation or reclassification (if gap < 15 min bounded, downgrade); (2) window slides (evictions 982+); (3) streak extension resumes; (4) #1043 countdown resumes. If the stall persists: re-report age, keep candidate #20 ongoing, verify renderer still healthy. Disruption ledger: 19 confirmed + 1 ONGOING CANDIDATE (#20). Degraded set: EMPTY. Protocol continues. Engine untouched.
