@@ -3704,3 +3704,35 @@ Stage Summary:
 - No new validation evidence this pass; equivalence state unchanged (verified 9v5 exp-tilted, n.s.).
 - Next pass: endpoint measurement or continued record watch; if silence persists past ~60 min, consider whether an upstream restart action exists OUTSIDE the page (e.g., feed service) — page-side actions remain unnecessary/inapplicable.
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 78 (cron monitor — Job ID 369099, pass 33 — OUTAGE #7 CLOSED at 41.7 min: NEW ALL-TIME RECORD; full analysis per trigger (b))
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 33, 09:16 +08); measure outage #7 endpoint. Full analysis per trigger (b). No engine changes.
+
+Work Log:
+- OUTAGE #7 CLOSED: #409 (08:21:08 +08) -> #410 (09:02:51 +08) = 41.7 min — NEW ALL-TIME RECORD (prev: outage #1, 31.6 min). Feed recovered before this pass: 19 new rounds 410-428 ingested, newest age 0.6 min. IDs contiguous, zero data loss. Gap auto-memorized as [409,410]; repeat escalation suppressed.
+- Lifetime outage ledger now 7: 31.6m, 25.2m, 16.0m, 25.5m, 20.8m, 19.5m, 41.7m. Lifetime unobserved est. ~85-105 rounds. Feed instability is now the dominant data-coverage constraint of the session (7 outages in ~5h; record broken in the last hour).
+- Window: base 128/200 = 64.0%, exp 129/200 = 64.5% — delta HOLDS at +1 (+0.5pp) exp-favoring, third consecutive window (new block eviction-symmetric: both -1).
+- theo 166/200 = 83.0% (recovering).
+- Agreement streak 34 (19/19 new rounds agreed; last flip still #394). McNemar window 2v1 p=1.000; lifetime verified 9v5 p=0.424; raw 9v8 p=1.000.
+- New block regime: '10'-storm — '10'x6 (417/419/420 missed, 424/426/428 hit), '1'x7 ALL hit, '2' 1/2 (#427 miss), bonus CASH HUNT miss (#412), COIN FLIP miss (#415), PACHINKO hit (#425). Calibration signature continues ('10' partial exclusion now producing 3-miss clusters then 3-hit runs).
+- Panel cross-check: exact match (200 paired, 64%/65%, delta +1%); normal/bonus base 107/166 vs exp 109/166 normal, base 21/34 vs exp 20/34 bonus.
+- Engine freeze: git verified zero engine diffs.
+
+Metrics (FIFO window n=200, IDs 229-428, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 128/200 = 64.0%
+3. Experimental HIT: 129/200 = 64.5%
+4. Delta: +1 hit (+0.5pp), exp-favoring, third consecutive window
+5. MISS->HIT flips: window 2 (#381, #394); lifetime 9
+6. HIT->MISS flips: window 1 verified (#236); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 166/200 = 83.0%
+8. MISS RCA: lifetime 15 + 2 documented exp-saves; no new categories (base misses in-block: 412 bonus, 415 bonus, 417/419/420 '10', 427 '2' — all existing families)
+- Feed/quality: outage #7 gap flagged, documented, memorized; no degraded rows; cadence normal post-resumption.
+
+Stage Summary:
+- RECORD outage archived: 41.7 min, zero data loss, page-side infrastructure flawless throughout. Collection fully healthy.
+- Equivalence state unchanged: verified 9v5 exp-tilted (p=0.424), delta +1 composition-driven, streak 34.
+- Session reliability watch: 7 outages / ~5h with the record set in the final hour — recommend the owner investigate the upstream feed service when convenient; monitoring continues to document each gap automatically.
+- Protocol continues: metrics-only. Engine untouched.
