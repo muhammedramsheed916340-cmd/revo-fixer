@@ -5434,3 +5434,38 @@ Stage Summary:
 - Window archaeology: this pass spanned THREE window states (861-1060 → 866-1065 → 873-1072); the frozen pass record is the final paired-consistent state. Effective observation latency during a burst ≈ one extraction cycle; metrics self-corrected at the final pair.
 - Countdown updates: #955 (window H2M) exits the FIFO window when maxId ≥ 1155 (~83 rounds away) — its exit will mechanically move window flips to 1v0 (p=0.5); #1043 (window M2H) exits at maxId ≥ 1243. Streak-29 run continues toward the session-record 76.
 - Next pass: burst sustainability + cadence watch; unwind ladder watch (2 consecutive H2M → 20v7 p=0.018 re-weaken); any M2H deepens toward record rung. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 129 (cron monitor — Job ID 369099, pass 84 — STEADY STATE: burst fully normalized (~42s cadence, max gap 86s), 13/13 new AGREE, streak 42; parity 138/138 7th pass (both engines −3 on a 4-joint-miss cold patch); lifetime static 20v6 p=0.009; panel==ledger FIRST-TRY EXACT (paired protocol validated); #1075 PACHINKO both-hit with layer INERT)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 84, 22:01 +08). Trigger (a) YES (standing re-deepened 20v6 p=0.009) → full analysis. Engine unchanged (git freeze clean; HEAD 4e37608 cron artifact commit; src/ diff vs baseline 9ec8c87 = 0 lines).
+
+Work Log:
+- STEADY STATE RESTORED: #1073–#1085 (13 rounds) at 38–86s cadence (typ 42s), max inter-row gap 86s, latest age 22s, zero >8min gaps — the pass-83 burst is over, no second-wave instability after #19. Disruption ledger stays 19 confirmed, 0 candidates.
+- Paired-extraction protocol (pass-83 lesson) applied: ledger+panel back-to-back → PANEL == LEDGER FIRST-TRY EXACT (200/138/138/166, M2H 1, H2M 1). Renderer healthy 2x first-try. Protocol lesson confirmed operational.
+- 13/13 new rounds AGREE → streak 29 → 42 (since #1043), now past half the session-record 76.
+- Window 873-1072 → 886-1085 (13 evictions 873-885). Both engines 141 → 138 (−3): a 5-round cold patch #1078-#1082 produced 4 joint misses ('10', '2', '2', '5' — ALL theo-caught); #1084 COIN FLIP both-miss (theo also missed → Q12-unavoidable). Theo unchanged at 166 (cold-patch misses offset by evicted misses).
+- #1075 PACHINKO LANDED, both engines HIT with IDENTICAL sets (bp==ep, rank-4 inclusion) — the reliability layer was NOT engaged (r ≈ 1 under live N_obs inflation, exactly the DIAG Q6/Q11 finding): a clean live demonstration that PACHINKO conversions are engine-level, not layer-level.
+- Window divergence rate: bp!=ep on 25/200 = 12.5% of window rounds (DIAG's pinned-window figure was ~3%) — but heavily CLUSTERED (886-892, 897-900, 955-966, 991, 1037-1045, 1067-1070) and outcome-flipping on only 2/25 (#955 H2M, #1043 M2H). Divergence is era-dependent; hit-rate consequence remains exactly zero. Zero divergence among the 13 new rounds.
+- '1' actuals 80/200 = 40.0% in-window — hot block persists (vs ~25% wheel base rate); DIAG's regime-check recommendation increasingly relevant (pattern looking persistent, not a blip).
+- Triggers: (a) YES — standing 20v6 p=0.009; (b) no; (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final paired window n=200, IDs 886-1085; clean n=200 — 7th consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 138/200 = 69.0% (clean==raw)
+3. Experimental HIT: 138/200 = 69.0% (clean==raw)
+4. Delta: +0 hits (+0.00pp) — parity holds 7th pass
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 166/200 = 83.0%
+8. MISS RCA: joint misses #1078 '10' / #1079 '2' / #1081 '2' / #1082 '5' (all theo-caught — the DIAG calibration-gap mechanism in miniature) + #1084 COIN FLIP both-miss (Q12-unavoidable, theo also missed); no flips → no new families; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 42 (since #1043)
+- Avg coverage: base 69.52% / exp 69.57% (+0.05pp — layer's thin positive edge persists)
+
+Stage Summary:
+- Cleanest steady-state pass of the post-#19 era: feed normalized immediately, evidence static, parity 138/138 for the 7th pass, streak 42 accumulating toward the record 76 (34 more agree rounds needed).
+- Two DIAG-confirming live observations this pass: (1) PACHINKO both-hit with the layer inert (#1075) — dampening is ineffective under live N_obs inflation exactly as diagnosed; (2) the 4-joint-miss cold patch on '2'/'5'/'10' — engines jointly exclude the actual-dominant normals while theo catches all four.
+- Divergence-rate note for the ledger: window bp!=ep rate (12.5%) is era-clustered and NOT comparable to DIAG's pinned-window 3%; only 2/25 divergences ever flip hit outcome — the layer's footprint is wide but hit-rate-shallow.
+- Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 70 rounds away (~50 min at current cadence); exit will mechanically move window flips to 1v0 (p=0.5). #1043 exits at maxId ≥ 1243.
+- Next pass: streak watch toward 76; #955 exit mechanics; unwind ladder (2 consecutive H2M → 20v7 p=0.018). Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
