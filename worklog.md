@@ -4306,3 +4306,34 @@ Stage Summary:
 - Lifetime 17v5 p=0.017 window-independent; only unwind is new H2M(s) (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 11+ consecutive passes.
 - Feed: 51 rounds since last disruption; hot cadence now ~1.2 min/round sustained. Owner infra review overdue.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 97 (cron monitor — Job ID 369099, pass 52 — MECHANICAL UNWIND LANDED: #511 aged out, window 5v0 p=0.062 n.s. (first window-n.s. since the crossing); lifetime 17v5 p=0.017 UNCHANGED — canonical ledger unaffected, exactly as forecast)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 52, 14:01 +08). Trigger (a) standing YES (lifetime) -> full analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- Extraction clean first attempt: n=200, window 531-730 (22 new rounds 709-730; hot cadence ~1.2 min sustained). Integrity: contiguous, no dupes, no gaps, latest 10s.
+- UNWIND EXECUTED ON SCHEDULE: #511 (3rd window rescue) aged out; NO 9th rescue in 709-730 -> window now 5v0 [532, #554, #562, #590, #664], p=0.062 — window significance LOST (n.s. for the first time since the window crossing began). This is the projected mechanical decay, not new evidence: zero new flips either direction, 22/22 new rounds agree.
+- New block texture 709-730: '1'-heavy (x12, 9 hit — #723 four-straight 720-723 + #727-#730 stretch), '2' x4 (3 hit), '5' x2 (1 hit), '10' x2 (0 hit), CASH HUNT x1 miss. Both engines 15/22 — hot block, fully symmetric. Session-best window rates again: 63.0%/65.5%.
+- Panel cross-check: EXACT (126/131, M2H 5, H2M 0, theo 169/200, paired 200, no reset, K=10, SHADOW ON). Coverage base 69.46% / exp 69.38%.
+- Triggers: (a) YES — lifetime 17v5 p=0.017 standing (window now n.s.); (b) no; (c) no (0 new flips, streak 66 — 2nd longest of session). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 531-730, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 126/200 = 63.0%
+3. Experimental HIT: 131/200 = 65.5%
+4. Delta: +5 hits (+2.50pp) exp-favoring — dipped +6 -> +5 via #511 eviction (composition, not performance)
+5. MISS->HIT flips: window 5 (#532, #554, #562, #590, #664); lifetime 17
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 169/200 = 84.5%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('1' x3, '10' x2, '2' x1, '5' x1, CASH HUNT x1) — no new categories
+- McNemar: window 5v0 p=0.062 (n.s. — mechanical); lifetime verified 17v5 p=0.017 (RECORD, unchanged); raw 17v8 p=0.108
+
+Stage Summary:
+- The window's significance has now fully decayed on the projected schedule: 7v0 -> 6v0 -> 5v0 (n.s.) as #458/#459/#511 aged out with only one replacement (#664). The monitor's standing interpretation is confirmed by the data: the WINDOW statistic is a renewable resource drained by eviction; the LIFETIME ledger (17v5 p=0.017) is where the crossing permanently lives and is today UNCHANGED.
+- Formal position unchanged: nominal lifetime significance (17v5 p=0.017) with unchanged caveats (sequential testing, raw-ledger sensitivity p=0.108); not a superiority verdict; owner's call. The window n.s. state does NOT weaken the lifetime ledger — but it does mean fresh-window evidence alone no longer crosses the bar; any owner decision should weigh the canonical lifetime number.
+- NEXT: #532 exits at maxId 732 — 2 ROUNDS away -> 4v0 (p=0.125) imminent. Then #554 (~754), #562 (~762), #590 (~790). Without new rescues the window drains to zero within ~60 rounds (~1.5-2 h at hot cadence).
+- Only lifetime unwind events: H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 12+ consecutive passes; lifetime H2M unchanged since #236 (out of window long ago).
+- Feed: 73 rounds since last disruption (11 events). Hot cadence sustained ~1 h. Owner infra review overdue.
+- Protocol continues. Engine untouched.
