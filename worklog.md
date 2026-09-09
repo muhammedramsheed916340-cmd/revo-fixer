@@ -4832,3 +4832,33 @@ Stage Summary:
 - Primary watch item shifts to FEED: 13-min leading-edge silence at close mirrors the pass-62 precursor of disruption #14 (26.3 min). Next pass either confirms disruption #16 or the feed resumes (pass-62's silence also partially resolved before confirmation).
 - No new misses at all this pass — RCA quiet. Disruption ledger stands at 15 pending #16 confirmation.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 114 (cron monitor — Job ID 369099, pass 69 — disruption #16 CONFIRMED (15.0 min, 913->914); feed resumed hot 22/22; streak record 91; headline frozen at delta +2 / 2v0 / lifetime 19v5 p=0.007)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 69, 18:16 +08). Trigger (a) YES (standing record) + (b) YES (outage confirmed) -> full analysis. Engine unchanged (git freeze clean; HEAD bb23f68 cron artifact commit).
+
+Work Log:
+- DISRUPTION #16 CONFIRMED: inter-row gap 913->914 = 15.0 min. The pass-68 leading-edge precursor (784s) resolved into a bounded outage — 5th disruption of the session's last ~2.5 h (#14 26.3 min at 16:21-16:49, plus repeated shorter silences). Pattern note for owner: outages are clustering in the 15-26 min band with full recovery and zero data loss each time (FIFO gap-bounded, no corruption; known-gaps registered at 756/775/836/913 boundaries).
+- Feed resumed at FULL cadence: 22 new rounds (#914-#935) landed within the pass, 1s age at close. Window 736-935, evictions 714-735.
+- New rounds: 22/22 AGREE, both engines 18/22 (hot). Composition: '2' x14 (11 hit — the '2' slot is running extremely hot), '1' x4 (4 hit), '5' x3 (2 hit), all theo 20/22. Evicted 714-735: 18 base/18 exp hits (composition, symmetric — includes the '1' quad).
+- Headline metrics FROZEN 5th pass: base clean 135/199 = 67.8%, exp 137/200 = 68.5%, delta clean +2 (+1.01pp), M2H 2v0 [#787,#844] p=0.5, H2M 0, theo 161/200 = 80.5%, lifetime 19v5 p=0.007 (record) / raw 19v8 p=0.052. Streak 91 — session record extended again (was 69).
+- Panel cross-check: EXACT (base 135 clean / exp 137 / theo 161 / M2H 2 / H2M 0; paired 200; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved). No snapshot-race. Stale 29/30.
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing; (b) YES — disruption #16 confirmed (15.0 min); (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 736-935; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 135/199 = 67.8% (raw 136/200 = 68.0%)
+3. Experimental HIT: 137/200 = 68.5% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 161/200 = 80.5% (clean 80.9%)
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves; new-round misses (#914/#915 '2', #921 '5') existing families — no new categories
+- McNemar: window 2v0 p=0.5 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- The outage-resume cycle repeated cleanly: 15-min silence, full recovery, zero loss, engines unbothered (22/22 symmetric through the boundary). The known-gaps map now has 4 in-validation boundaries (756/775/836/913) — each fully explained and bounded; owner infra review remains standing (URGENT).
+- Streak 91 is now 2.4x the pre-#844 record; the layer has been dormant for 91 rounds. The '2' slot at 11/14 this block is the hottest sustained run of the session for either engine.
+- All evidence metrics unchanged for 5 consecutive passes: 19v5 p=0.007 verified / p=0.052 raw / window 2v0 / delta clean +2. The validation is in a fully understood steady state; remaining movers unchanged (new rescue, 3-consecutive H2M, composition at ~#987/#1044).
+- Disruption ledger: 16 events. Degraded frozen (#785). Protocol continues. Engine untouched.
