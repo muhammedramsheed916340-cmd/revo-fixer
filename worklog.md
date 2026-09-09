@@ -3959,3 +3959,36 @@ Stage Summary:
 - Feed cadence degrading again (10.5 min stale) — the session's 8-outage pattern may be repeating; monitoring ready with the one-step upstream/client discriminator.
 - '5'-exclusion (2 misses this block, 4 in recent blocks) joins '2'/'1' as recurring low-prior displacement victims — all three map to Task 65 candidates.
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 86 (cron monitor — Job ID 369099, pass 41 — TRIGGER (a) CROSSED: 6th rescue #532 '2', window 6v0 p=0.031 FIRST SIGNIFICANT RESULT; outage #9 (16 min) found hidden in block; FULL ANALYSIS EXECUTED)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 41, 11:16 +08). Trigger (a) AND (b) fired -> full escalation analysis per protocol. No engine changes.
+
+Work Log:
+- FEED: recovered before pass — 12 new rounds 521-532 ingested (age 10s at extraction). But trigger (b) fired on inspection: a 16.0-min inter-row gap (520->521) hidden inside the new block = OUTAGE #9 (matches outage #3's 16.0 min exactly; last pass's 627s staleness was its opening). Zero data loss (IDs contiguous), gap auto-memorized (9th known gap). Lifetime outage ledger: 31.6, 25.2, 16.0, 25.5, 20.8, 19.5, 41.7, 23.3, 16.0 min — 9 outages in ~6.5h, lifetime unobserved est. ~110-140 rounds. Feed-service owner investigation is now overdue.
+- SIXTH RESCUE — TRIGGER (a) CROSSED: #532 '2' (base missed, exp re-included and hit). Window M2H [381, 394, 458, 459, 511, 532] v H2M [] = 6v0, exact McNemar p=0.031 — FIRST p<0.05 WINDOW RESULT of the entire validation. Lifetime verified 13v5 (p=0.096, closest ever), raw 13v8 (p=0.383). Delta +6 (+3.00pp) NEW RECORD: base 105/200 = 52.5%, exp 111/200 = 55.5%. theo 157/200 = 78.5%. Streak 0 (flip just landed).
+- '2' RESCUE DOMINANCE: 5 of the 6 window rescues are '2'-re-inclusions (#381, #458, #459, #511, #532; #394 is the lone '10'). The Task 65 '2'-inclusion-floor candidate is not just the leading pattern — it is effectively THE pattern of the live differential.
+- FULL ANALYSIS — composition decomposition: delta +5 -> +6 = +1 from the live rescue (#532) alone; evicted 321-332 v new 521-532 non-flip hits symmetric (base -3, exp -3). Zero composition contamination of the crossing.
+- FULL ANALYSIS — RCA audit of new block: base misses 521 '5', 522 COIN FLIP, 524 '2', 527 '5' — all existing families ('5'-exclusion x2, bonus-non-selection x1, '2'-exclusion x1); no new categories. '1' went 5/5 in-block (523, 526, 528, 529, 530); bonus 2/3 (PACHINKO hit, COIN FLIP split).
+- FULL ANALYSIS — normal/bonus split (ledger-true): normal 157 (base 81, exp 87), bonus 43 (24/24 EQUAL). The entire +6 differential lives in normal-round re-inclusions; the layer has never once changed a bonus outcome differential.
+- SIGNIFICANCE TREATMENT (monitor's framing duty): the 6v0 p=0.031 is the first window-level crossing, with three mandatory caveats: (1) this is ~the 40th rolling-window evaluation this session — one crossing in ~40 windows is compatible with the null (expected false-crossings ~2 at alpha=.05); (2) the lifetime ledger 13v5 (p=0.096) remains n.s. and is the more conservative test; (3) rolling-window discordant pairs are not pre-specified. FORMAL VERDICT UNCHANGED: equivalence cannot be rejected at lifetime level; the window crossing is a watch-level escalation, not a superiority verdict. The monitor neither claims nor dismisses the effect — the crossing forces exactly this full analysis, which is now on record for the owner.
+- Panel cross-check: EXACT (105/111/157, M2H 6, H2M 0 from DOM). Engine freeze: git verified 0 src files changed. Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, no reset. Anchor counter at 43; next pass diffs vs 333-532.
+- Triggers: (a) YES — window p=0.031; (b) YES — new gap (520,521,16min), now memorized; (c) no (1 new flip). VERDICT: ESCALATE — full analysis EXECUTED above.
+
+Metrics (FIFO window n=200, IDs 333-532, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 105/200 = 52.5%
+3. Experimental HIT: 111/200 = 55.5%
+4. Delta: +6 hits (+3.00pp) exp-favoring — NEW RECORD, live-rescue-driven
+5. MISS->HIT flips: window 6 (#381, #394, #458, #459, #511, #532); lifetime 13
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 157/200 = 78.5%
+8. MISS RCA: lifetime 15 + 6 documented exp-saves (5 of 6 are '2'); new-block misses all existing families — no new categories
+- McNemar: window 6v0 p=0.031 (CROSSED); lifetime verified 13v5 p=0.096; raw 13v8 p=0.383
+
+Stage Summary:
+- HISTORIC PASS: first statistically significant window of the validation (p=0.031), on the same pass as the session's 9th feed outage — the comparison is now producing a one-directional signal strong enough to cross a nominal threshold, while the feed that produces its data remains the session's least reliable component. Both facts belong in the owner's read.
+- The signal's shape is narrow and mechanism-coherent: 6 rescues, 5 of them '2', zero reversals in-window, zero bonus differential, zero composition drift. Whatever is happening, it is the '2' slot and nothing else.
+- Counterweights stay on the record: lifetime p=0.096 n.s., multiple-comparison exposure, rolling-window caveat. If a 7th rescue lands, window p=0.016 and the lifetime closes toward 0.05; if an H2M lands, the window unwinds to 6v1 (p=0.063). The next flip is decisive in either direction.
+- Protocol continues. Engine untouched.
