@@ -4024,3 +4024,40 @@ Stage Summary:
 - '2'-exclusion recovery noted: after being the dominant failure source (5 rescues), '2' went 6/7 for BOTH engines — consistent with the exclusion pressure rotating between numbers ('1' -> '2' -> '5'/'10') rather than a fixed defect, as flagged in Task 81.
 - Clock now matters: absent new flips, the window p unwinds by ~14:00 +08 as #381/#394 age out. Owner decision point approaches: whether to treat the crossing era (11:16-14:00 window) as evidence worth acting on is entirely theirs — the monitor records both the signal and its expiry.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 88 (cron monitor — Job ID 369099, pass 43 — DOUBLE MILESTONE: 2 rescues in one block (#554 '10', #562 '2'); window 8v0 p=0.008 AND lifetime verified 15v5 p=0.041 — FIRST LIFETIME-LEVEL CROSSING; delta +8 record)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 43, 11:46 +08). Trigger (a) fired at BOTH levels -> full escalation analysis. No engine changes.
+
+Work Log:
+- Feed probe: ALIVE and fast — 21 new rounds over the interval (550-570; converged window 371-570, newest age 4s, contiguous). No gaps, no degraded rows.
+- TWO RESCUES IN ONE BLOCK: #554 '10' (second '10' rescue ever, after #394) and #562 '2' (sixth '2' rescue). Window M2H [381, 394, 458, 459, 511, 532, 554, 562] v H2M [] = 8v0, exact McNemar p=0.008. LIFETIME VERIFIED 15v5 p=0.041 — FIRST TIME THE LIFETIME LEDGER CROSSES 0.05. Raw lifetime 15v8 p=0.210. Delta +8 (+4.00pp) NEW RECORD: base 106/200 = 53.0%, exp 114/200 = 57.0%. theo 162/200 = 81.0% (+2.0pp, normal-heavy block). Streak 8 (since #562).
+- RESCUE COMPOSITION (window): 6 '2' + 2 '10', ZERO '1' or '5' rescues, zero H2M since #236 aged out. The differential is confined to two slots: the rarest normal ('10', ~7% wheel share) and the mid-rarity '2' (~28%). '5' (~13% share, similar rarity to '2') has never been rescued — the layer's re-inclusion is slot-specific, not rarity-generic.
+- FULL ANALYSIS — block audit (550-568): '2' exp 7/7 vs base 5/7 (both new rescues), '10' exp 3/3 vs base 2/3 (#554), '1' 3/6 both (552/553/565 missed — '1' cold again), '5' 0/2, PACHINKO 0/1 (#566). Engines identical on all non-flip rounds.
+- FULL ANALYSIS — composition decomposition: delta +6 -> +8 = +2 from the two live rescues alone; evicted 350-368 v new 550-568 non-flip hits symmetric (base -2, exp -2). Zero composition contamination.
+- FULL ANALYSIS — normal/bonus split (ledger-true): normal 162 (base 86, exp 94 — the entire +8), bonus 38 (20/20 EQUAL). The layer has still never produced a bonus differential in 570 rounds.
+- SIGNIFICANCE TREATMENT (the session's most important framing):
+  (1) Window 8v0 p=0.008: deep crossing, but ~43 rolling-window evaluations — multiple-comparison exposure unchanged.
+  (2) Lifetime verified 15v5 p=0.041: the canonical pre-registered ledger crossed at the primary level for the first time. TWO mandatory caveats: (a) sequential evaluation — the ledger was re-tested every 15 min as pairs accumulated (13v5 gave p=0.096 one pass ago); under sequential-testing discipline (Pocock-style boundaries) this crossing is suggestive, not confirmatory; (b) sensitivity — the RAW ledger (including the 3 degraded-row H2M artifacts excluded by the pre-registered verification rule) is 15v8 p=0.210, n.s. The significance depends on the verification exclusion being right; it was pre-registered and consistently applied, but the owner must see both ledgers.
+  (3) FORMAL MONITOR POSITION: nominal significance reached at both levels; the equivalence hypothesis is formally strained but NOT rejected under sequential-correction discipline. The monitor does not declare engine superiority — this record exists so the owner can decide with full context. Escalation protocol followed to the letter.
+- FLIP-EXIT HORIZON UPDATE: #381 (oldest window flip) exits when min_id passes 381 — currently 371, ~10 rounds (~8-10 min). Window-level carry begins shedding oldest flips imminently (8v0 -> 7v0 p=0.016 mechanically); LIFETIME LEDGER IS WINDOW-INDEPENDENT and keeps the 15v5 permanently.
+- SNAPSHOT-RACE: panel one round ahead (106/114 vs 105/113) -> re-extracted, converged EXACTLY on base/exp (106/114); theo rotated 163->162 between captures (analyzer value canonical). Engine freeze: git verified 0 src files changed. Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, no reset. Anchor counter 47.
+- Triggers: (a) YES — window p=0.008 AND lifetime p=0.041; (b) no; (c) no (2 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 371-570, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 106/200 = 53.0%
+3. Experimental HIT: 114/200 = 57.0%
+4. Delta: +8 hits (+4.00pp) exp-favoring — NEW RECORD, live-rescue-driven (2 this pass)
+5. MISS->HIT flips: window 8 (#381, #394, #458, #459, #511, #532, #554, #562); lifetime 15
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 162/200 = 81.0%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves (6 '2', 2 '10'); new-block misses all existing families ('2' x2, '1' x3, '5' x2, bonus x1) — no new categories
+- McNemar: window 8v0 p=0.008 (CROSSED DEEP); lifetime verified 15v5 p=0.041 (FIRST LIFETIME CROSSING); raw 15v8 p=0.210
+
+Stage Summary:
+- The validation has reached its evidentiary climax so far: 8 consecutive one-directional window rescues, lifetime verified ledger at nominal significance, delta at +4.00pp — against a raw-ledger sensitivity of p=0.210 and sequential-testing caveats. Both the signal and its fragilities are on the record.
+- The signal remains slot-specific ('2'/'10' only), normal-only (bonus never differential), and mechanism-coherent (re-inclusion of under-included low-prior normals — exactly the layer's design intent).
+- Imminent: #381's window exit begins the mechanical unwind of the window stat within minutes; the lifetime 15v5 is permanent regardless.
+- Protocol continues. Engine untouched.
