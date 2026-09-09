@@ -3928,3 +3928,34 @@ Stage Summary:
 - The session's equivalence picture is now under real pressure: five same-direction rescues against zero counter-rescues in-window, delta at record +5, and window p one flip from formal significance. Equivalence is still the formal verdict (every p n.s.), but 'no difference' is weakening as a description of the live process — the asymmetry is sustained, one-directional, and mechanism-consistent (low-prior number re-inclusion).
 - Important guard for the owner's interpretation: p=0.062 with 5 rescues is exactly what a small-but-real effect looks like at this sample size, AND exactly what a fair coin looks like 3% of the time per direction — the monitor neither claims nor dismisses the effect; trigger (a) exists precisely to force the full-analysis treatment if it crosses.
 - Watch: (i) any 6th rescue -> ESCALATE; (ii) any H2M reverses the tilt story; (iii) '1'-cold-streak continuation. Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 85 (cron monitor — Job ID 369099, pass 40 — delta +5 holds second pass; feed staleness watch raised (627s, 2nd stalest of session); no flips)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 40, 11:01 +08). All triggers clear; trigger (a) still armed-by-proximity. No engine changes.
+
+Work Log:
+- FEED STALENESS WATCH RAISED: newest age 627s (10.5 min) — 2nd stalest reading of the session (after outage #8's 22.3 min at detection). No >8min inter-row gaps inside the ledger, no degraded rows, IDs contiguous — formally no trigger, but if the next pass shows few/no new rounds, outage #9 is likely forming. Forensic ladder on standby (direct /api/crazy-time probe distinguishes upstream-silence from client-pipeline-death in one step, per Task 82 codification).
+- Delta +5 (+2.50pp) RECORD HOLDS for the second pass: base 108/200 = 54.0%, exp 113/200 = 56.5%. Evicted 315-320 v new 515-520 symmetric (base -3, exp -3) — the +5 remains exactly the 5 in-window rescues (#381, #394, #458, #459, #511), zero composition drift.
+- No flips (0 this pass); agreement streak 9 (last flip #511). Window McNemar 5v0 p=0.062 UNCHANGED — trigger (a) remains one rescue from crossing (6v0 -> p=0.031). Lifetime verified 12v5 p=0.143, raw 12v8 p=0.503.
+- New block (515-520): '5' 0/2 (515, 516 — '5'-exclusion persisting), '1' 3/3 (517, 519, 520 — '1' fully recovered from its 0/3 cold end last block), '10' 0/1 (518). No bonus rounds this block. Engines identical 6/6.
+- theo 158/200 = 79.0% (+0.5pp).
+- Panel cross-check: EXACT (200 paired, 108/113, theo 158, M2H 5, H2M 0 read from DOM) — no snapshot race. Engine freeze: git verified 0 src files changed. Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, no reset.
+- Triggers: (a) no (p=0.143 lifetime / 0.062 window), (b) no, (c) no (0 new flips). VERDICT: metrics-only steady state.
+
+Metrics (FIFO window n=200, IDs 321-520, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 108/200 = 54.0%
+3. Experimental HIT: 113/200 = 56.5%
+4. Delta: +5 hits (+2.50pp) exp-favoring — second pass at record, flip-carried
+5. MISS->HIT flips: window 5 (#381, #394, #458, #459, #511); lifetime 12
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 158/200 = 79.0%
+8. MISS RCA: lifetime 15 + 5 documented exp-saves; new-round misses all existing families ('5' x2, '10' x1) — no new categories
+- McNemar: window 5v0 p=0.062; lifetime verified 12v5 p=0.143; raw 12v8 p=0.503
+
+Stage Summary:
+- Record delta +5 stable across block rotation for a second pass; the 5v0 window flip ledger is unchanged and one same-direction rescue from forcing the session's first formal escalation via trigger (a).
+- Feed cadence degrading again (10.5 min stale) — the session's 8-outage pattern may be repeating; monitoring ready with the one-step upstream/client discriminator.
+- '5'-exclusion (2 misses this block, 4 in recent blocks) joins '2'/'1' as recurring low-prior displacement victims — all three map to Task 65 candidates.
+- Protocol continues: metrics-only. Engine untouched.
