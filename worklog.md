@@ -4092,3 +4092,36 @@ Stage Summary:
 - In-block behavior unremarkable and symmetric (4/16 both engines, cold normals, hot PACHINKO) — the layer's differential remains entirely historical (the 15 verified rescues), with no fresh evidence this pass.
 - Watch: #394's exit (mechanical, imminent); any 9th rescue (window re-cross to 8v0 via new flip is still possible while 394 remains); any H2M (lifetime 15v5 -> 15v6 p=0.066, unwinds the lifetime crossing — the ONLY event that can erase the permanent ledger's significance).
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 90 (cron monitor — Job ID 369099, pass 45 — RENDERER HANG #2 + reload recovery with FULL BACKFILL (zero data loss); 7th rescue #590 landed mid-hang; lifetime DEEPENED 16v5 p=0.027)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 45, 12:16 +08). Trigger (a) fired -> full escalation analysis. Engine unchanged.
+
+Work Log:
+- RENDERER HANG #2 (first since Task 71-72): extraction timed out twice on CDP Runtime.evaluate (30s+ silent hangs) -> renderer hung. LADDER EXECUTED: probe x2 failed -> RELOAD at ~12:19:11 -> recovery verified instantly (eval alive, ledger n=200, validation-start unchanged). Integrity: IDs contiguous, no dupes, ts monotonic.
+- BACKFILL COMPLETE — ZERO DATA LOSS, NO TIMELINE GAP: page's size=30 poll batch captured rounds 587-607 that settled during the ~16.5-min freeze (12:02 -> 12:19). Forensics: #586 (last pre-hang) ts 12:01:19, #587 (first backfill) ts 12:03:38 — upstream feed NEVER paused (2.3-min round gap is normal cadence); the hang cost observability, not data. Mechanism ledger now: 8 upstream silences + 2 renderer hangs = 10 disruption events; reload ladder 2-for-2 with zero loss.
+- SEVENTH RESCUE LANDED MID-HANG: #590 '2' (ts 12:05:34, base missed, exp hit — backfilled and verified like any other round). Window M2H [458, 459, 511, 532, 554, 562, 590] = 7v0, p=0.016 — the rescue EXACTLY REPLACED the aging-out #394, so the window did NOT unwind to 6v0 as projected; significance held.
+- LIFETIME DEEPENED: verified 16v5, p=0.027 (was 15v5 p=0.041) — new record depth on the canonical ledger. Raw 16v8 p=0.152. Delta +7 (+3.50pp): base 108/200 = 54.0%, exp 115/200 = 57.5%. theo 162/200 = 81.0%. Streak 17 (last flip #590).
+- Decomposition: window flips -#394 +#590 (both exp rescues) -> delta unchanged; evicted 387-407 v new 587-607 raw hits symmetric (base +5, exp +5; both engines 17/21 = 81% in the hot new block).
+- Block audit (587-607): '2' exp 7/9 v base 6/9 (#590 the only differential), '1' 8/8 both, '10' 1/1 (#607 hit), bonus 2/3. Rescue composition now: lifetime 16 M2H = SEVEN '2' + two '10' + seven early-session; window: 5 '2' + 2 '10'. '5' has still never been rescued.
+- SIGNIFICANCE TREATMENT: lifetime 16v5 p=0.027 with unchanged caveats (sequential re-testing; raw-ledger sensitivity p=0.152). #590's backfilled status adds NO special discount — data verified identical in kind to live-ingested rounds (contiguous IDs, true timestamps, both engines evaluated). Formal monitor position unchanged: nominal significance, not a superiority verdict; owner's call.
+- Panel cross-check: EXACT (108/115, M2H 7, H2M 0). Engine freeze: git verified 0 src files changed. Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, no reset. Anchor counter 49; next pass diffs vs 408-607.
+- Triggers: (a) YES — window p=0.016 + lifetime p=0.027; (b) no (no gaps — backfill closed them); (c) no (1 new flip). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 408-607, clean 200):
+1. Paired rounds: 200 (clean, backfill-verified)
+2. Baseline HIT: 108/200 = 54.0%
+3. Experimental HIT: 115/200 = 57.5%
+4. Delta: +7 hits (+3.50pp) exp-favoring — held through the hang
+5. MISS->HIT flips: window 7 (#458, #459, #511, #532, #554, #562, #590); lifetime 16
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 162/200 = 81.0%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('2' x2, CRAZY TIME x1) — no new categories
+- McNemar: window 7v0 p=0.016 (held); lifetime verified 16v5 p=0.027 (DEEPENED); raw 16v8 p=0.152
+
+Stage Summary:
+- The hang test passed cleanly: reload ladder 2-for-2, backfill machinery proven under fire, and the rescue that landed mid-hang (#590) is fully verified — the validation's data pipeline is resilient to exactly the failure modes this session keeps producing.
+- Lifetime ledger deepened to 16v5 p=0.027 even as the window was projected to unwind — the 7th '2' rescue arrived just in time to replace #394's exit. The '2'-slot story is now 7 of 16 lifetime rescues with zero '5' rescues ever.
+- Watch: an H2M remains the only lifetime-unwind event (16v6 -> p=0.058); window stays significant while 7v0 holds. Feed/hang cadence now ~1 disruption per 35-40 min — the owner's infra review remains overdue.
+- Protocol continues. Engine untouched.
