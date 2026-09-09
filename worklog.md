@@ -3768,3 +3768,36 @@ Stage Summary:
 - '1'-exclusion appearing (3x in one block) marks the deepest calibration failure observed — strengthens the Task 65 candidate list ('1'/'2' inclusion floors) if the owner ever chooses to act.
 - Watch: further storms hit both engines symmetrically; no A/B action possible from regime alone. Trigger (c) remains armed.
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 80 (cron monitor — Job ID 369099, pass 35 — consecutive '2' rescues #458/#459; window delta +4 WIDEST YET, fully flip-driven; first panel snapshot-race documented)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 35, 09:46 +08). All triggers clear per frozen instrument. No engine changes.
+
+Work Log:
+- Feed probe: ALIVE. First extraction caught window 263-462; by panel-check time 3 new rounds (463-465) had landed -> converged window 266-465, newest age 39s. No gaps, no degraded rows, clean-pass streak continues since outage #7 recovery (now 20+ consecutive clean passes).
+- FIRST SNAPSHOT-RACE OF SESSION (benign, resolved): panel check showed off-by-one divergence (panel 118/122/163 vs ledger 117/121/164). Re-extraction 60s later converged EXACTLY to panel values — rounds 463-465 were ingested between the two evals; panel was simply ahead of the first snapshot. No data integrity issue. Secondary note: panel's normal/bonus breakdown renders one frame behind its headline counters (163/37 shown vs ledger-true 164 normal / 36 bonus for 266-465). Both artifacts documented; headline metrics consistent across panel and ledger.
+- TWO NEW M2H FLIPS, CONSECUTIVE ROUNDS: #458 '2' and #459 '2' — base missed both, exp re-included and hit both. Same '2'-rescue pattern as #381. Window M2H now [381, 394, 458, 459] v H2M [] = 4v0 (p=0.125); lifetime verified 11v5 (p=0.210), raw 11v8 (p=0.648). 3 of 4 window M2H are '2' rescues — the Task 65 '2'-inclusion-floor candidate is now the dominant live rescue pattern.
+- DELTA DECOMPOSITION (clean): +2 -> +4 widening = new flips (+2) + eviction asymmetry (0: evicted 247-262 had base 9 / exp 9) + new non-flip hits (0: base 7 v exp 7 excluding flips). The entire +4 window delta is flip-driven (4 exp rescues, 0 H2M) — NOT eviction composition this time (unlike pass 34's #236 exit). Live differential events, though individually n.s., are the sole driver.
+- New rounds: 463 COIN FLIP both hit (bonus recovery after 0/4 bonus storm continues: PACHINKO hit, COIN FLIP hit, CASH HUNT miss), 464 '1' and 465 '1' BOTH engines missed — '1'-exclusion deepens further (437/438/445 then 464/465; 5 '1'-misses in ~40 rounds vs zero before block 429). Both '1'/'2' floor candidates keep strengthening.
+- Window: base 118/200 = 59.0%, exp 122/200 = 61.0%, theo 163/200 = 81.5% (-0.5pp, bonus-heavy block). Agreement streak 6 (last flip #459). Coverage base 70.17% / exp 69.67%.
+- Panel cross-check: EXACT after convergence (118/122, delta display +2% = +2.0pp = +4 hits, M2H 4, H2M 0). Header: RELIABILITY_K=10 (reliability-layer smoothing constant per design r=N/(N+10)), EXPERIMENTAL SHADOW ON, validation-start epoch 1788886858749 (01:00:58 +08) unchanged — no reset.
+- Engine freeze: git verified zero engine/source diffs (only data artifacts touched: anchor.json + raw extractions).
+- Trigger (c) nuance: frozen per-pass rule (>=3 new flips) says no (2 new). Window-level same-direction count has reached 4v0 — the condition trigger (c) was designed to catch is now met at window granularity. Frozen instrument verdict governs (metrics-only); flagged here for the record. Trigger (a) no (p=0.210), (b) no.
+
+Metrics (FIFO window n=200, IDs 266-465, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 118/200 = 59.0%
+3. Experimental HIT: 122/200 = 61.0%
+4. Delta: +4 hits (+2.00pp) exp-favoring — WIDEST YET, fully flip-driven (4 rescues v 0 losses in window)
+5. MISS->HIT flips: window 4 (#381, #394, #458, #459); lifetime 11
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 163/200 = 81.5%
+8. MISS RCA: lifetime 15 + now 4 documented exp-saves (#381 '2', #394 '10', #458 '2', #459 '2'); base misses in new rounds all existing families ('1'-exclusion x2 — deepening; no new categories)
+- McNemar: window 4v0 p=0.125; lifetime verified 11v5 p=0.210; raw 11v8 p=0.648
+
+Stage Summary:
+- Equivalence formally unchanged (every p n.s.) but the live picture keeps tilting: window flips 4v0 all exp-favoring, delta at record +4, and the widening is now flip-driven rather than eviction-artifact — a qualitatively stronger (still insignificant) exp signal. p=0.125 window is the closest to trigger (a) the session has been.
+- '2' and '1' exclusion failures are the session's dominant calibration story, exactly matching the Task 65 audit's two named candidates ('1'/'2' inclusion floors). Owner-decision items; no shadow arm for fixes.
+- Panel render-lag and snapshot-race documented — future passes should re-extract rather than reconcile when panel/ledger disagree by exactly the newest-round count.
+- Protocol continues: metrics-only. Engine untouched.
