@@ -4616,3 +4616,33 @@ Stage Summary:
 - The validation has now run ~23 h (validation start 9/8 17:00:58) with the ledger at 831+ rounds lifetime. Data-coverage summary for the owner: 14 disruption events, 3 renderer hangs (all recovered zero-loss), known-gaps registered at 473/520/628/756/775 boundaries.
 - Window: 2v0 static until #664 exits (~33 rounds); lifetime unwind requires 3 consecutive H2M. Window H2M 0 for 19+ consecutive passes.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 107 (cron monitor — Job ID 369099, pass 62 — quiet hold #4: window 2v0 held, lifetime 18v5 p=0.011 unchanged; cold 5-round block all-both-miss; leading-edge silence 563s forming)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 62, 16:31 +08). Trigger (a) standing YES (lifetime) -> full analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- Extraction clean: n=200, window 637-836 (only 5 new rounds 832-836 — feed decelerating from hot cadence). Integrity: contiguous, no dupes, no in-ledger gaps. NOTE: latest age 563s (~9.4 min) at extraction — leading-edge silence FORMING again (disruption #14 candidate; confirm next pass).
+- New rounds 832-836: 5/5 AGREE, ALL BOTH-MISS (cold: '5' x2, CRAZY TIME, '1' x2 — all theo-hit except CRAZY TIME). Evicted 632-636 were a 4-hit block -> base/exp raw both -4 (composition, symmetric). Streak 49 (since #787).
+- Window state: 2v0 [664, #787] p=0.5 HELD; #664 exits ~maxId 864 (28 rounds away).
+- Panel cross-check: EXACT (126/128, theo 167/200, paired 200, no reset, K=10, SHADOW ON). Coverage base 68.28% / exp 68.23%.
+- Triggers: (a) YES — lifetime 18v5 p=0.011 standing; (b) no (in-ledger clean; leading-edge not yet qualifying); (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 637-836; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 126/199 = 63.3% (true count 126/200)
+3. Experimental HIT: 128/200 = 64.0% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#664, #787); lifetime 18
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 167/200 = 83.5% (clean 167/199 = 83.9%)
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('5' x2, '1' x2, CRAZY TIME x1) — no new categories
+- McNemar: window 2v0 p=0.5 (n.s. — mechanical); lifetime verified 18v5 p=0.011 (RECORD, unchanged); raw 18v8 p=0.076
+
+Stage Summary:
+- Fourth consecutive quiet hold: 49 symmetric rounds since #787. Both engines cooling in tandem (cold 5-round all-miss block) — the differential remains frozen at clean +2, 100% historical.
+- Canonical evidence unchanged: lifetime 18v5 p=0.011 (caveats unchanged; raw p=0.076; no superiority verdict; owner's call).
+- Feed: deceleration + 563s leading-edge silence — watch for disruption #14 next pass. Disruption ledger: 14 events.
+- Window: 2v0 static; #664 exits in ~28 rounds. Lifetime unwind requires 3 consecutive H2M. Window H2M 0 for 20+ consecutive passes.
+- Protocol continues. Engine untouched.
