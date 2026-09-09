@@ -4646,3 +4646,38 @@ Stage Summary:
 - Feed: deceleration + 563s leading-edge silence — watch for disruption #14 next pass. Disruption ledger: 14 events.
 - Window: 2v0 static; #664 exits in ~28 rounds. Lifetime unwind requires 3 consecutive H2M. Window H2M 0 for 20+ consecutive passes.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 108 (cron monitor — Job ID 369099, pass 63 — RESCUE #19: #844 '5' landed; lifetime 19v5 p=0.007 RECORD (first sub-0.01); disruption #14 confirmed 26.3 min)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 63, 16:46 +08). Trigger (a) YES (record deepened) + (b) YES (outage confirmed) -> full analysis. Engine unchanged (git freeze clean, HEAD e806e54).
+
+Work Log:
+- Extraction #1 (16:46): n=200 window 637-836, maxId UNCHANGED from pass 62, latest age 1507s (~25 min) — leading-edge silence from pass 62 now a full outage.
+- DISRUPTION #14 CONFIRMED: 836->837 gap = 26.3 min (longest since the 35.1-min record; 3rd-longest of session). Round #837 landed 16:49:11 +08; feed then resumed at full cadence (~30-40s). Analyzer auto-registered the gap as KNOWN outage. Disruption ledger: 15 total events counting this confirmation (14 prior + this one; pass 62 had pre-registered it as candidate).
+- Mid-pass the ledger began STREAMING: 637-836 -> 646-845 over the pass (9 new rounds #837-#845, evictions 637-645). Early panel reads appeared "divergent" (paired 62, M2H 0) — RESOLVED AS TOOLING ARTIFACT: this panel renders value-BEFORE-label, so my regex captured the adjacent stat (base-HIT% 62, H2M value 0), not real divergence. Lesson recorded: use value-before-label patterns for this panel. Matched simultaneous extraction (ledger + panel within ~2s): EXACT convergence (base 124 clean / exp 127 / theo 168 / M2H 3 / H2M 0; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved). Minor coverage display offset (panel 67.46/67.40 vs ledger 67.80/67.74, ~0.3pp, timing/rounding — base>exp sign consistent in both; core metrics exact).
+- NEW ROUNDS: #837 '1' both-miss (theo-hit), #838 CRAZY TIME both-HIT, #839 COIN FLIP both-miss, #840 '2' both-hit, #841 '1' both-hit, #842 '5' both-miss (theo-hit), #843 '10' both-miss (theo-hit; exp promoted '1' to slot 1 — no rescue), **#844 '5' — BASE MISS -> EXP HIT: RESCUE #19** (exp replaced slot-4 COIN FLIP with '5'; base had [CRAZY TIME,'1','2',COIN FLIP] — same slot-4 replacement mechanism as #787), #845 '2' both-hit.
+- Renewable-resource pattern now 5-for-5: #844 landed at maxId 844 while #664's exit is ~864 (~20 rounds before) — same final-approach timing as #787 (27 rounds before #664... prior instance). Rescue lineage: 381->394->590->664->787->844.
+- '5' rescue texture: 2nd-ever '5' rescue (#664 was 1st); '5' remains the most reliable base slot recently (7 app/6 hits per pass 61). '1' still never rescued (18→19 rescues, zero '1').
+- No new degraded rows (degraded set frozen: #785 sole, n=1). Integrity: contiguous, no dupes; the only in-ledger gap is the KNOWN 836->837 outage.
+- Window McNemar: 3v0 [664, #787, #844] p=0.25 (n.s. mechanically). Lifetime: verified 19v5 p=0.007 (RECORD — first sub-0.01; was 18v5 p=0.011); raw 19v8 p=0.052 (improved from 0.076 — raw-vs-verified sensitivity caveat weakening). Unwind ladder unchanged: 3 consecutive H2M (19v6 p=0.015, 19v7 p=0.029, 19v8 p=0.052).
+- Delta: clean +3 hits (+1.51pp) — widest of session (first time +3; was frozen at +2 since #787). Window base clean 124/199 = 62.3%, exp 127/200 = 63.5%. Theo 168/200 = 84.0% (clean 168/199 = 84.4%). Agreement streak reset to 1 (flip at #844 ended a 55-round all-agree block — ended by an EXP-FAVORING event).
+- Triggers: (a) YES — lifetime record deepened 19v5 p=0.007; (b) YES — disruption #14 confirmed 26.3 min; (c) no (1 new flip, exp-favoring). VERDICT: ESCALATE — full analysis EXECUTED (matched convergence, rescue forensics, outage measurement, McNemar deepening all above).
+
+Metrics (FIFO window n=200, IDs 646-845; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 124/199 = 62.3% (raw 125/200 = 62.5%)
+3. Experimental HIT: 127/200 = 63.5% (clean==raw)
+4. Delta: clean +3 hits (+1.51pp) exp-favoring — session-widest
+5. MISS->HIT flips: window 3 (#664, #787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 168/200 = 84.0% (clean 84.4%)
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves; new-round misses (#837 '1', #839 COIN FLIP, #842 '5', #843 '10') all existing families — no new categories
+- McNemar: window 3v0 p=0.25 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD); raw 19v8 p=0.052
+
+Stage Summary:
+- The pass opened on a 26.3-min feed outage (disruption #14, confirmed) and closed with the strongest evidence of the entire session: rescue #19 at #844 lifted lifetime verified to 19v5 p=0.007 — the first time nominal significance crossed below 0.01 — and widened the window differential to clean +3 (+1.51pp), both engines' window rates at session lows (62.3%/63.5%) but the exp layer catching a '5' the base missed.
+- Renewable-resource pattern extended to 5-for-5 (new rescue lands in the final ~30 rounds before the previous one exits; #664 exits ~maxId 864, ~19 rounds after pass end).
+- Caveats unchanged and standing: sequential testing (no alpha-spending correction), raw-vs-verified sensitivity (now p=0.052, nearly converged with verified), post-hoc window framing. No superiority verdict — owner's call. H2M requirement to unwind: 3 consecutive (window H2M 0 for 21+ passes).
+- Tooling lesson persisted: this panel renders value-BEFORE-label; future passes must parse accordingly (paired-62 false alarm was a regex bug, not app state).
+- Feed healthy at pass close (12s age, ~30-40s cadence). Protocol continues. Engine untouched.
