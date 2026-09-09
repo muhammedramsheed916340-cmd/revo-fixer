@@ -3580,3 +3580,37 @@ Stage Summary:
 - theo at 80.5% (series low) + engines 4/6 on bonus + base 5/11 on normals: the Task 65 calibration story (bonus displacement + '10'/'2' exclusion) keeps compounding in both directions.
 - Watch: whether #381's save persists in-window (will lift exp delta as old misses age) and whether more flips follow (streak reset means flip clustering is possible — monitor trigger (c) 3+ same-direction).
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 74 (cron monitor — Job ID 369099, pass 29 — SECOND exp save #394; window delta crosses to exp-favoring for the first time)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 29, 08:16 +08). All triggers clear. Flip-clustering watch from Task 73: TRIGGERED in exp's favor. No engine changes.
+
+Work Log:
+- Feed probe: ALIVE, 20 new rounds 384-403 (window 204-403, newest age 0.2 min). Tab reused, NO reload — 19th consecutive clean pass, zero degraded rows, no >8min gaps.
+- SECOND FLIP IN 13 ROUNDS: #394 (M2H — EXP SAVE): actual '10'; base excluded '10' -> MISS; exp kept '10' -> HIT. Task 73's clustering watch materialized: two saves (#381 '2', #394 '10') in quick succession after 131 rounds of perfect agreement. Lifetime M2H now 9: [4, 8, 22, 116, 163, 164, 178, 381, 394] — ALL NINE are exp saves on excluded normals; lifetime H2M raw 8 / verified 5.
+- Lifetime: verified 9v5 p=0.424 (n.s. but largest point gap recorded: exp +4); raw 9v8 (near-perfect balance).
+- WINDOW DELTA CROSSED: base 127/200 = 63.5%, exp 128/200 = 64.0% -> delta +1 hit (+0.5pp) EXP AHEAD — first exp-favoring window in the recorded pass series. Mechanism is composition + the two fresh saves: evicted block 184-203 carried base-favoring asymmetries (base 10 vs exp 8 there), new block is exp +1 (#394). Not a performance breakout — the flip ledger rotating through the window.
+- Agreement streak 9 (last flip #394). McNemar window 2v1 p=1.000.
+- theo 163/200 = 81.5% (recovering from 80.5% series low).
+- New block regime: normal-miss storm continues — '5'x3 ALL missed (384, 398, 399), '10' 1/4 (388 miss, 389 hit, 394 base-miss/exp-hit, 396 miss), '2' 2/5 (387/395/400 miss, 401/403 hit), '1' 5/5 hit; bonus 2/4-ish (CASH HUNT miss #385, COIN FLIP miss #393 + hit #402). Engines base 8/20 vs exp 9/20 on block. The '5'-exclusion signature now at its heaviest (3 misses in one block).
+- Panel cross-check: exact match; delta displays +1% (FIRST exp-favoring panel delta); normal/bonus base 103/163 vs exp 105/163 normal (+2, includes both saves), base 24/37 vs exp 23/37 bonus — bonus deficit narrowed -3 -> -1 by composition.
+- Engine freeze: git verified zero engine diffs.
+
+Metrics (FIFO window n=200, IDs 204-403, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 127/200 = 63.5%
+3. Experimental HIT: 128/200 = 64.0%
+4. Delta: +1 hit (+0.5pp) — first exp-favoring window (composition + 2 fresh saves)
+5. MISS->HIT flips: window 2 (#381, #394); lifetime 9
+6. HIT->MISS flips: window 1 verified (#236); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 163/200 = 81.5%
+8. MISS RCA: lifetime 15 + 2 exp-saves documented (#381 '2'-exclusion, #394 '10'-exclusion — both existing taxonomy families); base misses in-block (384 '5', 385 bonus, 387 '2', 388 '10', 393 bonus, 395 '2', 396 '10', 398 '5', 399 '5', 400 '2') all match existing families; no new category
+- McNemar: window 2v1 p=1.000; lifetime verified 9v5 p=0.424; raw 9v8 p=1.000
+
+Stage Summary:
+- The post-#236 story has flipped character: after 131 tied rounds, the layer has now saved '2' and '10' within 13 rounds — its designed mechanism (dampened-credible normal re-inclusion) visibly outperforming base's exclusions in the current storm.
+- Window delta exp-favoring (+0.5pp) for the first time; still composition-driven, all tests n.s. — but the verified lifetime ledger (9v5) is the most exp-tilted snapshot yet.
+- '5'-exclusion signature heaviest ever (3/3 missed in one block) — Task 65 audit relevance keeps growing; theo recovering but regime remains hostile to both engines.
+- Watch continues: further saves would push toward trigger (c) (3+ same-direction); #236 (last H2M) ages out soon, which will mechanically widen the exp-favoring window delta further.
+- Protocol continues: metrics-only. Engine untouched.
