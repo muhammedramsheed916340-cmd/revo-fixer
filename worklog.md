@@ -4890,3 +4890,31 @@ Stage Summary:
 - Sixth consecutive quiet hold: a textbook symmetric hot->cold rotation (12/14 out, 4/14 in, both engines identical) with the differential untouched at clean +2. The engines have now agreed for 105 straight rounds across a disruption boundary, a hot block, and a cold block — strongest sustained-symmetry evidence of the session, entirely consistent with the layer's design (intervene only on rare-outcome exclusion pressure).
 - Validation lifetime now ~25 h (start 9/8 17:00:58); ledger ~949 rounds. Evidence metrics unchanged for 6 passes; movers unchanged (new rescue, 3-consecutive H2M, composition at ~#987/#1044 — #787 exit now ~38 rounds out).
 - Feed stable post-#16 (202s close); disruption ledger 16; degraded frozen. Protocol continues. Engine untouched.
+
+---
+Task ID: 116 (cron monitor — Job ID 369099, pass 71 — ZERO new rounds; leading-edge silence 1103s and GROWING (disruption #17 candidate, would be ~18+ min); all evidence static)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 71, 18:46 +08). Trigger (a) standing YES (lifetime record) -> full analysis. Engine unchanged (git freeze clean; HEAD 3339bb8 cron artifact commit).
+
+Work Log:
+- Extraction: n=200, window 750-949 — IDENTICAL to pass 70. ZERO new rounds in the 15-min interval. Latest ts age 1103s (~18.4 min) at extraction and growing.
+- DISRUPTION #17 CANDIDATE: silence pattern repeats the #16 precursor arc (pass-68: 784s -> pass-69: 15.0 min confirmed). This silence is already LONGER than #16's precursor at the same phase (1103s vs 784s); if no round lands before next pass, the inter-row gap 949->950 will register at 20-25+ min — within the session's outage clustering band (15.0 / 26.3 min). Confirm next pass.
+- Renderer forensics NOT triggered: panel reads EXACT and stable (127/129/160, M2H 2, H2M 0; paired 200; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved) — page healthy, silence is upstream feed, matching the established signature. No reload needed.
+- All evidence metrics STATIC: base clean 127/199 = 63.8%, exp 129/200 = 64.5%, delta clean +2 (+1.01pp), M2H 2v0 [#787,#844] p=0.5, H2M 0, theo 160/200 = 80.0%, lifetime 19v5 p=0.007 (record) / raw 19v8 p=0.052. Streak static at 105 (no rounds = no change). Degraded frozen.
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing; (b) no (leading-edge not yet qualifying); (c) no. VERDICT: ESCALATE — full analysis EXECUTED (static-state verification + panel forensics above).
+
+Metrics (FIFO window n=200, IDs 750-949; clean n=199 — #785 excluded; UNCHANGED):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 127/199 = 63.8% (raw 128/200 = 64.0%)
+3. Experimental HIT: 129/200 = 64.5% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 160/200 = 80.0% (clean 80.4%)
+8. MISS RCA: no new rounds — nothing to classify; lifetime 15 families + 9 exp-saves stand
+- McNemar: window 2v0 p=0.5 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- The outage clustering pattern is now explicit: 4 disruptions in the last ~2.5 h of feed operation (#13-era silences, #14 26.3 min, #16 15.0 min, #17 forming at 18+ min). Every prior event recovered with zero data loss and zero engine impact; the FIFO ledger design keeps each outage fully bounded and documented. Owner infra review remains the standing action item (URGENT).
+- Monitoring-side impact: zero. The validation state is fully persisted in the ledger; whenever the feed resumes, the window will roll forward mechanically and the steady-state evidence (19v5 p=0.007 / delta +2 / 2v0) will continue unchanged until a rescue, an H2M sequence, or #787's exit (~#987) moves it.
+- Disruption ledger: 16 confirmed + #17 pending. Protocol continues. Engine untouched.
