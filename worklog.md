@@ -4490,3 +4490,35 @@ Stage Summary:
 - Only lifetime unwind events: H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 16+ consecutive passes.
 - Feed: leading-edge silence 246s forming at extraction (watch #13). Disruption ledger: 12 events.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 103 (cron monitor — Job ID 369099, pass 58 — DOUBLE EVENT: renderer hang #3 (reload ladder 3-for-3, zero loss) + upstream silence #13 (10.9 min); window 2v0 held through both; lifetime 17v5 p=0.017 unchanged)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 58, 15:31 +08). Triggers (a) standing + (b) NEW GAP fired -> full analysis + recovery forensics. Engine unchanged (git freeze clean).
+
+Work Log:
+- RENDERER HANG #3 (3rd ever; 2nd this afternoon): pass-58 extraction timed out at 30s with empty output; LADDER EXECUTED — probe x2 (eval "1+1", eval "typeof localStorage") both timed out on CDP Runtime.evaluate -> renderer confirmed hung -> RELOAD issued ~15:32 -> recovery verified instantly. Post-reload integrity: validation start UNCHANGED (9/8 17:00:58, no reset), ledger n=200, IDs contiguous, no dupes.
+- UPSTREAM SILENCE #13 (independent of the hang): #775 (15:13:09, last pre-hang round) -> #776 (15:24:02) = 10.9-min upstream pause. Forensics: rounds 776-784 settled at normal cadence (15:24-15:31) DURING the renderer freeze with true settlement timestamps -> upstream never paused because of the hang; the two events are distinct. Gap (775->776, 11 min) flagged + AUTO-REGISTERED to known_gaps.
+- ⭐ BACKFILL COMPLETE — ZERO DATA LOSS (ladder now 3-for-3): 9 rounds (776-784) captured post-reload, contiguous, no dupes, ts monotonic. Pattern identical to Tasks 90/92: the hang cost observability (~16 min), not data.
+- New block 776-784: 9/9 AGREE, 6/9 both-hit ('1' x5 4-hit incl. #782-#784 triple, '2' #780 hit, '5' x2 miss, PACHINKO #779 miss). Fully symmetric. Streak 120.
+- Window state: 2v0 [590, #664] p=0.5 HELD through both events (evictions 576-584 contained no flips). Base 132/200 = 66.0%, exp 134/200 = 67.0%, delta +2 (+1.00pp) unchanged.
+- Panel cross-check: consistent (132/134, theo 167/200, paired 200, validation start unchanged, no reset, K=10, SHADOW ON). Git freeze clean.
+- Triggers: (a) YES — lifetime 17v5 p=0.017 standing; (b) YES — new gap 775->776 10.9 min (documented + registered, zero loss); (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 585-784, clean 200):
+1. Paired rounds: 200 (clean, backfill-verified)
+2. Baseline HIT: 132/200 = 66.0%
+3. Experimental HIT: 134/200 = 67.0%
+4. Delta: +2 hits (+1.00pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#590, #664); lifetime 17
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 167/200 = 83.5%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('5' x2, PACHINKO x1) — no new categories
+- McNemar: window 2v0 p=0.5 (n.s. — mechanical); lifetime verified 17v5 p=0.017 (RECORD, unchanged); raw 17v8 p=0.108
+
+Stage Summary:
+- The double event tested BOTH failure modes back-to-back and the pipeline passed cleanly: silence #13 (10.9 min) then hang #3 (~16 min observability loss) — zero data loss, zero state damage, unwind clock frozen through it all (2v0 intact, #590 still in-window with ~6-round margin after the backfill).
+- Disruption ledger: 11 upstream silences + 3 renderer hangs = 14 events. The afternoon cluster (12:33 onward) shows accelerating instability: 4 disruptions in ~3 h, including the era-record 35.1-min silence. Owner infra review URGENT — feed instability is now THE dominant constraint on data coverage.
+- #590 exits at maxId 790 (~6 rounds) -> 1v0 (p=1.0); #664 at ~864. Window evidentiary content nearly exhausted; lifetime 17v5 p=0.017 remains the sole canonical crossing (caveats unchanged; no superiority verdict; owner's call).
+- Only lifetime unwind events: H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 17+ consecutive passes.
+- Protocol continues. Engine untouched.
