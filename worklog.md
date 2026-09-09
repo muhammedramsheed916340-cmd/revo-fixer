@@ -5736,3 +5736,38 @@ Stage Summary:
 - Owner-relevant: theo 84.0% vs engines 61.5/62.0% on the current window — fixed-set advantage ~45 hits/200 rounds; #1186 is a live existence proof of the optimizer's per-round edge (bonus conversion theo missed), consistent with DIAG's framing that the layer/optimizer value is real but small vs the calibration defect.
 - Countdown: #1043 exits at maxId ≥ 1243 — 39 rounds (~25 min, likely pass 93-94) → delta returns to 0.00pp unless a new flip lands first.
 - Next pass: #1043 exit watch (delta 0.00pp reversion); streak 161+; feed cadence stability post-record-outage (does another stall follow? — outage ledger now 20 confirmed, watch for clustering); '1'/'2' conversion runs. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 138 (cron monitor — Job ID 369099, pass 93 — '1' BARRAGE: 10 '1'-actuals in the 21-round block, ALL converted (incl. 8 consecutive #1214-#1221, engines+theo); BONUS CONVERSION SURGE: 3 bonus rounds engines-hit/theo-missed (#1206 PACHINKO, #1210/#1212 COIN FLIP) — optimizer beat the fixed set 3x in one block; streak 161 → 182 (21/21 AGREE, 21st block); delta +1 persists 5th pass; #1043 exit 18 rounds out; lifetime static 20v6 p=0.009)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 93, 00:16 +08). Trigger (a) YES (standing 20v6 p=0.009) → full analysis. Engine unchanged (git freeze clean; HEAD b3518dd cron artifact commit; src/ diff vs baseline 9ec8c87 = 0 lines).
+
+Work Log:
+- RECORD STREAK EXTENDS: 161 → 182 (21/21 new AGREE; last flip remains #1043). Span now ≈ 195 min of continuous hit-outcome agreement. The record keeps compounding: 76 (old) → 182, with 21 consecutive all-agree blocks since the flip.
+- '1' BARRAGE (anomaly dormancy confirmed at new depth): 10 '1'-actuals in the block, ALL 10 hit by both engines AND theo — including EIGHT CONSECUTIVE (#1214-#1221), plus #1209 and #1223. Combined with pass 92's tail, the '1'-exclusion anomaly has now been dormant for ~19 consecutive '1'-rounds (5+10 hit streaks back-to-back). The episodic character stands: runs of joint-misses (episodes) alternating with runs of full conversion; no new '1' joint miss since #1166.
+- BONUS CONVERSION SURGE — OPTIMIZER EDGES THEO 3x IN ONE BLOCK: #1206 PACHINKO, #1210 COIN FLIP, #1212 COIN FLIP — all three BOTH-ENGINES-HIT with theo MISSING. Session bonus-conversion count now 4 in 2 blocks (#1186, #1206, #1210, #1212), every one theo-missed. This is the clearest cumulative live evidence yet of the optimizer's per-round bonus edge — the exact texture DIAG predicted (layer/optimizer value real but small vs the calibration defect).
+- NEW BLOCK CENSUS (#1205-#1225): engines 9/21 (42.9%) vs theo 13/21 (61.9%) — block gap 4 hits. Joint misses ×6: #1205 PACHINKO + #1208 COIN FLIP (Q12 family, theo also missed both), '2' ×4 (#1211/#1222/#1224/#1225) + '10' ×1 (#1213) — all 5 numeric misses theo-caught (calibration family). The '2' exclusion runs persist episodically (4 in this block after pass 92's 3).
+- WINDOW MOVEMENT: base 123 → 121 (−2), exp 124 → 122 (−2), theo 168 → 165 (−3). Window engines-vs-theo gap 44 hits (22.0pp) — narrowed 1 hit (the 3 bonus conversions outpacing theo partially offset the numeric misses). Window slid 1005-1204 → 1026-1225 (evictions 1005-1025, incl. the 24.4-min legacy outage rows 1019/1020 — that known gap has aged out; remaining in-window known gaps: 1060→1061 21.8 min, 1181→1182 27.9 min record).
+- FEED STEADY POST-RECORD-OUTAGE (clustering watch clear): 21 rounds at ~43s average cadence, latest age 31s, zero new >8min gaps — 2nd consecutive clean pass since disruption #20; no stall clustering. Disruption ledger: 20 confirmed, 0 candidates.
+- #1043 COUNTDOWN: 18 rounds remain (maxId 1225, exits at ≥1243, ~13 min) — expected to exit DURING pass 94 → window delta reverts to 0.00pp unless a new flip lands first.
+- Paired extraction: PANEL == LEDGER FIRST-TRY EXACT ON ALL 8 FIELDS (200/121/122/165, Δ+1, M2H 1, H2M 0, coverage 69.42/69.48) — 10th consecutive pass; renderer healthy 2x first-try.
+- Triggers: (a) YES standing; (b) no; (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final paired window n=200, IDs 1026-1225; clean n=200 — 15th consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 121/200 = 60.5% (clean==raw; −2)
+3. Experimental HIT: 122/200 = 61.0% (clean==raw; −2)
+4. Delta: +1 hit (+0.50pp) — persists 5th pass (via unopposed #1043)
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 0; lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 165/200 = 82.5% (−3)
+8. MISS RCA: 6 new-block joint misses (2 bonus-Q12, '2' ×4, '10' ×1 — theo caught all numeric); no flips → no new families; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v0 p=1.0 (direction favors exp); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 182 — record, live-extending
+- Avg coverage: base 69.42% / exp 69.48% (+0.06pp)
+
+Stage Summary:
+- Texture-rich pass beneath a calm surface: the streak extended mechanically (21/21), but the block's internals flipped the usual narrative — the engines' numeric exclusion episodes ('2' ×4, '10' ×1) continued while their BONUS handling outperformed theo three times, and the '1' anomaly stayed fully dormant through a 10-round barrage. The optimizer is demonstrably better than the fixed set at bonuses (4 conversions in 2 blocks, all theo-missed) and demonstrably worse at normals window-wide (~44 hits) — DIAG's two-sided calibration story playing out live on both edges.
+- Owner-relevant: theo 82.5% vs engines 60.5/61.0% on the current window (fixed-set advantage ~44 hits/200); but theo lost 3 of 3 bonus conversions this block — per-round optimizer edge is real, repeatable, and exactly where theory says it should be.
+- Countdown: #1043 exits at maxId ≥ 1243 — 18 rounds (~13 min, during pass 94) → delta 0.00pp reversion expected unless a new flip lands first.
+- Next pass: #1043 EXIT VERIFICATION (window flips 1v0 → 0v0, delta → 0.00pp; first zero-zero window since #1043 landed); streak 182+; '2'/'10' exclusion episodes; bonus-conversion continuation. Disruption ledger: 20 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
