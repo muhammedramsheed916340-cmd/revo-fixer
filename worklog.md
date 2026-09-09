@@ -4742,3 +4742,33 @@ Stage Summary:
 - Both engines hot-together continues (13/17, then #871 hit): agreement streak 27, window H2M 0 for 23+ passes. PACHINKO 3/4 in-window symmetric — design claim holding.
 - Feed healthy post-outage (9s age at close); disruption ledger 15; degraded set frozen (#785 sole).
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 111 (cron monitor — Job ID 369099, pass 66 — quiet hold #2 post-record: 19/19 all-agree hot block, headline metrics frozen at delta +2 / M2H 2v0 / lifetime 19v5 p=0.007)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 66, 17:31 +08). Trigger (a) standing YES (lifetime record) -> full analysis. Engine unchanged (git freeze clean; HEAD 33fad3b cron artifact commit).
+
+Work Log:
+- Extraction clean first attempt: n=200, window 691-890 (19 new rounds 872-890, evictions 672-690). Integrity: contiguous, no dupes, no gaps; degraded set frozen (#785 sole). Feed healthy (31s age) — second consecutive fully-clean pass.
+- New rounds 872-890: 19/19 AGREE, both engines 15/19 (hot-together continues). Composition: '2' x7 (5 hit), '1' x9 (7 hit incl. #887 both-miss), '10' x2 (2 hit — both theo and both engines), CRAZY TIME x1 miss, COIN FLIP x1 miss. Theo 17/19. Evicted 672-690: 15 base/15 exp hits, 15 theo (composition, symmetric).
+- Headline metrics FROZEN: base clean 131/199 = 65.8%, exp 133/200 = 66.5%, delta clean +2 (+1.01pp), M2H 2v0 [#787,#844] p=0.5, H2M 0. Theo 166/200 = 83.0% (+2, now above 83%). Streak 46 (since #844) — 2nd-longest of session (record 55 pre-#844).
+- First-ever '1' rescue did NOT materialize: '1' went 7/9 this block for BOTH engines — exclusion pressure on '1' remains minimal, consistent with 19 lifetime rescues and zero '1' saves (the layer never needs to inflate the dominant prior).
+- Panel cross-check: EXACT (base 131 clean / exp 133 / theo 166 / M2H 2 / H2M 0; paired 200; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved). No snapshot-race. Stale runs 27/27 equal.
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing; (b) no; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 691-890; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 131/199 = 65.8% (raw 132/200 = 66.0%)
+3. Experimental HIT: 133/200 = 66.5% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 166/200 = 83.0% (clean 83.4%)
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves; new-round misses (#872 '2', #878 CRAZY TIME, #883 COIN FLIP, #887 '1') all existing families — no new categories
+- McNemar: window 2v0 p=0.5 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- Second consecutive quiet hold: 46 symmetric rounds since the #844 rescue, both engines hot-together (15/19), differential pinned at clean +2 with zero new flips in either direction. The post-#664 steady state is stable and fully understood: every future mover is either a new rescue (exp-favoring), an H2M (3 consecutive needed to unwind), or window composition at ~#987/#1044.
+- '10' texture: 2/2 this block both engines — the rarest slot (8 actuals in 200) hitting at 62.5% in-window, far above its 40% theoretical prior; another data point that the reliability layer's restraint on rare outcomes (negative deviations pass through) matches observed behavior.
+- Feed fully healthy 2 passes post-outage; disruption ledger 15; no degraded recurrence.
+- Protocol continues. Engine untouched.
