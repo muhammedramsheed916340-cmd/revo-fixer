@@ -4712,3 +4712,33 @@ Stage Summary:
 - PACHINKO texture note for owner: 2 appearances this block, split 1/1 both engines symmetric — consistent with the layer's design claim (deviations dampened, not banned).
 - Feed stable post-outage; disruption ledger stands at 15 events. Degraded rows: #785 sole, no recurrence.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 110 (cron monitor — Job ID 369099, pass 65 — #664 EXITS window: 3v0 -> 2v0 [#787,#844] exactly as mechanically projected; lifetime 19v5 p=0.007 unchanged)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 65, 17:16 +08). Trigger (a) standing YES (lifetime record) -> full analysis. Engine unchanged (git freeze clean; HEAD ec21ade cron artifact commit).
+
+Work Log:
+- Extraction #1: n=200, window 670-869 — 17 new rounds (853-869), evictions 653-669 INCLUDING #664: the session's oldest in-window rescue has formally exited the FIFO window. Integrity clean, feed accelerating back to fast cadence (23s age).
+- New rounds 853-869: 17/17 AGREE, both engines 13/17 (hot block). Composition: PACHINKO 2/2 BOTH-HIT (root-cause outcome now 3/4 in-window, symmetric), CASH HUNT 2/2, '1' x7 (6 hit), '2' x2 (2 hit), '5' x2 (1 hit), COIN FLIP 2 (1 hit). Theo 12/17. Evicted 653-669: 7 base / 7 exp hits, 16 theo hits (composition, symmetric).
+- MECHANICAL EVENT CONFIRMED: window M2H 3v0 [664,#787,#844] -> 2v0 [#787,#844] p=0.5. Delta narrowed clean +3 -> +2 (+1.01pp) PURELY from evicting the exp-favoring rescue hit #664 — zero behavior change, exactly the projection logged in passes 63-64. Lifetime evidence UNCHANGED: 19v5 p=0.007 (record), raw 19v8 p=0.052.
+- Snapshot-race #2 handled by protocol: mid-pass arrivals (#870 both-miss/theo-hit, #871 both-hit) made first panel read (131/133) lag the ledger window (132/134). Re-extracted BOTH until convergence: final window 672-871, panel==ledger EXACT (base 131 clean / exp 133 / theo 164 / M2H 2 / H2M 0; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved). Race resolved as timing, not divergence — consistent with the value-before-label parsing lesson (no regex false alarms this pass).
+- #870 detail: actual '2', both engines [1, COIN FLIP, CASH HUNT, 5] identical — both-miss. #871: actual '1', identical preds, both-hit. Streak now 27 (since #844).
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing; (b) no; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED (convergence loop, exit forensics, new-round composition above).
+
+Metrics (FIFO window n=200, IDs 672-871; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 131/199 = 65.8% (raw 132/200 = 66.0%)
+3. Experimental HIT: 133/200 = 66.5% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — post-#664-exit steady state
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 164/200 = 82.0% (clean 82.4%)
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves; new-round miss (#870 '2') existing family — no new categories
+- McNemar: window 2v0 p=0.5 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- The window has fully transitioned to the projected steady state: differential now rides on the two young rescues #787/#844 alone; #787 exits ~maxId 987 (~116 rounds away), #844 ~1044. With no in-window eviction pressure remaining for ~100+ rounds, the next delta movers are exclusively: a new rescue (first-ever '1' rescue the notable candidate — '1' appeared 7x this block with 6 both-hits, exclusion pressure minimal) or H2M losses (3 consecutive needed to unwind p=0.007).
+- Both engines hot-together continues (13/17, then #871 hit): agreement streak 27, window H2M 0 for 23+ passes. PACHINKO 3/4 in-window symmetric — design claim holding.
+- Feed healthy post-outage (9s age at close); disruption ledger 15; degraded set frozen (#785 sole).
+- Protocol continues. Engine untouched.
