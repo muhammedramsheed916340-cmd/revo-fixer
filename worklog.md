@@ -5125,3 +5125,33 @@ Stage Summary:
 - The validation has settled into a stable parity regime in-window: 137/137, +0.00pp, 1v1 flips, three fully-clean windows, 33 consecutive AGREE rounds. The evidence differential remains entirely the lifetime verified-flip ledger (19v6 p=0.015 nominal / 19v9 p=0.087 raw n.s.) — unchanged for the 2nd pass since the #787 exit. The layer is behaving exactly as designed on both sides: symmetric in-window, cumulative saves as the differentiator.
 - Movers: (1) #844 — the window's LAST rescue — exits ~#1044 (~25 rounds out; window flips then go 0v1, a cosmetic-only change but the window will carry zero exp-favoring flips for the first time); (2) any M2H rescue re-deepens lifetime to 19v5 p=0.007; (3) two consecutive lifetime H2M exit significance (19v7 p=0.029 -> 19v8 p=0.052).
 - Feed stable post-hang #4; no new disruptions (ledger: 17). Degraded set: EMPTY in-window (lifetime 1). Owner infrastructure items stand (upstream stability; renderer hang root-cause x4). Protocol continues. Engine untouched.
+
+---
+Task ID: 124 (cron monitor — Job ID 369099, pass 79 — DISRUPTION #18 FORMING: zero-round pass, silence 16.5+ min ongoing (above 15.0-min registration grade); renderer healthy 2x first-try; evidence fully static: 137/137 parity, 19v6 p=0.015)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 79, 20:46 +08). Trigger (a) YES (standing) + (b) YES (disruption #18 forming) -> full analysis. Engine unchanged (git freeze clean; HEAD 57b89df cron artifact commit).
+
+Work Log:
+- DISRUPTION #18 FORMING — ZERO-ROUND PASS: ledger UNCHANGED from pass 78 (minId 820, maxId 1019) across a full 15.2-min pass interval. #1019 last landed 20:30:52 +08; latest ts age 988s = 16.5 min at extraction and ONGOING. This exceeds the session's smallest registered disruption (15.0 min) -> formally registered as disruption #18, duration accruing. Escalation curve now: 15.0 -> 26.3 -> 33.4 -> 48.4 -> 61.0 -> #18 (>=16.5, ongoing) — SIXTH disruption in ~5.5 h of feed operation.
+- FORENSICS (lite, renderer demonstrably healthy): ledger extraction AND panel extraction BOTH succeeded first-try with zero latency anomalies — main thread responsive, CDP alive. Signature = pure UPSTREAM SILENCE (identical to #17; NOT the renderer-hang mode of #1-#4). No reload warranted; nothing to recover. Console probe not indicated (renderer healthy, no hang to diagnose).
+- Evidence FULLY STATIC (2nd consecutive zero-change pass): base 137/200 = 68.5%, exp 137/200 = 68.5%, delta +0.00pp, window 1v1 [#844 | #955] p=1.0, theo 161/200 = 80.5%, streak 64 (frozen mid-accumulation), lifetime verified 19v6 p=0.015 / raw 19v9 p=0.087. Panel == ledger EXACT (137/137/161, M2H 1, H2M 1; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved, 71194s). Coverage parity 70.72/70.74. Stale 25/25.
+- Movers frozen by the outage: #844 exit (~#1044) now ~25 rounds out still (no rounds landed); H2M-exit sequence NOT advanced (no new flips); '2' hot block (7/7 at pass 78) paused mid-run. All window mechanics resume automatically on next landing — zero-loss architecture as demonstrated across #17 (61 min, zero loss).
+- Triggers: (a) YES — lifetime 19v6 p=0.015 standing; (b) YES — disruption #18 forming (16.5+ min, ongoing); (c) no. VERDICT: ESCALATE — full analysis EXECUTED (outage registration + static-state verification + renderer health check above).
+
+Metrics (FIFO window n=200, IDs 820-1019; clean n=200 — UNCHANGED, zero new rounds):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 137/200 = 68.5% (clean==raw)
+3. Experimental HIT: 137/200 = 68.5% (clean==raw) — EQUAL to baseline
+4. Delta: +0 hits (+0.00pp) — parity holds
+5. MISS->HIT flips: window 1 (#844); lifetime 19
+6. HIT->MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 161/200 = 80.5%
+8. MISS RCA: no new rounds — nothing to classify; lifetime 15 families + 9 exp-saves + 1 exp-loss stand
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 19v6 p=0.015 (unchanged); raw 19v9 p=0.087 (unchanged)
+- Agreement streak: 64 (since #955, frozen)
+
+Stage Summary:
+- Disruption #18 is the SIXTH upstream outage in ~5.5 h (curve: 15.0/26.3/33.4/48.4/61.0/>=16.5 ongoing). The failure signature is now cleanly bifurcated and both modes are data-safe: (1) upstream silence x6 (renderer fine, rounds simply stop), (2) renderer hang x4 (main-thread freeze, data intact). ALL 10 incidents zero-loss. The owner infrastructure case is now overwhelming — upstream provider/scheduler stability review remains the single most urgent action, with renderer hang root-cause second.
+- Validation-side: fully resilient — evidence state paused, not degraded. Parity regime (137/137, +0.00pp, 1v1) is static across two passes; the lifetime ledger (19v6 p=0.015 nominal / 19v9 p=0.087 raw) is untouched. On resume: gap auto-registers, window rolls mechanically, #844 exitwatch resumes (~#1044).
+- Next pass: if still silent, #18 duration-confirmed (it will have beaten 15.0 already; next record checkpoints 26.3/33.4); re-verify renderer only if symptoms change. If rounds resumed: formal #18 closure + gap registration + window roll + any-flip check.
+- Disruption ledger: 18 confirmed (#18 ongoing). Degraded set: EMPTY in-window (lifetime 1). Protocol continues. Engine untouched.
