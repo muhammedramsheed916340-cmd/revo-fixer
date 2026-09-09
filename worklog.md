@@ -3992,3 +3992,35 @@ Stage Summary:
 - The signal's shape is narrow and mechanism-coherent: 6 rescues, 5 of them '2', zero reversals in-window, zero bonus differential, zero composition drift. Whatever is happening, it is the '2' slot and nothing else.
 - Counterweights stay on the record: lifetime p=0.096 n.s., multiple-comparison exposure, rolling-window caveat. If a 7th rescue lands, window p=0.016 and the lifetime closes toward 0.05; if an H2M lands, the window unwinds to 6v1 (p=0.063). The next flip is decisive in either direction.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 87 (cron monitor — Job ID 369099, pass 42 — STANDING ESCALATION: window 6v0 p=0.031 persists second pass; streak 17; flip-exit horizon projected)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 42, 11:31 +08). Trigger (a) standing-state. No engine changes.
+
+Work Log:
+- Feed probe: ALIVE — 17 new rounds over the interval (533-549; converged window 350-549, newest age 19s, contiguous). No gaps, no degraded rows. Outage #9 fully closed, no relapse.
+- STANDING ESCALATION (not a new event): window flips UNCHANGED 6v0 [381, 394, 458, 459, 511, 532], p=0.031 — the trigger (a) crossing from Task 86 persists because the crossed state is still in-window. No new flips of either direction (17/17 agreements since #532, streak 17). Lifetime ledger unchanged: verified 13v5 (p=0.096), raw 13v8 (p=0.383).
+- Delta +6 (+3.00pp) holds third pass: base 107/200 = 53.5%, exp 113/200 = 56.5%. Evicted 348-349 v new 548-549 symmetric (base -1, exp -1). theo 158/200 = 79.0% (+0.5pp).
+- New rounds: 548 '1' both hit, 549 '10' both miss ('10'-exclusion family). Prior block 533-547 audit (this pass's full-analysis scope): '2' 6/7 both engines (only #535 missed — '2' inclusion has largely RECOVERED from its exclusion phase), '1' 4/4, '5' 1/3 (#540/#544 miss, #545 hit), '10' 0/1 (#533), no bonus rounds. Engines identical 17/17 — zero live differential exposure since #532.
+- FLIP-EXIT HORIZON (projection for the owner): the crossing unwinds mechanically as old flips age out. #381 (oldest in-window flip) exits when window min_id passes 381 — currently 350, i.e. ~131 rounds away (~2.0-2.5h at ~55s cadence). Without new flips: 6v0 -> 5v0 (p=0.062, unwinds) as #381 exits, then 4v0 as #394 exits. WITH a 7th rescue before then: 7v0 (p=0.016). WITH an H2M anywhere: 6v1 (p=0.063, unwinds). The next flip decides the narrative; the calendar otherwise decides it by ~14:00 +08.
+- SNAPSHOT-RACE (reverse direction, benign): panel rendered one round BEHIND the ledger this time (107/113 panel vs 108/114 first extraction) — opposite of the usual race; re-extraction converged EXACTLY (107/113/158, M2H 6, H2M 0). Both race directions now documented; protocol (re-extract on any mismatch) validated bidirectionally.
+- Engine freeze: git verified 0 src files changed. Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, no reset.
+- Triggers: (a) YES — standing crossing (p=0.031 persists in-window); (b) no; (c) no (0 new flips). VERDICT: ESCALATE — standing-state analysis executed (persistence + block audit + horizon projection).
+
+Metrics (FIFO window n=200, IDs 350-549, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 107/200 = 53.5%
+3. Experimental HIT: 113/200 = 56.5%
+4. Delta: +6 hits (+3.00pp) exp-favoring — third pass at record
+5. MISS->HIT flips: window 6 (#381, #394, #458, #459, #511, #532); lifetime 13
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 158/200 = 79.0%
+8. MISS RCA: lifetime 15 + 6 documented exp-saves; new-round misses all existing families ('10' #533/#549, '2' #535, '5' #540/#544) — no new categories
+- McNemar: window 6v0 p=0.031 (standing); lifetime verified 13v5 p=0.096; raw 13v8 p=0.383
+
+Stage Summary:
+- The crossing is stable, not flashing: 17 consecutive agreements, block composition symmetric, '2'-slot behavior normalizing (6/7 hits) — the differential is being carried entirely by the historical 6 rescues, with no fresh evidence either way this pass.
+- '2'-exclusion recovery noted: after being the dominant failure source (5 rescues), '2' went 6/7 for BOTH engines — consistent with the exclusion pressure rotating between numbers ('1' -> '2' -> '5'/'10') rather than a fixed defect, as flagged in Task 81.
+- Clock now matters: absent new flips, the window p unwinds by ~14:00 +08 as #381/#394 age out. Owner decision point approaches: whether to treat the crossing era (11:16-14:00 window) as evidence worth acting on is entirely theirs — the monitor records both the signal and its expiry.
+- Protocol continues. Engine untouched.
