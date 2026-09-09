@@ -5469,3 +5469,37 @@ Stage Summary:
 - Divergence-rate note for the ledger: window bp!=ep rate (12.5%) is era-clustered and NOT comparable to DIAG's pinned-window 3%; only 2/25 divergences ever flip hit outcome — the layer's footprint is wide but hit-rate-shallow.
 - Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 70 rounds away (~50 min at current cadence); exit will mechanically move window flips to 1v0 (p=0.5). #1043 exits at maxId ≥ 1243.
 - Next pass: streak watch toward 76; #955 exit mechanics; unwind ladder (2 consecutive H2M → 20v7 p=0.018). Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 130 (cron monitor — Job ID 369099, pass 85 — HOT STREAK: 19/19 new AGREE, streak 61 (15 short of record 76); parity 140/140 8th pass; theo surges to 170/200 = 85.0% ('10' x3 both-miss, theo caught all); lifetime static 20v6 p=0.009; panel==ledger first-try EXACT 2nd pass running)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 85, 22:16 +08). Trigger (a) YES (standing re-deepened 20v6 p=0.009) → full analysis. Engine unchanged (git freeze clean; HEAD 7a3a985 cron artifact commit; src/ diff vs baseline = 0 lines).
+
+Work Log:
+- FEED STEADY: #1086–#1104 (19 rounds) at 34–90s cadence (typ ~42s), max gap 89.9s, zero >8min gaps, latest age 40s. Second consecutive fully-stable pass post-#19; disruption ledger stays 19 confirmed, 0 candidates.
+- Paired extraction: PANEL == LEDGER FIRST-TRY EXACT (200/140/140/170, M2H 1, H2M 1) — 2nd pass running; protocol fully operational. Renderer healthy 2x first-try.
+- 19/19 new AGREE → streak 42 → 61 (since #1043). Record 76 is 15 agree-rounds away — at current cadence reachable within ~11 min of clean feed.
+- Window 886-1085 → 905-1104 (19 evictions 886-904). Both engines 138 → 140 (+2); theo 166 → 170 (+4).
+- New-block composition: 17/19 normal rounds — '1' x6 (all both-hit), '2' x6 (all both-hit), '5' x2 (both-hit), '10' x3 (ALL both-MISS, theo caught every one); bonuses: #1099 COIN FLIP both-hit (theo miss), #1104 CASH HUNT both-miss (theo miss, Q12-unavoidable). Engines 13/17 on normals vs theo 16/17 — the '10' exclusion pattern again.
+- Window divergence bp!=ep: 16/200 = 8.0% (down from 25 as the clustered 886-904 era evicted) — consistent with era-clustering; still outcome-flipping on only the 2 known rounds (#955, #1043). Zero divergence among new rounds.
+- '1' actuals 79/200 = 39.5% — hot block persists 3rd pass (vs ~25% wheel base rate); regime-shift hypothesis strengthening.
+- Triggers: (a) YES — standing; (b) no; (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final paired window n=200, IDs 905-1104; clean n=200 — 8th consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 140/200 = 70.0% (clean==raw)
+3. Experimental HIT: 140/200 = 70.0% (clean==raw)
+4. Delta: +0 hits (+0.00pp) — parity holds 8th pass
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 170/200 = 85.0% (+4 — hot normal block directly feeds theo)
+8. MISS RCA: joint misses #1087/#1092/#1102 '10' (theo-caught — calibration family, '10' now 3x joint-missed this window) + #1104 CASH HUNT (Q12-unavoidable); no flips → no new families; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 61 (since #1043)
+- Avg coverage: base 68.67% / exp 68.74% (+0.07pp)
+
+Stage Summary:
+- Hottest agree-run since the record: 61 consecutive agreements spanning #1044-#1104; parity 140/140 for the 8th pass; theo at 85.0% is its best window level since the pass-81 hot block (83.5%) — the normal-dominant feed continues to favor theo while both engines trail via bonus-seeking Top-4s (DIAG mechanism, live).
+- '10' is emerging as this window's signature joint-miss (3x, all theo-caught): the engines' ranker consistently excludes '10' — matching DIAG's exclusion accounting ('10' excluded at 50% of its landings).
+- Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 51 rounds away (~36 min): likely during pass 86-87; its exit mechanically moves window flips to 1v0 (p=0.5). #1043 exits at maxId ≥ 1243 (139 rounds).
+- Next pass: streak record watch (61 → 76); #955 exit mechanics; unwind ladder unchanged (2 consecutive H2M → 20v7 p=0.018). Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
