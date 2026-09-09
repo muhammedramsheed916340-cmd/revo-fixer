@@ -4429,3 +4429,33 @@ Stage Summary:
 - Recovery expectations per playbook: on resume, backfill burst (near-simultaneous poll batches), possible >8min inter-row gap registration (628->629 precedent), zero data loss if IDs contiguous. If #757 shows an ID jump instead, that is the first real data-loss event of the session — full forensics then.
 - Feed ledger: 10 upstream silences + 2 renderer hangs = 12 events. Silence count within validation era now includes two >10 min events (10.4 min at 12:33, current ~24 min). Owner infra review URGENT — this is now the dominant data-coverage constraint of the validation.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 101 (cron monitor — Job ID 369099, pass 56 — DISRUPTION #12 RESOLVED: 35.1-min upstream silence (validation-era record), ZERO data loss (3rd consecutive clean backfill); window 3v0 held, lifetime 17v5 p=0.017 unchanged)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 56, 15:01 +08). Triggers (a) standing + (b) NEW GAP fired -> full analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- DISRUPTION #12 RESOLVED: #757 settled 14:58:57 +08 -> silence duration 14:23:54 -> 14:58:57 = 35.1 MIN (validation-era record; 2nd longest ever incl. pre-validation 41.7 min). Page was alive throughout (both prior-pass extractions instant).
+- ⭐ ZERO DATA LOSS CONFIRMED (3rd consecutive clean recovery): IDs contiguous 757-760, backfill burst at ~1 min cadence (757 -> 760 within 3 min of resume). The size=30 poll catch-up pattern now proven 3-for-3 (Tasks 90/92/101). Gap (756->757, 35 min) flagged by analyzer and AUTO-REGISTERED to known_gaps — future passes exclude it.
+- Post-resume block 757-760: 4/4 AGREE, ALL BOTH-MISS (cold resume: '2' theo-hit, CASH HUNT, COIN FLIP, '5' theo-hit). Symmetric — no differential. Window dipped via composition: evicted 557-560 (4 both-hit) -> base 131->128, exp 134->131.
+- Window rescues: 3v0 [562, #590, #664] p=0.25 HELD through the silence (the freeze also froze the unwind clock). #562 now 2 rounds from exit (maxId 762).
+- Panel cross-check: EXACT (128/131, M2H 3, H2M 0, theo 164/200, paired 200, no reset, K=10, SHADOW ON). Coverage base 70.47% / exp 70.40%.
+- Triggers: (a) YES — lifetime 17v5 p=0.017 standing; (b) YES — new gap 756->757 35.1 min (documented + registered, zero loss); (c) no (0 new flips, streak 96). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 561-760, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 128/200 = 64.0%
+3. Experimental HIT: 131/200 = 65.5%
+4. Delta: +3 hits (+1.50pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 3 (#562, #590, #664); lifetime 17
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 164/200 = 82.0%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('2' x1, '5' x1, CASH HUNT x1, COIN FLIP x1) — no new categories
+- McNemar: window 3v0 p=0.25 (n.s. — mechanical); lifetime verified 17v5 p=0.017 (RECORD, unchanged); raw 17v8 p=0.108
+
+Stage Summary:
+- The longest silence of the validation era (35.1 min) came and went with zero data loss and zero state damage — the pipeline's recovery machinery is now 3-for-3 on full backfill. The silence froze BOTH the unwind clock and the stats; on resume the window simply resumed its scheduled decay (3v0 intact).
+- Disruption ledger: 10 upstream silences + 2 renderer hangs = 12 events. Two of the last three silences are >10 min (10.4 min, 35.1 min) — the feed's stability is DEGRADING within the validation era, not improving. Owner infra review URGENT (standing since pass ~44).
+- Watch next pass: #562 exit (2 rounds) -> window 2v0 (p=0.5); then #590 at ~790, #664 at ~864. Only lifetime unwind remains the H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 15+ consecutive passes.
+- Protocol continues. Engine untouched.
