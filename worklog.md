@@ -5400,3 +5400,37 @@ Stage Summary:
 - Evidence paused, not degraded: 20v6 p=0.009 verified / 20v9 p=0.061 raw; window parity 139/139 static across 3 passes now. On resume: gap auto-registers, window rolls mechanically.
 - Context note: pass 81's companion diagnostic (Task 126-DIAG) established the structural parity context — both engines share the score architecture and differ on ~3% of rounds; the lifetime flip asymmetry (now 20v6) carries all evidential weight.
 - Next pass: #19 confirmation (>= 15 min) or closure (rounds resumed + gap registration + window roll + flip check). Disruption ledger: 18 confirmed + 1 candidate. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 128 (cron monitor — Job ID 369099, pass 83 — DISRUPTION #19 CONFIRMED 21.8 min (2nd consecutive shortened outage, curve descending); feed resumed into LIVE BURST mid-pass (window rolled twice: 861-1060 → 866-1065 → 873-1072); 12/12 post-resume rounds AGREE, streak 29; parity holds 141/141 6th pass; panel==ledger reconciliation event resolved as burst race, zero UI defect)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 83, 21:46 +08). Trigger (a) YES (standing re-deepened 20v6 p=0.009) + (b) YES (#19 candidate confirmation) → full analysis. Engine unchanged (git freeze clean; HEAD 3916b10 cron artifact commit; src/ diff vs baseline 9ec8c87 EMPTY; dirty files = cron artifacts only).
+
+Work Log:
+- DISRUPTION #19 CONFIRMED: gap #1060→#1061 = 1309.6s = 21.83 min (≥ 15.0-min registration grade). Escalation curve: 15.0 → 26.3 → 33.4 → 48.4 → 61.0 → 24.4 (#18) → 21.8 (#19) — SECOND consecutive sub-25-min outage; the curve has DESCENDED twice after the 26–61 era. 19 confirmed total.
+- LIVE BURST MID-PASS: first extraction (21:47) showed window 866-1065 (5 new rounds #1061-#1065, all AGREE); by final extraction (21:52) window was 873-1072 — 12 new rounds (#1061-#1072) and 12 evictions (#861-#872) total, n=200 stable. Post-resume cadence 66s→51s→27s→48s→39s→11s→79s: immediate normalization, no residual throttling; latest age 2s at final extraction.
+- PANEL/LEDGER RECONCILIATION EVENT (resolved, zero defect): first panel read theo 166/200 vs first ledger 167/200; 2x panel re-extract stable at 166 (not a transient snapshot race) → investigated. Root cause: live-burst window race — the panel had already incorporated round #1066 while my ledger snapshot pre-dated it. Forensic arithmetic (normal/bonus split ±1, pred-changes 90→91, inclusion-table '2' +1/'5' −1 between panel reads) pinpointed #1066 = bonus, both-hit, theo-miss landing mid-pass. Final back-to-back paired extraction: PANEL == LEDGER EXACT (141/141/166, M2H 1, H2M 1). PROTOCOL LESSON: during live bursts, single-tool snapshots are stale on arrival — ledger+panel must be extracted back-to-back and convergence judged on the pair, not individual reads.
+- Renderer health: 6/6 first-try extractions (3 ledger + 3 panel) — zero renderer incidents; #19 signature = pure upstream silence (3rd consecutive: #17/#18/#19 same mode). No reload warranted, 战绩零丢失.
+- New rounds 12/12 AGREE: streak 17 → 29 (since #1043). Composition: '1' landed 6/12 (hot block continues: 1062/1064/1067/1069/1070/1071); COIN FLIP converted both times it landed (#1065, #1066 both-hit); #1068 '5' joint miss (theo caught); #1072 CASH HUNT both-miss (Q12-unavoidable family). No flips → no new RCA families.
+- Notable micro-event: #1070 exp engine REORDERED '1' to rank-1 (base ranked COIN FLIP first) via layer dampening — second observed rank-order effect after the #1043 tie-flip; both engines hit anyway (hit-rate-neutral, rank-mechanism visible).
+- Triggers: (a) YES — standing 20v6 p=0.009; (b) YES — #19 confirmed; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final frozen paired window n=200, IDs 873-1072; clean n=200 — 6th consecutive fully-clean window; NOTE: analyzer anchor updated twice this pass — intermediate "pass 100 state" 866-1065 superseded same-pass by the burst; anchor now "pass 101 state" 873-1072):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 141/200 = 70.5% (clean==raw)
+3. Experimental HIT: 141/200 = 70.5% (clean==raw)
+4. Delta: +0 hits (+0.00pp) — parity holds 6th pass
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 166/200 = 83.0% (−1 net from the roll: CF/CASH HUNT theo-misses added vs evicted theo hits)
+8. MISS RCA: #1072 CASH HUNT both-miss (Q12 unavoidable — theo also missed); #1068 '5' joint miss (theo caught); lifetime 15 families + 10 exp-saves + 1 exp-loss stand; no new categories
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 29 (since #1043, accumulating through burst)
+- Avg coverage: base 69.03% / exp 69.09% (+0.06pp — layer's thin positive coverage edge persists)
+
+Stage Summary:
+- #19 confirmed at 21.8 min — 7th upstream outage of the session, 19 confirmed disruptions total; renderer exonerated 6/6 first-try. Outage-length trend: the recent regime produces SHORTER self-healing blips (24.4 → 21.8) versus the earlier 26–61 era — the disruption curve is non-monotonic and currently descending, which softens (but does not close) the owner infrastructure escalation case; frequency remains the argument (7 upstream outages in ~7h).
+- Evidence static through outage+burst: 20v6 p=0.009 verified / 20v9 p=0.061 raw; window parity 141/141 for the 6th pass — exactly as the Task 126-DIAG structural prediction (shared score architecture, ~3% divergence; lifetime flip asymmetry carries all evidential weight).
+- Window archaeology: this pass spanned THREE window states (861-1060 → 866-1065 → 873-1072); the frozen pass record is the final paired-consistent state. Effective observation latency during a burst ≈ one extraction cycle; metrics self-corrected at the final pair.
+- Countdown updates: #955 (window H2M) exits the FIFO window when maxId ≥ 1155 (~83 rounds away) — its exit will mechanically move window flips to 1v0 (p=0.5); #1043 (window M2H) exits at maxId ≥ 1243. Streak-29 run continues toward the session-record 76.
+- Next pass: burst sustainability + cadence watch; unwind ladder watch (2 consecutive H2M → 20v7 p=0.018 re-weaken); any M2H deepens toward record rung. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
