@@ -3865,3 +3865,34 @@ Stage Summary:
 - New forensic capability: direct /api/crazy-time probe distinguishes upstream-silence (page healthy, no reload) from client-pipeline-death (reload) in one step — codified for future outages; resource-buffer fullness (250 cap) documented as a known blind spot.
 - Validation state UNCHANGED by the outage: delta +4 plateau intact, engines identical 23 straight rounds, every significance test n.s. The outage affected coverage, not the comparison.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 83 (cron monitor — Job ID 369099, pass 38 — delta +4 plateau holds third pass; COIN FLIP 5/5 streak; streak 34 ties session record; feed fully recovered)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 38, 10:31 +08). All triggers clear. No engine changes.
+
+Work Log:
+- Feed probe: ALIVE and fast — 11 new rounds 483-493 (window 294-493, newest age 14s, contiguous IDs). Post-outage-#8 cadence ~54s/round; no gaps; outage gap 473->474 now suppressed as KNOWN (memorization verified working).
+- DELTA +4 PLATEAU — third consecutive pass at exactly +4 (+2.00pp): base 114/200 = 57.0%, exp 118/200 = 59.0%. Composition fully symmetric again (evicted 283-293 v new 483-493: base -3, exp -3). The +4 remains EXACTLY the 4 in-window rescues (#381, #394, #458, #459) — three passes of block rotation have not moved it; it is a stable, flip-carried structure, not drift.
+- No flips (0 this pass); agreement streak 34 — TIES the session record post-flip streak (34 after #394, Tasks 72-79 era). Last differential event remains #459.
+- COIN FLIP 5/5 STREAK in new block (#485, #486, #489, #490, #491 all hit by BOTH engines) — bonus continues hot: window bonus now 26/43 = 60.5% vs normal 56.1% for base. Bonus recovery narrative from the 0/4 storm (block 429-446) fully matured.
+- theo 157/200 = 78.5% (-2.5pp): block was bonus-heavy (5/11 COIN FLIP, theo N/A) plus '10'-exclusion miss (#492) and '2'-exclusion miss (#493, alternating with #481's hit). Engines identical 11/11.
+- Panel cross-check: EXACT full convergence, no snapshot race (114/118/157, delta display +2% = +4 hits, M2H 4, H2M 0, coverage 69.47%/69.01%, normal 157 split 88/92, bonus 43 split 26/26 — every figure matches). Pred changes now EQUAL 88/88 (first time since the rescues began). Outcome table: '2' inclusion gap still largest fingerprint (base 68% vs exp 73%, Δ+10), '5' Δ+4, '1' Δ+1.
+- Engine freeze: git verified 0 src files changed (data artifacts only). Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, no reset.
+- Triggers: (a) no (p=0.210), (b) no, (c) no (0 new flips). VERDICT: metrics-only steady state.
+
+Metrics (FIFO window n=200, IDs 294-493, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 114/200 = 57.0%
+3. Experimental HIT: 118/200 = 59.0%
+4. Delta: +4 hits (+2.00pp) exp-favoring — third pass at plateau, flip-carried
+5. MISS->HIT flips: window 4 (#381, #394, #458, #459); lifetime 11
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 157/200 = 78.5%
+8. MISS RCA: lifetime 15 + 4 documented exp-saves; new-round misses all existing families ('5' #483, '10' #492, '2' #493) — no new categories
+- McNemar: window 4v0 p=0.125; lifetime verified 11v5 p=0.210; raw 11v8 p=0.648
+
+Stage Summary:
+- The exp tilt has now survived three passes of pure block rotation at exactly +4 — the most stable differential structure of the session, entirely attributable to 4 rescues vs 0 losses. Still n.s. at every horizon (window p=0.125, lifetime p=0.210), but no counter-movement whatsoever: raw flips 11v8 is the only lifetime-level symmetry remaining.
+- Bonus regime flipped hot (COIN FLIP 5/5, window bonus 60.5% > normal 56.1%) while theo slides (78.5%) — consistent with the session-long pattern: bonus-heavy stretches raise displacement pressure on normals (the Task 65 mechanism), which is where both engines' misses concentrate.
+- Feed healthy post-outage; watch reset to normal. Protocol continues: metrics-only. Engine untouched.
