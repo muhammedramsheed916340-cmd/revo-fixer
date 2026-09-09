@@ -5155,3 +5155,34 @@ Stage Summary:
 - Validation-side: fully resilient — evidence state paused, not degraded. Parity regime (137/137, +0.00pp, 1v1) is static across two passes; the lifetime ledger (19v6 p=0.015 nominal / 19v9 p=0.087 raw) is untouched. On resume: gap auto-registers, window rolls mechanically, #844 exitwatch resumes (~#1044).
 - Next pass: if still silent, #18 duration-confirmed (it will have beaten 15.0 already; next record checkpoints 26.3/33.4); re-verify renderer only if symptoms change. If rounds resumed: formal #18 closure + gap registration + window roll + any-flip check.
 - Disruption ledger: 18 confirmed (#18 ongoing). Degraded set: EMPTY in-window (lifetime 1). Protocol continues. Engine untouched.
+
+---
+Task ID: 125 (cron monitor — Job ID 369099, pass 80 — DISRUPTION #18 CLOSED: gap 1019->1020 = 24.4 min (20:30:52 -> 20:55:14); ESCALATION CURVE BROKE (24.4 < 26.3/33.4/48.4/61.0); resume symmetric 12/12 AGREE; streak 76 crosses outage boundary; evidence static: 138/138 parity)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 80, 21:01 +08). Trigger (a) YES (standing) + (b) YES (#18 closure formalized) -> full analysis. Engine unchanged (git freeze clean; HEAD 301df3c cron artifact commit).
+
+Work Log:
+- DISRUPTION #18 CLOSED + FORMALIZED: inter-row gap 1019->1020 = 24.4 min (20:30:52 -> 20:55:14 +08), auto-registered by the analyzer. Final curve position: 15.0 -> 26.3 -> 33.4 -> 48.4 -> 61.0 -> 24.4 min. **The strictly-escalating pattern BROKE** — #18 came in below the previous three events. Escalation hypothesis weakened: either the 61-min event reset upstream state, or the escalation was coincidental clustering. Still 6 outages in ~5.5 h — systemic instability stands, but the monotonic-escalation read is retired.
+- Zero-loss arc replayed exactly: gap bounded, zero corruption, resume symmetric. 12 new rounds (#1020-#1031) landed pre-extraction at ~50s cadence (latest ts age 30s); window rolled 820-1019 -> 832-1031 (evictions 820-831). Fourth consecutive FULLY-CLEAN window.
+- New rounds: 12/12 AGREE, both 9/12. '1' BLISTERING: 8/8 (#1021-#1025, #1028, #1029, #1031) — the block reignited straight through the outage boundary. '2' hot run ended: #1020 hit then #1030 miss (1/2; the 7/7 run closed at 8/9 across two passes). Misses: #1026 CRAZY TIME, #1027 COIN FLIP, #1030 '2' — all existing families. Theo 10/12.
+- Evidence UNCHANGED 3rd consecutive pass: base 138/200 = 69.0%, exp 138/200 = 69.0%, delta +0.00pp (138/138 parity — both engines +1 symmetric on resume), window 1v1 [#844 | #955] p=1.0, theo 162/200 = 81.0%, lifetime verified 19v6 p=0.015 / raw 19v9 p=0.087. Streak 76 (since #955) — extended through the #18 boundary, mirroring the streak-through-outage behavior at #17.
+- Panel == ledger EXACT (138/138/162, M2H 1, H2M 1; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved). No snapshot race — first-extraction convergence 3rd time in 4 passes. Renderer healthy (no hang this pass).
+- Triggers: (a) YES — lifetime 19v6 p=0.015 standing; (b) YES — 24.4-min gap formally registered; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED (closure + resume analysis above).
+
+Metrics (FIFO window n=200, IDs 832-1031; clean n=200 — fourth consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 138/200 = 69.0% (clean==raw)
+3. Experimental HIT: 138/200 = 69.0% (clean==raw) — EQUAL to baseline
+4. Delta: +0 hits (+0.00pp) — parity holds 3rd pass
+5. MISS->HIT flips: window 1 (#844); lifetime 19
+6. HIT->MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 162/200 = 81.0%
+8. MISS RCA: lifetime 15 families + 9 exp-saves + 1 exp-loss; new misses (#1026 CRAZY TIME, #1027 COIN FLIP, #1030 '2') existing families — no new categories
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 19v6 p=0.015 (unchanged); raw 19v9 p=0.087 (unchanged)
+- Agreement streak: 76 (since #955)
+
+Stage Summary:
+- #18 closed at 24.4 min — the outage ledger now reads 18 confirmed, all zero-loss, and the escalation curve is officially non-monotonic. The infrastructure case stands on FREQUENCY (6 outages / 5.5 h) rather than escalation now; owner review remains top action item, second only to nothing.
+- Validation-side: the parity regime (138/138, +0.00pp, 1v1) is now static across 3 passes and 45 consecutive AGREE rounds spanning an outage boundary. Lifetime ledger untouched (19v6 p=0.015 nominal / 19v9 p=0.087 raw n.s.). The layer and baseline remain behaviorally indistinguishable in-window; the cumulative-flip asymmetry is the entire case — owner's call, caveats standing.
+- Movers: #844 (last in-window rescue) exits ~#1044 — 13 rounds out; window flips go 0v1 then (cosmetic). Any M2H rescue re-deepens to 19v5 p=0.007; two consecutive lifetime H2M exit significance (19v7 -> 19v8 p=0.052).
+- Disruption ledger: 18 confirmed (#18 closed 24.4 min). Degraded set: EMPTY in-window (lifetime 1). Protocol continues. Engine untouched.
