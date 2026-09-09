@@ -4862,3 +4862,31 @@ Stage Summary:
 - Streak 91 is now 2.4x the pre-#844 record; the layer has been dormant for 91 rounds. The '2' slot at 11/14 this block is the hottest sustained run of the session for either engine.
 - All evidence metrics unchanged for 5 consecutive passes: 19v5 p=0.007 verified / p=0.052 raw / window 2v0 / delta clean +2. The validation is in a fully understood steady state; remaining movers unchanged (new rescue, 3-consecutive H2M, composition at ~#987/#1044).
 - Disruption ledger: 16 events. Degraded frozen (#785). Protocol continues. Engine untouched.
+
+---
+Task ID: 115 (cron monitor — Job ID 369099, pass 70 — quiet hold #6: cold 4/14 block symmetric, streak record 105, headline frozen at delta +2 / 2v0 / lifetime 19v5 p=0.007; feed holds post-#16)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 70, 18:31 +08). Trigger (a) standing YES (lifetime record) -> full analysis. Engine unchanged (git freeze clean; HEAD c4cad7d cron artifact commit).
+
+Work Log:
+- Extraction clean first attempt: n=200, window 750-949 (14 new rounds 936-949, evictions 736-749). Integrity: contiguous, no dupes, no gaps; degraded frozen (#785 sole). Feed: 202s age at close — no new disruption in the post-#16 period (clustering fear not yet realized).
+- New rounds 936-949: 14/14 AGREE but COLD — both engines 4/14. Composition: '2' x6 (2 hit — hot streak ended, now cooling), '1' x4 (1 hit), bonus x4 (1 hit: COIN FLIP). Theo 10/14. Evicted 736-749: 12 base/12 exp hits, 11 theo — the hot block rotated out, symmetric raw drop -8 each. Perfectly mirrored hot->cold transition; zero divergence.
+- Headline metrics FROZEN 6th pass: base clean 127/199 = 63.8%, exp 129/200 = 64.5%, delta clean +2 (+1.01pp), M2H 2v0 [#787,#844] p=0.5, H2M 0, theo 160/200 = 80.0%, lifetime 19v5 p=0.007 (record) / raw 19v8 p=0.052. Streak 105 — record extended (91 -> 105). Layer dormant 105 rounds.
+- Panel cross-check: EXACT (base 127 clean / exp 129 / theo 160 / M2H 2 / H2M 0; paired 200; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved). No snapshot-race. Stale 27/28.
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing; (b) no; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 750-949; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 127/199 = 63.8% (raw 128/200 = 64.0%)
+3. Experimental HIT: 129/200 = 64.5% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 160/200 = 80.0% (clean 80.4%)
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves; new-round misses (#938 '1', #939 '10', #940 PACHINKO, #941 COIN FLIP, #943-#945 '2', #946 '1', #947 CASH HUNT, #948/#949 '1') all existing families — no new categories
+- McNemar: window 2v0 p=0.5 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- Sixth consecutive quiet hold: a textbook symmetric hot->cold rotation (12/14 out, 4/14 in, both engines identical) with the differential untouched at clean +2. The engines have now agreed for 105 straight rounds across a disruption boundary, a hot block, and a cold block — strongest sustained-symmetry evidence of the session, entirely consistent with the layer's design (intervene only on rare-outcome exclusion pressure).
+- Validation lifetime now ~25 h (start 9/8 17:00:58); ledger ~949 rounds. Evidence metrics unchanged for 6 passes; movers unchanged (new rescue, 3-consecutive H2M, composition at ~#987/#1044 — #787 exit now ~38 rounds out).
+- Feed stable post-#16 (202s close); disruption ledger 16; degraded frozen. Protocol continues. Engine untouched.
