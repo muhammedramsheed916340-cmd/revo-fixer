@@ -4918,3 +4918,32 @@ Stage Summary:
 - The outage clustering pattern is now explicit: 4 disruptions in the last ~2.5 h of feed operation (#13-era silences, #14 26.3 min, #16 15.0 min, #17 forming at 18+ min). Every prior event recovered with zero data loss and zero engine impact; the FIFO ledger design keeps each outage fully bounded and documented. Owner infra review remains the standing action item (URGENT).
 - Monitoring-side impact: zero. The validation state is fully persisted in the ledger; whenever the feed resumes, the window will roll forward mechanically and the steady-state evidence (19v5 p=0.007 / delta +2 / 2v0) will continue unchanged until a rescue, an H2M sequence, or #787's exit (~#987) moves it.
 - Disruption ledger: 16 confirmed + #17 pending. Protocol continues. Engine untouched.
+
+---
+Task ID: 117 (cron monitor — Job ID 369099, pass 72 — DISRUPTION #17 CONFIRMED by duration: silence 33.4 min, 2nd-longest of session (record 35.1); zero new rounds 2nd pass; renderer healthy; all evidence static)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 72, 19:01 +08). Trigger (a) standing YES (lifetime record) + (b) YES (outage confirmed by duration) -> full analysis. Engine unchanged (git freeze clean; HEAD a2ba3b1 cron artifact commit).
+
+Work Log:
+- DISRUPTION #17 CONFIRMED: zero new rounds for the 2nd consecutive pass; latest ts age 2002s (~33.4 min) — #949 last landed ~18:28:27 +08. The silence has now EXCEEDED disruption #14 (26.3 min) and is closing on the all-session record (35.1 min). Formal inter-row gap (949->950) will register in the ledger automatically when the feed resumes; duration-based confirmation logged now per protocol.
+- Outage timeline reconstruction: #949 ts 18:28:27 -> pass-70 close was 202s (normal); pass-71 saw 1103s; pass-72 sees 2002s. Monotonic growth = continuous upstream silence, NOT intermittent dropouts (no interleaved arrivals). 3rd outage of the 15-26+ min band in ~2.5 h of feed operation.
+- Renderer forensics NOT triggered (again): panel EXACT and stable (127/129/160, M2H 2, H2M 0; paired 200; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved; stale 27/28 static) — page fully healthy through 33+ min of upstream silence. Upstream-only signature reconfirmed.
+- All evidence metrics STATIC for the 3rd consecutive pass: base clean 127/199 = 63.8%, exp 129/200 = 64.5%, delta clean +2 (+1.01pp), M2H 2v0 [#787,#844] p=0.5, H2M 0, theo 160/200 = 80.0%, lifetime 19v5 p=0.007 (record) / raw 19v8 p=0.052, streak 105.
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing; (b) YES — disruption #17 confirmed (33.4 min, duration-based); (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 750-949; clean n=199 — #785 excluded; UNCHANGED 3rd pass):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 127/199 = 63.8% (raw 128/200 = 64.0%)
+3. Experimental HIT: 129/200 = 64.5% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 160/200 = 80.0% (clean 80.4%)
+8. MISS RCA: no new rounds — nothing to classify; lifetime 15 families + 9 exp-saves stand
+- McNemar: window 2v0 p=0.5 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- Disruption #17 is the 2nd-longest silence of the validation (33.4+ min and counting vs record 35.1) and the 3rd outage in the 15-26+ min band within ~2.5 h — the clustering pattern has now produced #14 (26.3), #16 (15.0), #17 (33.4+). Every event has been bounded, upstream-only, zero-loss. The frequency/severity is escalating; owner infrastructure review is overdue (standing URGENT).
+- Monitoring impact remains zero: ledger persisted, panel consistent, evidence frozen (7th consecutive pass). The validation is designed to tolerate exactly this class of feed failure.
+- Next pass: either #17 resolves (resume cadence + formal gap registration + window roll) or it sets a new all-session record (>35.1 min). If the latter, consider a console probe per the stop-loss forensics ladder (renderer already verified healthy twice this outage).
+- Disruption ledger: 17 confirmed. Degraded frozen (#785). Protocol continues. Engine untouched.
