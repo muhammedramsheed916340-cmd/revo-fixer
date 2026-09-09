@@ -5569,3 +5569,37 @@ Stage Summary:
 - Divergence-of-texture note: agreement streak 89 coexists with a −5 slide in BOTH engines' hit rates (67.0%, lowest window level since the pinned-window era) — the engines agree with each other while jointly missing normal-dominant stretches ('2'/'10'/'1' exclusions; theo 84.0%). Window-level engines-vs-theo gap now 17pp (134 vs 168), wider than the pinned-window 12pp — consistent with the DIAG pooled gap 15.4pp direction.
 - Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 23 rounds (~16 min), likely DURING pass 88; exit moves window flips to 1v0 (p=0.5). #1043 (window M2H) exits at maxId ≥ 1243 (111 rounds).
 - Next pass: #955 EXIT VERIFICATION (window flips 1v0, p=0.5 — first time the window will have zero H2M since #955 landed); streak extension watch (89+); unwind ladder unchanged. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 133 (cron monitor — Job ID 369099, pass 88 — record streak extends 89 → 110 (21/21 new AGREE); WIDEST ENGINE-THEO DIVERGENCE BLOCK YET: engines 7/21 vs theo 16/21 on the new block, '1' joint-missed 4 CONSECUTIVE rounds (#1139-#1142); parity 134/134 11th pass; #955 exit 2 rounds away; lifetime static 20v6 p=0.009)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 88, 23:01 +08). Trigger (a) YES (standing re-deepened 20v6 p=0.009) → full analysis. Engine unchanged (git freeze clean; HEAD a5e8ba2 cron artifact commit; src/ diff vs baseline = 0 lines).
+
+Work Log:
+- RECORD STREAK EXTENDS: 89 → 110 (since #1043, now spanning #1044-#1153 ≈ 76 min of continuous hit-outcome agreement). 21/21 new rounds AGREE. The record has more than doubled the old mark (76) and is live-extending.
+- WIDEST ENGINE-THEO DIVERGENCE BLOCK OF THE SESSION: engines 7/21 (33.3%) vs theo 16/21 (76.2%) on #1133-#1153 — a 9-hit shortfall in 21 rounds. Yet the two engines agreed on ALL 21 (streak mechanism = agreement, not quality). Window engines-vs-theo gap now 33pp (134 vs 167) — the largest observed; DIAG gap mechanism at maximum amplitude.
+- '1' EXCLUSION ANOMALY DEEPENS: #1139-#1142 — '1' joint-missed FOUR CONSECUTIVE rounds (theo caught all 4) while '1' actuals hold at 79/200 = 39.5% window-wide. Session '1' joint-miss count now 7 (#1107/#1108/#1127/#1139-#1142). The engines' ranker is systematically under-weighing the single most-frequent actual — the DIAG calibration finding amplified to its clearest live form.
+- Bonus texture: all 4 bonus landings in the block joint-missed INCL. theo (#1133 COIN FLIP, #1134 PACHINKO, #1146 CRAZY TIME, #1153 CASH HUNT — Q12-unavoidable family); #1147 CRAZY TIME landed back-to-back and BOTH engines HIT (rare bonus conversion; theo missed). '5'/'10' joint misses (#1138/#1151 '5', #1149/#1150 '10') all theo-caught.
+- FEED STEADY: 21 rounds at 2-100s cadence (several sub-10s pairs), max gap 99.7s, zero >8min gaps, latest age 60s. Disruption ledger: 19 confirmed, 0 candidates.
+- Paired extraction: PANEL == LEDGER FIRST-TRY EXACT (200/134/134/167, M2H 1, H2M 1) — 5th consecutive pass. Renderer healthy 2x first-try.
+- #955 EXIT IMMINENT: maxId 1153, exits at ≥1155 — TWO rounds away (minutes); not yet executed at extraction close.
+- Triggers: (a) YES — standing; (b) no; (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final paired window n=200, IDs 954-1153; clean n=200 — 11th consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 134/200 = 67.0% (clean==raw; flat vs pass 87)
+3. Experimental HIT: 134/200 = 67.0% (clean==raw)
+4. Delta: +0 hits (+0.00pp) — parity holds 11th pass
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 1 (#955); lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 167/200 = 83.5%
+8. MISS RCA: 14 joint misses this block — '1' x4 (#1139-#1142), '2' x2 (#1143/#1144), '5' x2, '10' x2 (all theo-caught, calibration family) + 4 bonus Q12s (#1133/#1134/#1146/#1153); no flips → no new families; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v1 p=1.0 (n.s.); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 110 — record, live-extending
+- Avg coverage: base 67.29% / exp 67.37% (+0.08pp)
+
+Stage Summary:
+- The session's clearest separation of concerns: engine-vs-engine identity is total (streak 110, parity 134/134 for the 11th pass) while engine-vs-theo divergence hits a session-widest 33pp. The reliability layer is irrelevant to the current gap (per DIAG); the calibration defect is the whole story, and the feed is now stress-testing it ('1' at 39.5% actual vs engines' exclusion behavior).
+- Owner-relevant summary line: theo 83.5% vs engines 67.0% on identical information — the fixed [1,2,5,10] set is outperforming the dynamic optimizer by ~17 hits per 200 rounds in the current regime, consistent with DIAG's dominant-cause finding (probability compression: normals underestimated, bonuses overestimated).
+- Countdown: #955 (window H2M) exits at maxId ≥ 1155 — 2 rounds; WILL roll off early in pass 89's window → window flips 1v0 (p=0.5). #1043 (window M2H) exits at maxId ≥ 1243 (90 rounds).
+- Next pass: #955 EXIT VERIFICATION (flips 1v0); '1'-exclusion anomaly continuation watch; streak 110+; unwind ladder unchanged. Disruption ledger: 19 confirmed, 0 candidates. Degraded set: EMPTY. Protocol continues. Engine untouched.
