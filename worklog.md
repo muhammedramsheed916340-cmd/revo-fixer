@@ -4681,3 +4681,34 @@ Stage Summary:
 - Caveats unchanged and standing: sequential testing (no alpha-spending correction), raw-vs-verified sensitivity (now p=0.052, nearly converged with verified), post-hoc window framing. No superiority verdict — owner's call. H2M requirement to unwind: 3 consecutive (window H2M 0 for 21+ passes).
 - Tooling lesson persisted: this panel renders value-BEFORE-label; future passes must parse accordingly (paired-62 false alarm was a regex bug, not app state).
 - Feed healthy at pass close (12s age, ~30-40s cadence). Protocol continues. Engine untouched.
+
+---
+Task ID: 109 (cron monitor — Job ID 369099, pass 64 — quiet hold #1 post-record: window 3v0 held, lifetime 19v5 p=0.007 unchanged; hot '2' block 6/7 both-hit)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 64, 17:01 +08). Trigger (a) standing YES (lifetime record) -> full analysis. Engine unchanged (git freeze clean for engine code; HEAD 7c33d0a cron artifact commit).
+
+Work Log:
+- Extraction clean first attempt: n=200, window 653-852 (7 new rounds 846-852, evictions 646-652). Integrity: contiguous, no dupes, no in-ledger gaps; only gap is KNOWN 836->837 outage. Feed healthy (24s age) — first full pass since disruption #14 with zero anomalies.
+- #664 EXITS LATER THAN PROJECTED: still in window (12 rounds from exit at ~864). Feed cadence this pass ~2 min/round (slower than the 30-40s burst at pass close) — only 7 rounds in 15 min. Exit projection revised: ~12 rounds from pass end.
+- New rounds 846-852: 7/7 AGREE, hot '2' block — #846 '2' HIT, #847 '2' HIT, #848 PACHINKO miss, #849 '2' HIT, #850 PACHINKO HIT, #851 '2' HIT, #852 '2' HIT. Six '2's in seven rounds (5/6 hit); PACHINKO 1/2 for BOTH engines (the root-cause outcome now behaving symmetrically; #850 hit shows PACHINKO isn't systematically excluded — negative deviations pass through as designed). Theo 5/7. Evicted 646-652: 4 base hits, 4 exp hits, 5 theo hits (composition, symmetric).
+- Window state: 3v0 [664, #787, #844] p=0.25 HELD; H2M 0. Streak 8 (since #844).
+- Panel cross-check: EXACT (base 126 clean / exp 129 / theo 168 / M2H 3 / H2M 0; paired 200; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved). Two consecutive panel reads identical — no snapshot-race (no arrivals mid-read at slow cadence). Coverage display offset recurs (~0.34pp, panel 67.73/67.67 vs ledger 68.07/68.01 — consistent display/rounding artifact, base>exp sign agrees in both sources). Stale runs now 26/26 (both engines equal).
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing record; (b) no; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED (metrics + convergence verification above).
+
+Metrics (FIFO window n=200, IDs 653-852; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 126/199 = 63.3% (raw 127/200 = 63.5%)
+3. Experimental HIT: 129/200 = 64.5% (clean==raw)
+4. Delta: clean +3 hits (+1.51pp) exp-favoring — held at session-widest
+5. MISS->HIT flips: window 3 (#664, #787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 168/200 = 84.0% (clean 84.4%)
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves; new-round misses (#848 PACHINKO) all existing families — no new categories
+- McNemar: window 3v0 p=0.25 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- First quiet hold after the pass-63 record: the 3v0 window and the 19v5 p=0.007 lifetime evidence both held intact; delta pinned at clean +3 (+1.51pp). Both engines ran hot together (6/7 block) — differential frozen, 100% historical flips.
+- #664 exit countdown revised to ~12 rounds; when it exits the window becomes 2v0 [#787, #844] mechanically (p=0.5) with NO evidence change — the differential then rides on the two young rescues. Next rescue (10th '2' would be #846-852-adjacent; first-ever '1' rescue remains the notable live possibility) or an H2M (3 consecutive needed to unwind) are the remaining movers.
+- PACHINKO texture note for owner: 2 appearances this block, split 1/1 both engines symmetric — consistent with the layer's design claim (deviations dampened, not banned).
+- Feed stable post-outage; disruption ledger stands at 15 events. Degraded rows: #785 sole, no recurrence.
+- Protocol continues. Engine untouched.
