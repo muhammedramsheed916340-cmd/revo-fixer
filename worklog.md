@@ -5701,3 +5701,38 @@ Stage Summary:
 - No validation-state change: the frozen window means the +1 delta (via #1043), the 138-round streak, and the ~22pp engines-vs-theo gap all carry over verbatim. The #1043 exit countdown (maxId ≥ 1243) is ALSO frozen at 62 rounds — it cannot advance until the feed resumes.
 - Owner-relevant: 26.9 min of feed silence is the longest stall of the monitored era if confirmed; the ledger's localStorage durability means zero data risk — the window will slide normally on resumption, and the #1181→#1182 gap will be measured and bounded for the disruption ledger.
 - Next pass: RESUMPTION WATCH — if new rounds arrive: (1) bound the #1181→#1182 gap → disruption #20 confirmation or reclassification (if gap < 15 min bounded, downgrade); (2) window slides (evictions 982+); (3) streak extension resumes; (4) #1043 countdown resumes. If the stall persists: re-report age, keep candidate #20 ongoing, verify renderer still healthy. Disruption ledger: 19 confirmed + 1 ONGOING CANDIDATE (#20). Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 137 (cron monitor — Job ID 369099, pass 92 — RESUMPTION CONFIRMED + DISRUPTION #20 CONFIRMED AT 27.9 MIN (#1181→#1182): NEW SESSION-RECORD OUTAGE (old 24.4 min), 20 confirmed / 0 candidates; feed live again (23 rounds #1182-#1204, 36s cadence, latest age 34s); streak 138 → 161 (23/23 new AGREE, span 171.2 min); window slid to 1005-1204, 14th consecutive fully-clean window; delta +1 persists 4th pass; lifetime static 20v6 p=0.009)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 92, 00:01 +08). Trigger (a) YES (standing 20v6 p=0.009); (b) YES — new in-ledger >8min gap (the stall) → full analysis. Engine unchanged (git freeze clean; HEAD d2b00bd cron artifact commit; src/ diff vs baseline 9ec8c87 = 0 lines).
+
+Work Log:
+- DISRUPTION #20 CONFIRMED — NEW SESSION RECORD: pass 91's ongoing candidate is now bounded and in-ledger: #1181→#1182 = 1673s = 27.9 min, exceeding the previous record 24.4 min (#1019→#1020) and 21.8 min (#1060→#1061). Outage-duration curve now 24.4 → 21.8 → 27.9 (non-monotonic, record set 3rd). Feed-side confirmed (renderer healthy throughout pass 91-92: 4 consecutive first-try evals, panel wall-clock correct). Disruption ledger: 20 confirmed, 0 candidates, all 20 zero-loss (ledger localStorage durability held again — zero rounds lost across the stall).
+- FEED RESUMPTION PROFILE: 23 new rounds (#1182-#1204) arrived at a steady ~36s average cadence over ~13.3 min with zero sub-gaps; latest age at extraction 34s. Clean resumption, no burst anomalies, no degraded rows.
+- RECORD STREAK EXTENDS: 138 → 161 (23/23 new AGREE). Span #1044-#1204 = 171.2 min of continuous hit-outcome agreement — the record has more than doubled the old mark (76) and keeps extending through a session-record outage boundary (first streak to survive a >20 min disruption untouched, since agreement state is per-round).
+- NEW BLOCK CENSUS (#1182-#1204): engines 15/23 (65.2%) vs theo 17/23 (73.9%) — block gap narrowed to 2 hits (from 22pp window-level). Joint misses ×8: #1183 PACHINKO, #1185 COIN FLIP, #1202 COIN FLIP (bonus-Q12 ×3, theo also missed all); #1189 '10', #1191/#1192/#1194 '2' ×3 (all theo-caught, calibration family). STANDOUT: #1186 COIN FLIP — BOTH ENGINES HIT, theo missed (rare bonus conversion the optimizer caught and the fixed set did not; engines beat theo on this round). Strong '1'/'2' conversion runs post-stall: '1' ×8/8 hit (#1187/#1188/#1190/#1193/#1196/#1203/#1204), '2' ×5/8 hit (#1195/#1197-#1199) — the episodic exclusion runs stayed dormant.
+- WINDOW SLIDE: evictions 982-1004 (23 rounds, includes legacy outage rows 986/987 — that known gap has now aged out of the window; remaining in-window known gaps: 1019→1020, 1060→1061). Window 982-1181 → 1005-1204, clean n=200 — 14th consecutive fully-clean window.
+- METRICS MOVEMENT: base 124 → 123 (−1, evicted hits ≈ new hits), exp 125 → 124 (−1), theo 168 → 168 (0). Delta +1 (+0.50pp) PERSISTS 4TH PASS — #1043 still unopposed; exit countdown now 39 rounds (maxId ≥ 1243, ~25 min, likely pass 93-94). Window engines-vs-theo gap 45 hits (22.5pp).
+- Paired extraction: PANEL == LEDGER FIRST-TRY EXACT ON EVERY FIELD (200/123/124/168, M2H 1, H2M 0, coverage 68.96/69.02, full per-outcome table) — 9th consecutive pass, 2x renderer healthy post-stall.
+- Triggers: (a) YES standing; (b) YES — stall gap (now documented, 27.9 min); (c) no. VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (final paired window n=200, IDs 1005-1204; clean n=200 — 14th consecutive fully-clean window):
+1. Paired rounds: 200 (ALL CLEAN)
+2. Baseline HIT: 123/200 = 61.5% (clean==raw; −1)
+3. Experimental HIT: 124/200 = 62.0% (clean==raw; −1)
+4. Delta: +1 hit (+0.50pp) — persists 4th pass (via unopposed #1043)
+5. MISS→HIT flips: window 1 (#1043); lifetime 20
+6. HIT→MISS flips: window 0; lifetime raw 9, verified 6
+7. Theoretical [1,2,5,10]: 168/200 = 84.0% (0)
+8. MISS RCA: window joint misses dominated by carried-over census (75 pre-stall) + 8 new-block (3 bonus-Q12, '2' ×3, '10' ×1, all theo-caught except Q12s) + #1186 theo-missed bonus conversion; no flips → no new families; lifetime 15 families + 10 exp-saves + 1 exp-loss stand
+- McNemar: window 1v0 p=1.0 (direction favors exp); lifetime verified 20v6 p=0.009 (static); raw 20v9 p=0.061 (static)
+- Agreement streak: 161 — record, live-extending (171.2 min span, survived a 27.9-min outage)
+- Avg coverage: base 68.96% / exp 69.02% (+0.06pp)
+
+Stage Summary:
+- The stall cycle closed cleanly end-to-end: detection (pass 91, renderer ruled out), unbounded candidate registration, and now bounded confirmation (27.9 min, session record) with ZERO data loss — the 20/20 zero-loss record across disruptions stands. The validation state was fully preserved through the outage: window metrics carried over, then slid normally on resumption.
+- Structural story unchanged and strengthened: engines are twins (streak 161, 171.2 min, spanning a session-record outage), the layer's #1043 save keeps the delta at +1 (4th pass), and the calibration gap holds ~22.5pp window-level even as the newest block narrowed to 2 hits — with the rare #1186 bonus conversion showing the optimizer CAN beat the fixed set on individual rounds even while losing the aggregate.
+- Owner-relevant: theo 84.0% vs engines 61.5/62.0% on the current window — fixed-set advantage ~45 hits/200 rounds; #1186 is a live existence proof of the optimizer's per-round edge (bonus conversion theo missed), consistent with DIAG's framing that the layer/optimizer value is real but small vs the calibration defect.
+- Countdown: #1043 exits at maxId ≥ 1243 — 39 rounds (~25 min, likely pass 93-94) → delta returns to 0.00pp unless a new flip lands first.
+- Next pass: #1043 exit watch (delta 0.00pp reversion); streak 161+; feed cadence stability post-record-outage (does another stall follow? — outage ledger now 20 confirmed, watch for clustering); '1'/'2' conversion runs. Degraded set: EMPTY. Protocol continues. Engine untouched.
