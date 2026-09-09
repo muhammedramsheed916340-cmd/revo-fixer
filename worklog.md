@@ -4125,3 +4125,34 @@ Stage Summary:
 - Lifetime ledger deepened to 16v5 p=0.027 even as the window was projected to unwind — the 7th '2' rescue arrived just in time to replace #394's exit. The '2'-slot story is now 7 of 16 lifetime rescues with zero '5' rescues ever.
 - Watch: an H2M remains the only lifetime-unwind event (16v6 -> p=0.058); window stays significant while 7v0 holds. Feed/hang cadence now ~1 disruption per 35-40 min — the owner's infra review remains overdue.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 91 (cron monitor — Job ID 369099, pass 46 — quiet pass; window advanced cleanly, 7v0 held, lifetime 16v5 p=0.027 unchanged)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 46, 12:31 +08). Trigger (a) standing YES -> full analysis per protocol. Engine unchanged (git freeze clean).
+
+Work Log:
+- Extraction clean on FIRST attempt (no renderer hang, no upstream silence): n=200, window 427-626. Snapshot-race detected on panel cross-check (panel 107/114 vs ledger 106/113, both engines +1) -> re-extracted per protocol, converged instantly: #627 ('1', both engines hit, ts 12:32:36) settled between extraction and panel render. Two-extraction convergence, no reconciliation forced. Analyzer re-run on converged ledger.
+- Window advanced 408-607 -> 428-627 (19 new rounds 608-626 settled this pass; 408-426 evicted). ALL 19 new rounds AGREE (19/19 both engines identical) — zero new flips, zero degraded rows, zero gaps. New-block hits symmetric: both engines 13/19 in 608-626, then #627 both-hit.
+- New-block texture: cold stretch #619-#623+#625 where BOTH engines missed (actuals '1' x4, '2' x2 — theo hit, engines missed) — symmetric cold snap, no differential; composition unremarkable otherwise (PACHINKO #614 miss both, COIN FLIP x3 2/3 both).
+- Panel cross-check: EXACT after re-extraction (107/114, M2H 7, H2M 0, theo 161). Header: RELIABILITY_K=10, EXPERIMENTAL SHADOW ON, validation start unchanged (9/8 17:00:58, ~41498s), no reset. Coverage base 69.75% / exp 69.61%. Pred changes 90/86. Stale runs 21/24.
+- Feed health: latest ts age 19s; NO >8min inter-row gaps in-window; no reload needed. Disruption counter unchanged (8 upstream silences + 2 renderer hangs).
+- Triggers: (a) YES — standing window crossing 7v0 p=0.016 + lifetime 16v5 p=0.027; (b) no; (c) no (0 new flips, streak now 37 since #590). VERDICT: ESCALATE — full analysis EXECUTED (all metrics below).
+
+Metrics (FIFO window n=200, IDs 428-627, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 107/200 = 53.5%
+3. Experimental HIT: 114/200 = 57.0%
+4. Delta: +7 hits (+3.50pp) exp-favoring — unchanged; composition-clean (differential 100% historical flips)
+5. MISS->HIT flips: window 7 (#458, #459, #511, #532, #554, #562, #590); lifetime 16
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 161/200 = 80.5%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('1' x4, '2' x2, PACHINKO x1) — no new categories
+- McNemar: window 7v0 p=0.016 (held); lifetime verified 16v5 p=0.027 (unchanged record); raw 16v8 p=0.152
+
+Stage Summary:
+- A genuinely quiet pass: the projected mechanical unwind did NOT begin — all 7 window rescues (incl. #458/#459) remain in-window, so 7v0 p=0.016 holds intact. First eviction of a window rescue (#458) is ~31 rounds away (window start reaches 459 at maxId 658); if no 8th rescue lands before then, window unwinds 7v0 -> 6v0 (p=0.062 n.s.) -> 5v0 (p=0.13). Lifetime 16v5 p=0.027 is window-independent and remains the number of record.
+- 37-round agreement streak (since #590) is the longest observed this session — the layer's differential is entirely the 16 historical rescues; live behavior is fully symmetric. '5' still never rescued; '2' remains the dominant rescue slot (7 of 16).
+- The ONLY lifetime-unwind event remains a new H2M (16v6 -> p=0.058). None observed; window H2M count 0 for 6+ consecutive passes.
+- Feed stable this pass (first extraction-only pass since the hang); disruption cadence paused. Owner infra review still overdue.
+- Protocol continues. Engine untouched.
