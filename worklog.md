@@ -4156,3 +4156,33 @@ Stage Summary:
 - The ONLY lifetime-unwind event remains a new H2M (16v6 -> p=0.058). None observed; window H2M count 0 for 6+ consecutive passes.
 - Feed stable this pass (first extraction-only pass since the hang); disruption cadence paused. Owner infra review still overdue.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 92 (cron monitor — Job ID 369099, pass 47 — NEW upstream silence #9 (10.4-min gap 628->629, zero data loss, auto-registered); post-gap hot streak, 7v0 held, lifetime 16v5 p=0.027 unchanged)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 47, 12:46 +08). Triggers (a) standing + (b) NEW GAP fired -> full escalation analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- NEW DISRUPTION EVENT #11 (9th upstream silence): trigger (b) fired on a 10.4-min inter-row gap #628 (ts 12:33:39) -> #629 (ts 12:44:04). Forensics: IDs CONTIGUOUS (no rounds skipped -> ZERO data loss either way); page responsive throughout (extraction succeeded first attempt, eval instant -> NOT a renderer hang); per Task 90 precedent (ts = true settlement time), no rounds settled during the silence -> upstream feed paused ~12:33-12:44. Post-gap cadence burst: 629-632 within ~2 min of resume. GAP AUTO-REGISTERED to anchor known_gaps (628->629) — future passes will exclude it from triggers. Disruption ledger: 9 upstream silences + 2 renderer hangs = 11 events.
+- Snapshot-race x2 this pass, both converged by re-extraction per protocol (no reconciliation forced): (1) first extraction window 433-632 vs panel 110/117 (panel +3 both engines — fast drift); (2) re-extraction found window already 440-639 — post-gap feed ran HOT: 12 rounds settled during this 15-min pass (628-639). Panel captured mid-drift; invariant metrics (M2H 7, H2M 0, paired 200, validation start unchanged, no reset) matched exactly at every snapshot. Final canonical numbers below from converged ledger 440-639.
+- New rounds 633-639: 7/7 AGREE, all 7 BOTH-ENGINE HITS (hot block: 4x '1' streak 636-639, 2x '10', CASH HUNT) — zero flips, zero degraded, theo 6/7 (#633 CASH HUNT theo-miss expected).
+- Triggers: (a) YES — standing window 7v0 p=0.016 + lifetime 16v5 p=0.027; (b) YES — new gap 628->629 (documented + registered, zero data loss); (c) no (0 new flips, streak 49). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 440-639, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 112/200 = 56.0%
+3. Experimental HIT: 119/200 = 59.5%
+4. Delta: +7 hits (+3.50pp) exp-favoring — unchanged through the gap and the hot streak
+5. MISS->HIT flips: window 7 (#458, #459, #511, #532, #554, #562, #590); lifetime 16
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 160/200 = 80.0%
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('10' x1, '5' x1, COIN FLIP x2, PACHINKO x1) — no new categories
+- McNemar: window 7v0 p=0.016 (held); lifetime verified 16v5 p=0.027 (unchanged record); raw 16v8 p=0.152
+- Coverage: base 69.12% / exp 68.98%; pred changes 91/87; bonus normal-round split consistent (no divergence)
+
+Stage Summary:
+- The 11th disruption event arrived and was absorbed with ZERO data loss: contiguous IDs, full post-gap catch-up (629-639 all landed), auto-registered known-gap. The data pipeline's resilience now proven across 9 silences + 2 hangs; owner infra review remains overdue (cadence ~1 event/38 min this session).
+- Hot streak aftermath: 49-round agreement (since #590), approaching the 50 milestone; the differential remains 100% historical (16 rescues), live behavior fully symmetric for 6+ consecutive passes.
+- EVICTION COUNTDOWN ACCELERATED: post-gap speed burned 12 window positions — first window rescue #458 now exits in ~19 rounds (window start 459 at maxId 658). If no 8th rescue lands first, window unwinds 7v0 -> 6v0 (p=0.062 n.s.). Watch next pass closely.
+- Lifetime 16v5 p=0.027 (window-independent) remains the number of record; the ONLY unwind event is a new H2M (16v6 -> p=0.058). None observed; window H2M 0 for 7+ consecutive passes.
+- Protocol continues. Engine untouched.
