@@ -4522,3 +4522,35 @@ Stage Summary:
 - #590 exits at maxId 790 (~6 rounds) -> 1v0 (p=1.0); #664 at ~864. Window evidentiary content nearly exhausted; lifetime 17v5 p=0.017 remains the sole canonical crossing (caveats unchanged; no superiority verdict; owner's call).
 - Only lifetime unwind events: H2M chain (17v6 p=0.035 still sig; 17v7 p=0.064 crosses). Window H2M 0 for 17+ consecutive passes.
 - Protocol continues. Engine untouched.
+
+---
+Task ID: 104 (cron monitor — Job ID 369099, pass 59 — ⭐ NINTH RESCUE #787 '2' caught #590's exit (window held 2v0); lifetime DEEPENED to 18v5 p=0.011 NEW RECORD; first in-window DEGRADED row #785 (symmetric, non-H2M) documented)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 59, 15:46 +08). Triggers (a) standing + (b) new degraded row fired -> full analysis. Engine unchanged (git freeze clean).
+
+Work Log:
+- ⭐ NINTH LIFETIME RESCUE: #787 '2' (ts 15:38:34, 43s after #785) — base preds ['1','PACHINKO','5','COIN FLIP'] (no '2'), exp preds ['1','PACHINKO','5','2'] — the reliability layer REPLACED COIN FLIP with '2', textbook re-inclusion exactly as designed. Timing: landed one round after #590 aged out — the renewable-resource pattern is now 4-for-4 (#381->#394, #394->#590, #458/#459->#664, #590->#787); window held 2v0 [664, #787] p=0.5.
+- ⭐ LIFETIME DEEPENED AGAIN: verified 18v5 p=0.011 (was 17v5 p=0.017) — SECOND consecutive record deepening in 3 passes; strongest canonical evidence of the session. Raw 18v8 p=0.076. Lifetime composition: 18 rescues = 8x'2' + 2x'10' + 7 early-session + 1x'5'; '2' now 8 of 18 (44%).
+- ⚠️ FIRST IN-WINDOW DEGRADED ROW: #785 CASH HUNT (ts 15:37:51) — BOTH pred lists empty (bp=[] ep=[]), coverage 0/0, both engines miss. Forensics: SYMMETRIC recording gap (not an H2M artifact — no flip impact either direction); settled in the post-hang-recovery window (page reloaded ~15:32, #785 43s before rescue #787) — plausibly a poll-snapshot race on a freshly-resumed page, cause unproven from ledger alone. Protocol: excluded from clean denominators (clean n=199); flagged unknown-new=[785] and registered in anchor degraded_all. No prior degraded row since the early-session set [6,24,45,67].
+- New block 785-796 (12 rounds): 11/12 agree, 1 M2H (#787), 0 H2M, 1 degraded (#785). Both engines 8/12 on clean rounds ('1' x7 6-hit incl. #794-#796 triple, '2' x2 1-hit). Streak reset to 9 (last flip #787).
+- Panel cross-check: EXACT on raw hits/theo (132/134, 168/200, paired 200, no reset, K=10, SHADOW ON). Coverage base 69.63% / exp 69.58%.
+- Triggers: (a) YES — lifetime 18v5 p=0.011 deepened + window 2v0 held; (b) YES — new degraded row #785 (documented, registered, non-H2M, symmetric); (c) no (1 new flip). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 597-796; raw 200, clean 199 — #785 excluded):
+1. Paired rounds: 200 raw / 199 clean (1 degraded)
+2. Baseline HIT: raw 133/200 = 66.5% | clean 132/199 = 66.3%
+3. Experimental HIT: 134/200 = 67.0% (clean==raw)
+4. Delta: raw +1 (+0.50pp) | clean +2 (+1.01pp) — degraded-row denominator artifact; substantive delta +2
+5. MISS->HIT flips: window 2 (#664, #787); lifetime 18
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 168/200 = 84.0% (clean 168/199 = 84.4%)
+8. MISS RCA: lifetime 15 + 8 documented exp-saves; new-round misses all existing families ('5' x2, '2' x1, CASH HUNT x1, COIN FLIP x1) — no new categories; #785 excluded (no preds recorded)
+- McNemar: window 2v0 p=0.5 (n.s. — mechanical); lifetime verified 18v5 p=0.011 (NEW RECORD); raw 18v8 p=0.076
+
+Stage Summary:
+- The 9th rescue arrived within minutes of the 5th eviction — the renewable-resource dynamic is now 4-for-4, and each replacement has landed while the window still held 2+ rescues. The lifetime ledger deepened to 18v5 p=0.011, the session's strongest number, with unchanged caveats (sequential testing; raw sensitivity p=0.076 — note raw is itself approaching significance as clean rescues accumulate).
+- #785 is the first in-window degraded row of the entire validation — symmetric, non-H2M, zero flip impact, excluded from clean metrics per pre-registered protocol. Watch for recurrence: if degraded rows cluster post-hang, that suggests a recovery-transient artifact class; a second event would warrant pattern analysis (currently n=1, no claim).
+- '2' slot: 8 of 18 lifetime rescues — the layer's single biggest source of differential value remains the '2' exclusion-reinclusion path; '1' has still never been rescued (17+ passes).
+- Window: 2 rescues left (#664, #787). #664 exits at ~864 (~68 rounds); #787 at ~887. Lifetime unwind events: H2M chain only (18v6 p=0.023 still sig; 18v7 p=0.043 still sig; 18v8 p=0.076 crosses — three consecutive H2M now needed; exact analyzer-formula values).
+- Feed: post-hang cadence healthy (12 rounds/15 min). Disruption ledger: 14 events. Owner infra review URGENT.
+- Protocol continues. Engine untouched.
