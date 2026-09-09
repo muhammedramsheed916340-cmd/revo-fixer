@@ -4975,3 +4975,33 @@ Stage Summary:
 - Validation-side: fully resilient by design — the ledger, panel, and evidence chain are unaffected; the moment rounds resume, the 949->950 gap will auto-register and the window rolls mechanically. The evidence state (19v5 p=0.007 / delta +2 / 2v0 / streak 105) is intact and paused, not degraded.
 - Next pass: resume watch + formal gap registration; if still silent, re-verify renderer (3rd) — reload remains available but unnecessary while console/panel stay clean.
 - Disruption ledger: 17 confirmed (#17 record-holder, ongoing). Degraded frozen. Protocol continues. Engine untouched.
+
+---
+Task ID: 119 (cron monitor — Job ID 369099, pass 74 — disruption #17 RESOLVED: 949->950 gap = 61 MIN (all-session record, prev 35.1); feed resumed 45s pre-extraction; window rolled; evidence static)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 74, 19:31 +08). Trigger (a) YES (standing record) + (b) YES (61-min gap formally registered) -> full analysis. Engine unchanged (git freeze clean; HEAD 4fdd6cd cron artifact commit).
+
+Work Log:
+- DISRUPTION #17 RESOLVED + FORMALIZED: inter-row gap 949->950 = 61 min (18:28:27 -> 19:29:28 +08), auto-registered by the analyzer as KNOWN outage — new all-session record (previous 35.1 min, beaten by 74%). Total outage arc: precursor (pass-71 1103s) -> duration-confirmed (pass-72 33.4 min) -> record broken (pass-73 48.4 min) -> resolved at 61 min (pass-74). Zero data loss, zero corruption, gap perfectly bounded.
+- Feed resumed at normal cadence: 5 new rounds (#950-#954) landed before extraction (45s age). Window rolled 750-949 -> 755-954, evictions 750-754.
+- New rounds: 5/5 AGREE, both engines 2/5 (mild block: #950 '2' miss, #951 '10' both-HIT — rare slot converting, #952/#953 '5' miss, #954 '1' hit). Theo 4/5. Composition symmetric (evicted 3 hits each, net -1/-1). Streak 110 — record extended through the outage boundary.
+- Headline metrics: base clean 126/199 = 63.3%, exp 128/200 = 64.0%, delta clean +2 (+1.01pp), M2H 2v0 [#787,#844] p=0.5, H2M 0, theo 160/200 = 80.0%, lifetime 19v5 p=0.007 (record) / raw 19v8 p=0.052.
+- Panel cross-check post-resume: EXACT (base 126 clean / exp 128 / theo 160 / M2H 2 / H2M 0; paired 200; K=10, SHADOW ON, validation start 9/8 17:00:58 preserved). No race. Stale 26/27.
+- Triggers: (a) YES — lifetime 19v5 p=0.007 standing; (b) YES — 61-min gap registered; (c) no (0 new flips). VERDICT: ESCALATE — full analysis EXECUTED.
+
+Metrics (FIFO window n=200, IDs 755-954; clean n=199 — #785 excluded):
+1. Paired rounds: 200 (1 degraded, 199 clean)
+2. Baseline HIT: clean 126/199 = 63.3% (raw 127/200 = 63.5%)
+3. Experimental HIT: 128/200 = 64.0% (clean==raw)
+4. Delta: clean +2 hits (+1.01pp) exp-favoring — unchanged
+5. MISS->HIT flips: window 2 (#787, #844); lifetime 19
+6. HIT->MISS flips: window 0; lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 160/200 = 80.0% (clean 80.4%)
+8. MISS RCA: lifetime 15 documented families + 9 exp-saves; new-round misses (#950 '2', #952/#953 '5') existing families — no new categories
+- McNemar: window 2v0 p=0.5 (n.s.); lifetime verified 19v5 p=0.007 (ALL-SESSION RECORD, unchanged); raw 19v8 p=0.052
+
+Stage Summary:
+- The record outage closed exactly as the architecture promised: 61 min of upstream silence, zero loss, mechanical gap registration, symmetric resume (5/5), evidence chain untouched. The disruption ledger now reads 17 confirmed with a 61-min record holder; the escalation curve across the last ~4 h is 15.0 -> 26.3 -> 33.4 -> 48.4+ -> 61.0 min — this is a systemic upstream stability problem and remains the top owner action item.
+- In-window known-gaps map: 756, 775, 836, 913, 949 boundaries — all documented, all zero-loss. The '1' quad and hot/cold blocks all survived across the outage boundary with the streak intact at 110.
+- Evidence state: 8th consecutive pass unchanged (19v5 p=0.007 / delta +2 / 2v0). Movers unchanged (new rescue, 3-consecutive H2M, #787 exit ~#987 -> ~33 rounds out).
+- Disruption ledger: 17 confirmed. Degraded frozen. Protocol continues. Engine untouched.
