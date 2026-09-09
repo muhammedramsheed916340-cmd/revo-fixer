@@ -3614,3 +3614,34 @@ Stage Summary:
 - '5'-exclusion signature heaviest ever (3/3 missed in one block) — Task 65 audit relevance keeps growing; theo recovering but regime remains hostile to both engines.
 - Watch continues: further saves would push toward trigger (c) (3+ same-direction); #236 (last H2M) ages out soon, which will mechanically widen the exp-favoring window delta further.
 - Protocol continues: metrics-only. Engine untouched.
+
+---
+Task ID: 75 (cron monitor — Job ID 369099, pass 30 — metrics-only steady state; feed-silence watch re-armed)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 30, 08:31 +08). All triggers clear. No engine changes.
+
+Work Log:
+- Feed probe: 6 new rounds 404-409 (window 210-409); 6/6 agreed. WATCH ITEM: newest age 10.7 min at extraction — same early-silence pattern as Task 69 (8.3 min then became outage #5). No >8min inter-row gaps within ledger yet. Next pass to resolve: recovery -> cadence note; growth -> outage #7 preparation.
+- No third flip: trigger (c) watch did NOT fire (streak 15 since #394, last flip unchanged). #236 (last H2M) STILL in window — exp-favoring delta has NOT yet been mechanically widened by its exit.
+- Window: base 129/200 = 64.5%, exp 130/200 = 65.0% — delta HOLDS at +1 (+0.5pp) exp-favoring; new block eviction-symmetric (both +2).
+- theo 165/200 = 82.5% (recovering).
+- New block: '1'x3 + '2' all hit; '10' missed by both (#409 — '10'-exclusion signature); COIN FLIP hit.
+- Panel cross-check: exact match (200 paired, 65%/65%, delta +1%); normal/bonus base 106/165 vs exp 108/165 normal, base 23/35 vs exp 22/35 bonus.
+- Engine freeze: git verified zero engine diffs.
+
+Metrics (FIFO window n=200, IDs 210-409, clean 200):
+1. Paired rounds: 200 (clean)
+2. Baseline HIT: 129/200 = 64.5%
+3. Experimental HIT: 130/200 = 65.0%
+4. Delta: +1 hit (+0.5pp), exp-favoring, second consecutive window
+5. MISS->HIT flips: window 2 (#381, #394); lifetime 9
+6. HIT->MISS flips: window 1 verified (#236); lifetime raw 8, verified 5
+7. Theoretical [1,2,5,10]: 165/200 = 82.5%
+8. MISS RCA: lifetime 15 + 2 documented exp-saves; no new categories this window
+- McNemar: window 2v1 p=1.000; lifetime verified 9v5 p=0.424; raw 9v8 p=1.000
+
+Stage Summary:
+- Steady state: exp-favoring delta stable at +1, all significance tests n.s., no new flips, no degradation.
+- Feed-silence watch re-armed (10.7 min newest age) — next pass resolves per the documented ladder.
+- Lifetime flip structure unchanged: 9 exp saves vs 5 verified base wins; the two post-#236 saves remain the only live A/B signal.
+- Protocol continues: metrics-only. Engine untouched.
