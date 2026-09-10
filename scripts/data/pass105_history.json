@@ -1,0 +1,7438 @@
+[
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 24,
+    "time": 1789058109862
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 24,
+    "time": 1789058109862
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 24,
+    "time": 1789058109862
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 24,
+    "time": 1789058109862
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789058112914,
+  "confidence": 24,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 24,
+    "time": 1789058112923
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 24,
+    "time": 1789058112923
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 24,
+    "time": 1789058112923
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 24,
+    "time": 1789058112923
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789058163823,
+  "confidence": 24,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 24,
+    "time": 1789058163827
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 24,
+    "time": 1789058163827
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 24,
+    "time": 1789058163827
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 24,
+    "time": 1789058163827
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789058205903,
+  "confidence": 24,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 24,
+    "time": 1789058205907
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 24,
+    "time": 1789058205907
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 24,
+    "time": 1789058205907
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 24,
+    "time": 1789058205907
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789058240366,
+  "confidence": 24,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 24,
+    "time": 1789058240370
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 24,
+    "time": 1789058240370
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 24,
+    "time": 1789058240370
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 24,
+    "time": 1789058240370
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789058246347,
+  "confidence": 24,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 40,
+    "time": 1789058246351
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 40,
+    "time": 1789058246351
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 40,
+    "time": 1789058246351
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 40,
+    "time": 1789058246351
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": true,
+  "time": 1789058292870,
+  "confidence": 40,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 40,
+    "time": 1789058292873
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 40,
+    "time": 1789058292873
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 40,
+    "time": 1789058292873
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 40,
+    "time": 1789058292873
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789058327311,
+  "confidence": 40,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 40,
+    "time": 1789058327315
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 40,
+    "time": 1789058327315
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 40,
+    "time": 1789058327315
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 40,
+    "time": 1789058327315
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789058363353,
+  "confidence": 40,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 40,
+    "time": 1789058363354
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 40,
+    "time": 1789058363354
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 40,
+    "time": 1789058363354
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 40,
+    "time": 1789058363354
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789058405345,
+  "confidence": 40,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 40,
+    "time": 1789058405348
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 40,
+    "time": 1789058405348
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 40,
+    "time": 1789058405348
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 40,
+    "time": 1789058405348
+   }
+  ],
+  "actualResult": {
+   "name": "CASH HUNT"
+  },
+  "hit": false,
+  "time": 1789058511857,
+  "confidence": 40,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 55,
+    "time": 1789058511860
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 55,
+    "time": 1789058511860
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789058511860
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 55,
+    "time": 1789058511860
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789058541922,
+  "confidence": 55,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 55,
+    "time": 1789058541927
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 55,
+    "time": 1789058541927
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789058541927
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 55,
+    "time": 1789058541927
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789058583859,
+  "confidence": 55,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 47,
+    "time": 1789058583861
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 47,
+    "time": 1789058583861
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 47,
+    "time": 1789058583861
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 47,
+    "time": 1789058583861
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789058628856,
+  "confidence": 47,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 55,
+    "time": 1789058628859
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 55,
+    "time": 1789058628859
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 55,
+    "time": 1789058628859
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789058628859
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": false,
+  "time": 1789058693358,
+  "confidence": 55,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 39,
+    "time": 1789058693364
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 39,
+    "time": 1789058693364
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 39,
+    "time": 1789058693364
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 39,
+    "time": 1789058693364
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789058735414,
+  "confidence": 39,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 51,
+    "time": 1789058735418
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 51,
+    "time": 1789058735418
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 51,
+    "time": 1789058735418
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 51,
+    "time": 1789058735418
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789058790864,
+  "confidence": 51,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789058790866
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 55,
+    "time": 1789058790866
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 55,
+    "time": 1789058790866
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 55,
+    "time": 1789058790866
+   }
+  ],
+  "actualResult": {
+   "name": "CASH HUNT"
+  },
+  "hit": true,
+  "time": 1789058875480,
+  "confidence": 55,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789058875482
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 55,
+    "time": 1789058875482
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 55,
+    "time": 1789058875482
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 55,
+    "time": 1789058875482
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789058879997,
+  "confidence": 55,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789058880002
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 55,
+    "time": 1789058880002
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 55,
+    "time": 1789058880002
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 55,
+    "time": 1789058880002
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789058914526,
+  "confidence": 55,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789058914540
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 55,
+    "time": 1789058914540
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 55,
+    "time": 1789058914540
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 55,
+    "time": 1789058914540
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789058926495,
+  "confidence": 55,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 48,
+    "time": 1789058926498
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 48,
+    "time": 1789058926498
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 48,
+    "time": 1789058926498
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 48,
+    "time": 1789058926498
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": false,
+  "time": 1789058963971,
+  "confidence": 48,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 41,
+    "time": 1789058963975
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 41,
+    "time": 1789058963975
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 41,
+    "time": 1789058963975
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 41,
+    "time": 1789058963975
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789058995468,
+  "confidence": 41,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 50,
+    "time": 1789058995472
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 50,
+    "time": 1789058995472
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 50,
+    "time": 1789058995472
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 50,
+    "time": 1789058995472
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789059042299,
+  "confidence": 50,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 51,
+    "time": 1789059042309
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 51,
+    "time": 1789059042309
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 51,
+    "time": 1789059042309
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 51,
+    "time": 1789059042309
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789059078103,
+  "confidence": 51,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 47,
+    "time": 1789059078105
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 47,
+    "time": 1789059078105
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 47,
+    "time": 1789059078105
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 47,
+    "time": 1789059078105
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789059113971,
+  "confidence": 47,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 61,
+    "time": 1789059113973
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789059113973
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 61,
+    "time": 1789059113973
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 61,
+    "time": 1789059113973
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789059116953,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 67,
+    "time": 1789059116956
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 67,
+    "time": 1789059116956
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 67,
+    "time": 1789059116956
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 67,
+    "time": 1789059116956
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789059165044,
+  "confidence": 67,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 68,
+    "time": 1789059165047
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 68,
+    "time": 1789059165047
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 68,
+    "time": 1789059165047
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 68,
+    "time": 1789059165047
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789059205485,
+  "confidence": 68,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 64,
+    "time": 1789059205487
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 64,
+    "time": 1789059205487
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 64,
+    "time": 1789059205487
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 64,
+    "time": 1789059205487
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": false,
+  "time": 1789059243004,
+  "confidence": 64,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 54,
+    "time": 1789059243006
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 54,
+    "time": 1789059243006
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 54,
+    "time": 1789059243006
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 54,
+    "time": 1789059243006
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789059292476,
+  "confidence": 54,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 63,
+    "time": 1789059292478
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 63,
+    "time": 1789059292478
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 63,
+    "time": 1789059292478
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 63,
+    "time": 1789059292478
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789059327027,
+  "confidence": 63,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 54,
+    "time": 1789059327029
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 54,
+    "time": 1789059327029
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 54,
+    "time": 1789059327029
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 54,
+    "time": 1789059327029
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789059541733,
+  "confidence": 54,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 63,
+    "time": 1789059541734
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 63,
+    "time": 1789059541734
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 63,
+    "time": 1789059541734
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 63,
+    "time": 1789059541734
+   }
+  ],
+  "actualResult": {
+   "name": "CASH HUNT"
+  },
+  "hit": true,
+  "time": 1789059557904,
+  "confidence": 63,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 59,
+    "time": 1789059557907
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 59,
+    "time": 1789059557907
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 59,
+    "time": 1789059557907
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 59,
+    "time": 1789059557907
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": true,
+  "time": 1789059601471,
+  "confidence": 59,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 64,
+    "time": 1789059601477
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 64,
+    "time": 1789059601477
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 64,
+    "time": 1789059601477
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 64,
+    "time": 1789059601477
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789059632895,
+  "confidence": 64,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 64,
+    "time": 1789059632903
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 64,
+    "time": 1789059632903
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 64,
+    "time": 1789059632903
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 64,
+    "time": 1789059632903
+   }
+  ],
+  "actualResult": {
+   "name": "CASH HUNT"
+  },
+  "hit": false,
+  "time": 1789059728990,
+  "confidence": 64,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 55,
+    "time": 1789059728996
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 55,
+    "time": 1789059728996
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 55,
+    "time": 1789059728996
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789059728996
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": true,
+  "time": 1789059767302,
+  "confidence": 55,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 64,
+    "time": 1789059767306
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 64,
+    "time": 1789059767306
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 64,
+    "time": 1789059767306
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 64,
+    "time": 1789059767306
+   }
+  ],
+  "actualResult": {
+   "name": "CASH HUNT"
+  },
+  "hit": true,
+  "time": 1789059768773,
+  "confidence": 64,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 64,
+    "time": 1789059768778
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 64,
+    "time": 1789059768778
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 64,
+    "time": 1789059768778
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 64,
+    "time": 1789059768778
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789059809306,
+  "confidence": 64,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 51,
+    "time": 1789059809311
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 51,
+    "time": 1789059809311
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 51,
+    "time": 1789059809311
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 51,
+    "time": 1789059809311
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789059849676,
+  "confidence": 51,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 59,
+    "time": 1789059849681
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 59,
+    "time": 1789059849681
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 59,
+    "time": 1789059849681
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 59,
+    "time": 1789059849681
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789059893219,
+  "confidence": 59,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789059893223
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 55,
+    "time": 1789059893223
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 55,
+    "time": 1789059893223
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 55,
+    "time": 1789059893223
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789059930830,
+  "confidence": 55,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 44,
+    "time": 1789059930837
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 44,
+    "time": 1789059930837
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 44,
+    "time": 1789059930837
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 44,
+    "time": 1789059930837
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": true,
+  "time": 1789059944215,
+  "confidence": 44,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 52,
+    "time": 1789059944217
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 52,
+    "time": 1789059944217
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 52,
+    "time": 1789059944217
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 52,
+    "time": 1789059944217
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": true,
+  "time": 1789059974265,
+  "confidence": 52,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 58,
+    "time": 1789059974270
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 58,
+    "time": 1789059974270
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 58,
+    "time": 1789059974270
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 58,
+    "time": 1789059974270
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789060014798,
+  "confidence": 58,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 44,
+    "time": 1789060014801
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 44,
+    "time": 1789060014801
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 44,
+    "time": 1789060014801
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 44,
+    "time": 1789060014801
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789060055214,
+  "confidence": 44,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 43,
+    "time": 1789060055216
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 43,
+    "time": 1789060055216
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 43,
+    "time": 1789060055216
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 43,
+    "time": 1789060055216
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": true,
+  "time": 1789060097204,
+  "confidence": 43,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 57,
+    "time": 1789060097210
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 57,
+    "time": 1789060097210
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 57,
+    "time": 1789060097210
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 57,
+    "time": 1789060097210
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789060140860,
+  "confidence": 57,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 58,
+    "time": 1789060140865
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 58,
+    "time": 1789060140865
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 58,
+    "time": 1789060140865
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 58,
+    "time": 1789060140865
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789060187216,
+  "confidence": 58,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 43,
+    "time": 1789060187223
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 43,
+    "time": 1789060187223
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 43,
+    "time": 1789060187223
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 43,
+    "time": 1789060187223
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789060227776,
+  "confidence": 43,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 57,
+    "time": 1789060227779
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 57,
+    "time": 1789060227779
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 57,
+    "time": 1789060227779
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 57,
+    "time": 1789060227779
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789060272754,
+  "confidence": 57,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 48,
+    "time": 1789060272759
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 48,
+    "time": 1789060272759
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 48,
+    "time": 1789060272759
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 48,
+    "time": 1789060272759
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789060304258,
+  "confidence": 48,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 42,
+    "time": 1789060304265
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 42,
+    "time": 1789060304265
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 42,
+    "time": 1789060304265
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 42,
+    "time": 1789060304265
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789060307314,
+  "confidence": 42,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 56,
+    "time": 1789060307319
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 56,
+    "time": 1789060307319
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 56,
+    "time": 1789060307319
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 56,
+    "time": 1789060307319
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": false,
+  "time": 1789060368845,
+  "confidence": 56,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 47,
+    "time": 1789060368852
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 47,
+    "time": 1789060368852
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 47,
+    "time": 1789060368852
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 47,
+    "time": 1789060368852
+   }
+  ],
+  "actualResult": {
+   "name": "CASH HUNT"
+  },
+  "hit": true,
+  "time": 1789060460292,
+  "confidence": 47,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 56,
+    "time": 1789060460303
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 56,
+    "time": 1789060460303
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 56,
+    "time": 1789060460303
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 56,
+    "time": 1789060460303
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": false,
+  "time": 1789060499332,
+  "confidence": 56,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 47,
+    "time": 1789060499339
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 47,
+    "time": 1789060499339
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 47,
+    "time": 1789060499339
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 47,
+    "time": 1789060499339
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789060535259,
+  "confidence": 47,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 60,
+    "time": 1789060535265
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 60,
+    "time": 1789060535265
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 60,
+    "time": 1789060535265
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 60,
+    "time": 1789060535265
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789060575827,
+  "confidence": 60,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 47,
+    "time": 1789060575830
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 47,
+    "time": 1789060575830
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 47,
+    "time": 1789060575830
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 47,
+    "time": 1789060575830
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789060625285,
+  "confidence": 47,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 60,
+    "time": 1789060625291
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 60,
+    "time": 1789060625291
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 60,
+    "time": 1789060625291
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 60,
+    "time": 1789060625291
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789060659567,
+  "confidence": 60,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 61,
+    "time": 1789060659571
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789060659571
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 61,
+    "time": 1789060659571
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 61,
+    "time": 1789060659571
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789060661075,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 66,
+    "time": 1789060661078
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 66,
+    "time": 1789060661078
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 66,
+    "time": 1789060661078
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 66,
+    "time": 1789060661078
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": false,
+  "time": 1789060722501,
+  "confidence": 66,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 52,
+    "time": 1789060722504
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 52,
+    "time": 1789060722504
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 52,
+    "time": 1789060722504
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 52,
+    "time": 1789060722504
+   }
+  ],
+  "actualResult": {
+   "name": "CRAZY TIME"
+  },
+  "hit": false,
+  "time": 1789060845493,
+  "confidence": 52,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 47,
+    "time": 1789060845498
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 47,
+    "time": 1789060845498
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 47,
+    "time": 1789060845498
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 47,
+    "time": 1789060845498
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789060893506,
+  "confidence": 47,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 60,
+    "time": 1789060893512
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 60,
+    "time": 1789060893512
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 60,
+    "time": 1789060893512
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 60,
+    "time": 1789060893512
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789060938550,
+  "confidence": 60,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 61,
+    "time": 1789060938552
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789060938552
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 61,
+    "time": 1789060938552
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 61,
+    "time": 1789060938552
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789060971574,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 61,
+    "time": 1789060971580
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 61,
+    "time": 1789060971580
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789060971580
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 61,
+    "time": 1789060971580
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789060986503,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 66,
+    "time": 1789060986510
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 66,
+    "time": 1789060986510
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 66,
+    "time": 1789060986510
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 66,
+    "time": 1789060986510
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789061013571,
+  "confidence": 66,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 68,
+    "time": 1789061013576
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 68,
+    "time": 1789061013576
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 68,
+    "time": 1789061013576
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 68,
+    "time": 1789061013576
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789061060120,
+  "confidence": 68,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 69,
+    "time": 1789061060125
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 69,
+    "time": 1789061060125
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 69,
+    "time": 1789061060125
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 69,
+    "time": 1789061060125
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789061097598,
+  "confidence": 69,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 69,
+    "time": 1789061097602
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 69,
+    "time": 1789061097602
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 69,
+    "time": 1789061097602
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 69,
+    "time": 1789061097602
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789061129100,
+  "confidence": 69,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 69,
+    "time": 1789061129108
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 69,
+    "time": 1789061129108
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 69,
+    "time": 1789061129108
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 69,
+    "time": 1789061129108
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789061138057,
+  "confidence": 69,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 59,
+    "time": 1789061138060
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 59,
+    "time": 1789061138060
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 59,
+    "time": 1789061138060
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 59,
+    "time": 1789061138060
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789061175625,
+  "confidence": 59,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 67,
+    "time": 1789061175631
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 67,
+    "time": 1789061175631
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 67,
+    "time": 1789061175631
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 67,
+    "time": 1789061175631
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789061216030,
+  "confidence": 67,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 68,
+    "time": 1789061216035
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 68,
+    "time": 1789061216035
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 68,
+    "time": 1789061216035
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 68,
+    "time": 1789061216035
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789061222033,
+  "confidence": 68,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 68,
+    "time": 1789061222037
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 68,
+    "time": 1789061222037
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 68,
+    "time": 1789061222037
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 68,
+    "time": 1789061222037
+   }
+  ],
+  "actualResult": {
+   "name": "PACHINKO"
+  },
+  "hit": false,
+  "time": 1789061306063,
+  "confidence": 68,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 50,
+    "time": 1789061306066
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 50,
+    "time": 1789061306066
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 50,
+    "time": 1789061306066
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 50,
+    "time": 1789061306066
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789061343482,
+  "confidence": 50,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 63,
+    "time": 1789061343487
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 63,
+    "time": 1789061343487
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 63,
+    "time": 1789061343487
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 63,
+    "time": 1789061343487
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789061381094,
+  "confidence": 63,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 63,
+    "time": 1789061381099
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 63,
+    "time": 1789061381099
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 63,
+    "time": 1789061381099
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 63,
+    "time": 1789061381099
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789061427572,
+  "confidence": 63,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 63,
+    "time": 1789061427578
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 63,
+    "time": 1789061427578
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 63,
+    "time": 1789061427578
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 63,
+    "time": 1789061427578
+   }
+  ],
+  "actualResult": {
+   "name": "CRAZY TIME"
+  },
+  "hit": false,
+  "time": 1789061549055,
+  "confidence": 63,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 50,
+    "time": 1789061549059
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 50,
+    "time": 1789061549059
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 50,
+    "time": 1789061549059
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 50,
+    "time": 1789061549059
+   }
+  ],
+  "actualResult": {
+   "name": "CRAZY TIME"
+  },
+  "hit": true,
+  "time": 1789061555356,
+  "confidence": 50,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 63,
+    "time": 1789061555362
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 63,
+    "time": 1789061555362
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 63,
+    "time": 1789061555362
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 63,
+    "time": 1789061555362
+   }
+  ],
+  "actualResult": {
+   "name": "CRAZY TIME"
+  },
+  "hit": true,
+  "time": 1789061565950,
+  "confidence": 63,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 64,
+    "time": 1789061565958
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 64,
+    "time": 1789061565958
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 64,
+    "time": 1789061565958
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 64,
+    "time": 1789061565958
+   }
+  ],
+  "actualResult": {
+   "name": "CRAZY TIME"
+  },
+  "hit": true,
+  "time": 1789061570535,
+  "confidence": 64,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 64,
+    "time": 1789061570538
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 64,
+    "time": 1789061570538
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 64,
+    "time": 1789061570538
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 64,
+    "time": 1789061570538
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789061603404,
+  "confidence": 64,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 64,
+    "time": 1789061603406
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 64,
+    "time": 1789061603406
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 64,
+    "time": 1789061603406
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 64,
+    "time": 1789061603406
+   }
+  ],
+  "actualResult": {
+   "name": "CRAZY TIME"
+  },
+  "hit": true,
+  "time": 1789061604986,
+  "confidence": 64,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 71,
+    "time": 1789061604989
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 71,
+    "time": 1789061604989
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 71,
+    "time": 1789061604989
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 71,
+    "time": 1789061604989
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789061641082,
+  "confidence": 71,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 71,
+    "time": 1789061641087
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 71,
+    "time": 1789061641087
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 71,
+    "time": 1789061641087
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 71,
+    "time": 1789061641087
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789061687396,
+  "confidence": 71,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 56,
+    "time": 1789061687399
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 56,
+    "time": 1789061687399
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 56,
+    "time": 1789061687399
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 56,
+    "time": 1789061687399
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789061720487,
+  "confidence": 56,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 64,
+    "time": 1789061720492
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 64,
+    "time": 1789061720492
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 64,
+    "time": 1789061720492
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 64,
+    "time": 1789061720492
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": false,
+  "time": 1789061783521,
+  "confidence": 64,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 51,
+    "time": 1789061783525
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 51,
+    "time": 1789061783525
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 51,
+    "time": 1789061783525
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 51,
+    "time": 1789061783525
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789061833007,
+  "confidence": 51,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 60,
+    "time": 1789061833012
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 60,
+    "time": 1789061833012
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 60,
+    "time": 1789061833012
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 60,
+    "time": 1789061833012
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789061871925,
+  "confidence": 60,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 60,
+    "time": 1789061871928
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 60,
+    "time": 1789061871928
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 60,
+    "time": 1789061871928
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 60,
+    "time": 1789061871928
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789061911103,
+  "confidence": 60,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 65,
+    "time": 1789061911109
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 65,
+    "time": 1789061911109
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 65,
+    "time": 1789061911109
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 65,
+    "time": 1789061911109
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789061918582,
+  "confidence": 65,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 65,
+    "time": 1789061918585
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 65,
+    "time": 1789061918585
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 65,
+    "time": 1789061918585
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 65,
+    "time": 1789061918585
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": true,
+  "time": 1789061971033,
+  "confidence": 65,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 71,
+    "time": 1789061971037
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 71,
+    "time": 1789061971037
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 71,
+    "time": 1789061971037
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 71,
+    "time": 1789061971037
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789062017504,
+  "confidence": 71,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 72,
+    "time": 1789062017509
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 72,
+    "time": 1789062017509
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 72,
+    "time": 1789062017509
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 72,
+    "time": 1789062017509
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789062061046,
+  "confidence": 72,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 57,
+    "time": 1789062061055
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 57,
+    "time": 1789062061055
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 57,
+    "time": 1789062061055
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 57,
+    "time": 1789062061055
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789062098481,
+  "confidence": 57,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 52,
+    "time": 1789062098484
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 52,
+    "time": 1789062098484
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 52,
+    "time": 1789062098484
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 52,
+    "time": 1789062098484
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789062140400,
+  "confidence": 52,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 60,
+    "time": 1789062140403
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 60,
+    "time": 1789062140403
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 60,
+    "time": 1789062140403
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 60,
+    "time": 1789062140403
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": true,
+  "time": 1789062212414,
+  "confidence": 60,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 60,
+    "time": 1789062212416
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 60,
+    "time": 1789062212416
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 60,
+    "time": 1789062212416
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 60,
+    "time": 1789062212416
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": true,
+  "time": 1789062274007,
+  "confidence": 60,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 61,
+    "time": 1789062274009
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 61,
+    "time": 1789062274009
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 61,
+    "time": 1789062274009
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 61,
+    "time": 1789062274009
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789062315977,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 65,
+    "time": 1789062315988
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 65,
+    "time": 1789062315988
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 65,
+    "time": 1789062315988
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 65,
+    "time": 1789062315988
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789062322003,
+  "confidence": 65,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 72,
+    "time": 1789062322006
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 72,
+    "time": 1789062322006
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 72,
+    "time": 1789062322006
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 72,
+    "time": 1789062322006
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": true,
+  "time": 1789062361118,
+  "confidence": 72,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 72,
+    "time": 1789062361126
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 72,
+    "time": 1789062361126
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 72,
+    "time": 1789062361126
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 72,
+    "time": 1789062361126
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789062405973,
+  "confidence": 72,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 72,
+    "time": 1789062405982
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 72,
+    "time": 1789062405982
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 72,
+    "time": 1789062405982
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 72,
+    "time": 1789062405982
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": true,
+  "time": 1789062437499,
+  "confidence": 72,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 72,
+    "time": 1789062437504
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 72,
+    "time": 1789062437504
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 72,
+    "time": 1789062437504
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 72,
+    "time": 1789062437504
+   }
+  ],
+  "actualResult": {
+   "name": "PACHINKO"
+  },
+  "hit": false,
+  "time": 1789062530596,
+  "confidence": 72,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 58,
+    "time": 1789062530602
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 58,
+    "time": 1789062530602
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 58,
+    "time": 1789062530602
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 58,
+    "time": 1789062530602
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": true,
+  "time": 1789062535201,
+  "confidence": 58,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 66,
+    "time": 1789062535208
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 66,
+    "time": 1789062535208
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 66,
+    "time": 1789062535208
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 66,
+    "time": 1789062535208
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": true,
+  "time": 1789062569676,
+  "confidence": 66,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 66,
+    "time": 1789062569682
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 66,
+    "time": 1789062569682
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 66,
+    "time": 1789062569682
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 66,
+    "time": 1789062569682
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": true,
+  "time": 1789062629695,
+  "confidence": 66,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 66,
+    "time": 1789062629701
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 66,
+    "time": 1789062629701
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 66,
+    "time": 1789062629701
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 66,
+    "time": 1789062629701
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789062671612,
+  "confidence": 66,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 54,
+    "time": 1789062671619
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 54,
+    "time": 1789062671619
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 54,
+    "time": 1789062671619
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 54,
+    "time": 1789062671619
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789062713688,
+  "confidence": 54,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 53,
+    "time": 1789062713693
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 53,
+    "time": 1789062713693
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 53,
+    "time": 1789062713693
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 53,
+    "time": 1789062713693
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": false,
+  "time": 1789062773614,
+  "confidence": 53,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 47,
+    "time": 1789062773618
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 47,
+    "time": 1789062773618
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 47,
+    "time": 1789062773618
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 47,
+    "time": 1789062773618
+   }
+  ],
+  "actualResult": {
+   "name": "CASH HUNT"
+  },
+  "hit": false,
+  "time": 1789062860716,
+  "confidence": 47,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 39,
+    "time": 1789062860719
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 39,
+    "time": 1789062860719
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 39,
+    "time": 1789062860719
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 39,
+    "time": 1789062860719
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789062910202,
+  "confidence": 39,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 32,
+    "time": 1789062910204
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 32,
+    "time": 1789062910204
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 32,
+    "time": 1789062910204
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 32,
+    "time": 1789062910204
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789062952397,
+  "confidence": 32,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 32,
+    "time": 1789062952410
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 32,
+    "time": 1789062952410
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 32,
+    "time": 1789062952410
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 32,
+    "time": 1789062952410
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": false,
+  "time": 1789062998649,
+  "confidence": 32,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 31,
+    "time": 1789062998655
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 31,
+    "time": 1789062998655
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 31,
+    "time": 1789062998655
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 31,
+    "time": 1789062998655
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789063042194,
+  "confidence": 31,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 31,
+    "time": 1789063042197
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 31,
+    "time": 1789063042197
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 31,
+    "time": 1789063042197
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 31,
+    "time": 1789063042197
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789063073612,
+  "confidence": 31,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 35,
+    "time": 1789063073615
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 35,
+    "time": 1789063073615
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 35,
+    "time": 1789063073615
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 35,
+    "time": 1789063073615
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789063120156,
+  "confidence": 35,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 35,
+    "time": 1789063120163
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 35,
+    "time": 1789063120163
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 35,
+    "time": 1789063120163
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 35,
+    "time": 1789063120163
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789063171069,
+  "confidence": 35,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 50,
+    "time": 1789063171075
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 50,
+    "time": 1789063171075
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 50,
+    "time": 1789063171075
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 50,
+    "time": 1789063171075
+   }
+  ],
+  "actualResult": {
+   "name": "CASH HUNT"
+  },
+  "hit": true,
+  "time": 1789063252222,
+  "confidence": 50,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 58,
+    "time": 1789063252226
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 58,
+    "time": 1789063252226
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 58,
+    "time": 1789063252226
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 58,
+    "time": 1789063252226
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789063297651,
+  "confidence": 58,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 58,
+    "time": 1789063297656
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 58,
+    "time": 1789063297656
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 58,
+    "time": 1789063297656
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 58,
+    "time": 1789063297656
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789063339164,
+  "confidence": 58,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 68,
+    "time": 1789063339171
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 68,
+    "time": 1789063339171
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 68,
+    "time": 1789063339171
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 68,
+    "time": 1789063339171
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": false,
+  "time": 1789063400145,
+  "confidence": 68,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 60,
+    "time": 1789063400152
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 60,
+    "time": 1789063400152
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 60,
+    "time": 1789063400152
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 60,
+    "time": 1789063400152
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789063401679,
+  "confidence": 60,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 68,
+    "time": 1789063401687
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 68,
+    "time": 1789063401687
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 68,
+    "time": 1789063401687
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 68,
+    "time": 1789063401687
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789063439162,
+  "confidence": 68,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 63,
+    "time": 1789063439168
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 63,
+    "time": 1789063439168
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 63,
+    "time": 1789063439168
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 63,
+    "time": 1789063439168
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789063481049,
+  "confidence": 63,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 55,
+    "time": 1789063481057
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 55,
+    "time": 1789063481057
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 55,
+    "time": 1789063481057
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 55,
+    "time": 1789063481057
+   }
+  ],
+  "actualResult": {
+   "name": "PACHINKO"
+  },
+  "hit": false,
+  "time": 1789063569592,
+  "confidence": 55,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 50,
+    "time": 1789063569597
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 50,
+    "time": 1789063569597
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 50,
+    "time": 1789063569597
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 50,
+    "time": 1789063569597
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789063616137,
+  "confidence": 50,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 49,
+    "time": 1789063616140
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 49,
+    "time": 1789063616140
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 49,
+    "time": 1789063616140
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 49,
+    "time": 1789063616140
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789063653668,
+  "confidence": 49,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 37,
+    "time": 1789063653672
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 37,
+    "time": 1789063653672
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 37,
+    "time": 1789063653672
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 37,
+    "time": 1789063653672
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789063692687,
+  "confidence": 37,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 29,
+    "time": 1789063692693
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 29,
+    "time": 1789063692693
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 29,
+    "time": 1789063692693
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 29,
+    "time": 1789063692693
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789063704595,
+  "confidence": 29,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 45,
+    "time": 1789063704599
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 45,
+    "time": 1789063704599
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 45,
+    "time": 1789063704599
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 45,
+    "time": 1789063704599
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789063734552,
+  "confidence": 45,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 52,
+    "time": 1789063734556
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 52,
+    "time": 1789063734556
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 52,
+    "time": 1789063734556
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 52,
+    "time": 1789063734556
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": true,
+  "time": 1789063784144,
+  "confidence": 52,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 57,
+    "time": 1789063784163
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 57,
+    "time": 1789063784163
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 57,
+    "time": 1789063784163
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 57,
+    "time": 1789063784163
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": false,
+  "time": 1789063848601,
+  "confidence": 57,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 49,
+    "time": 1789063848606
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 49,
+    "time": 1789063848606
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 49,
+    "time": 1789063848606
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 49,
+    "time": 1789063848606
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789063892146,
+  "confidence": 49,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 62,
+    "time": 1789063892148
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 62,
+    "time": 1789063892148
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 62,
+    "time": 1789063892148
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 62,
+    "time": 1789063892148
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789063931109,
+  "confidence": 62,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 49,
+    "time": 1789063931115
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 49,
+    "time": 1789063931115
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 49,
+    "time": 1789063931115
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 49,
+    "time": 1789063931115
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789063976169,
+  "confidence": 49,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 57,
+    "time": 1789063976191
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 57,
+    "time": 1789063976191
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 57,
+    "time": 1789063976191
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 57,
+    "time": 1789063976191
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789064018100,
+  "confidence": 57,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 57,
+    "time": 1789064018108
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 57,
+    "time": 1789064018108
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 57,
+    "time": 1789064018108
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 57,
+    "time": 1789064018108
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789064064690,
+  "confidence": 57,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 62,
+    "time": 1789064064695
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 62,
+    "time": 1789064064695
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 62,
+    "time": 1789064064695
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 62,
+    "time": 1789064064695
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789064103628,
+  "confidence": 62,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 62,
+    "time": 1789064103635
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 62,
+    "time": 1789064103635
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 62,
+    "time": 1789064103635
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 62,
+    "time": 1789064103635
+   }
+  ],
+  "actualResult": {
+   "name": "CRAZY TIME"
+  },
+  "hit": true,
+  "time": 1789064210146,
+  "confidence": 62,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 69,
+    "time": 1789064210150
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 69,
+    "time": 1789064210150
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 69,
+    "time": 1789064210150
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 69,
+    "time": 1789064210150
+   }
+  ],
+  "actualResult": {
+   "name": "PACHINKO"
+  },
+  "hit": false,
+  "time": 1789064302275,
+  "confidence": 69,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 59,
+    "time": 1789064302293
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 59,
+    "time": 1789064302293
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 59,
+    "time": 1789064302293
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 59,
+    "time": 1789064302293
+   }
+  ],
+  "actualResult": {
+   "name": "CRAZY TIME"
+  },
+  "hit": true,
+  "time": 1789064315674,
+  "confidence": 59,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 62,
+    "time": 1789064315679
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 62,
+    "time": 1789064315679
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 62,
+    "time": 1789064315679
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 62,
+    "time": 1789064315679
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789064344291,
+  "confidence": 62,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 49,
+    "time": 1789064344295
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 49,
+    "time": 1789064344295
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 49,
+    "time": 1789064344295
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 49,
+    "time": 1789064344295
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": false,
+  "time": 1789064390789,
+  "confidence": 49,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 44,
+    "time": 1789064390794
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 44,
+    "time": 1789064390794
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 44,
+    "time": 1789064390794
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 44,
+    "time": 1789064390794
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789064432774,
+  "confidence": 44,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 52,
+    "time": 1789064432781
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 52,
+    "time": 1789064432781
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 52,
+    "time": 1789064432781
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 52,
+    "time": 1789064432781
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": false,
+  "time": 1789064501757,
+  "confidence": 52,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 44,
+    "time": 1789065175459
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 44,
+    "time": 1789065175459
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 44,
+    "time": 1789065175459
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 44,
+    "time": 1789065175459
+   }
+  ],
+  "actualResult": {
+   "name": "PACHINKO"
+  },
+  "hit": true,
+  "time": 1789065548804,
+  "confidence": 44,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 52,
+    "time": 1789065548812
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 52,
+    "time": 1789065548812
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 52,
+    "time": 1789065548812
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 52,
+    "time": 1789065548812
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789065571148,
+  "confidence": 52,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 44,
+    "time": 1789065571153
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 44,
+    "time": 1789065571153
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 44,
+    "time": 1789065571153
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 44,
+    "time": 1789065571153
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789065610140,
+  "confidence": 44,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 43,
+    "time": 1789065610146
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 43,
+    "time": 1789065610146
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 43,
+    "time": 1789065610146
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 43,
+    "time": 1789065610146
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": true,
+  "time": 1789065650775,
+  "confidence": 43,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 52,
+    "time": 1789065650778
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 52,
+    "time": 1789065650778
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 52,
+    "time": 1789065650778
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 52,
+    "time": 1789065650778
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": false,
+  "time": 1789065689665,
+  "confidence": 52,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 48,
+    "time": 1789065689675
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 48,
+    "time": 1789065689675
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 48,
+    "time": 1789065689675
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 48,
+    "time": 1789065689675
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789065745192,
+  "confidence": 48,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 51,
+    "time": 1789065745205
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 51,
+    "time": 1789065745205
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 51,
+    "time": 1789065745205
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 51,
+    "time": 1789065745205
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789065773639,
+  "confidence": 51,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 57,
+    "time": 1789065773648
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 57,
+    "time": 1789065773648
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 57,
+    "time": 1789065773648
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 57,
+    "time": 1789065773648
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789065806863,
+  "confidence": 57,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 62,
+    "time": 1789065806893
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 62,
+    "time": 1789065806893
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 62,
+    "time": 1789065806893
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 62,
+    "time": 1789065806893
+   }
+  ],
+  "actualResult": {
+   "name": "CASH HUNT"
+  },
+  "hit": false,
+  "time": 1789065896732,
+  "confidence": 62,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 49,
+    "time": 1789065896738
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 49,
+    "time": 1789065896738
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 49,
+    "time": 1789065896738
+   },
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 49,
+    "time": 1789065896738
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": true,
+  "time": 1789065935641,
+  "confidence": 49,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 62,
+    "time": 1789065935647
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 62,
+    "time": 1789065935647
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 62,
+    "time": 1789065935647
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 62,
+    "time": 1789065935647
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789065974733,
+  "confidence": 62,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 49,
+    "time": 1789065974736
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 49,
+    "time": 1789065974736
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 49,
+    "time": 1789065974736
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 49,
+    "time": 1789065974736
+   }
+  ],
+  "actualResult": {
+   "name": "PACHINKO"
+  },
+  "hit": false,
+  "time": 1789066063253,
+  "confidence": 49,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 43,
+    "time": 1789066063261
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 43,
+    "time": 1789066063261
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 43,
+    "time": 1789066063261
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 43,
+    "time": 1789066063261
+   }
+  ],
+  "actualResult": {
+   "name": "PACHINKO"
+  },
+  "hit": false,
+  "time": 1789066071377,
+  "confidence": 43,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 36,
+    "time": 1789066071382
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 36,
+    "time": 1789066071382
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 36,
+    "time": 1789066071382
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 36,
+    "time": 1789066071382
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": true,
+  "time": 1789066078884,
+  "confidence": 36,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 51,
+    "time": 1789066078890
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 51,
+    "time": 1789066078890
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 51,
+    "time": 1789066078890
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 51,
+    "time": 1789066078890
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789066099891,
+  "confidence": 51,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 36,
+    "time": 1789066099899
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 36,
+    "time": 1789066099899
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 36,
+    "time": 1789066099899
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 36,
+    "time": 1789066099899
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": true,
+  "time": 1789066144804,
+  "confidence": 36,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 51,
+    "time": 1789066144810
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 51,
+    "time": 1789066144810
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 51,
+    "time": 1789066144810
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 51,
+    "time": 1789066144810
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789066189837,
+  "confidence": 51,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 56,
+    "time": 1789066189841
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 56,
+    "time": 1789066189841
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 56,
+    "time": 1789066189841
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 56,
+    "time": 1789066189841
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789066227417,
+  "confidence": 56,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 61,
+    "time": 1789066227423
+   },
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 61,
+    "time": 1789066227423
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 61,
+    "time": 1789066227423
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789066227423
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789066263303,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 61,
+    "time": 1789066263313
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 61,
+    "time": 1789066263313
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 61,
+    "time": 1789066263313
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789066263313
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789066305688,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "5"
+    },
+    "confidence": 53,
+    "time": 1789066305693
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 53,
+    "time": 1789066305693
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 53,
+    "time": 1789066305693
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 53,
+    "time": 1789066305693
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": false,
+  "time": 1789066353478,
+  "confidence": 53,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 53,
+    "time": 1789066353486
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 53,
+    "time": 1789066353486
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 53,
+    "time": 1789066353486
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 53,
+    "time": 1789066353486
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066386324,
+  "confidence": 53,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 61,
+    "time": 1789066386332
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 61,
+    "time": 1789066386332
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789066386332
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 61,
+    "time": 1789066386332
+   }
+  ],
+  "actualResult": {
+   "name": "COIN FLIP"
+  },
+  "hit": false,
+  "time": 1789066452363,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 48,
+    "time": 1789066452369
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 48,
+    "time": 1789066452369
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 48,
+    "time": 1789066452369
+   },
+   {
+    "game": {
+     "name": "PACHINKO"
+    },
+    "confidence": 48,
+    "time": 1789066452369
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066492876,
+  "confidence": 48,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 56,
+    "time": 1789066492882
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 56,
+    "time": 1789066492882
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 56,
+    "time": 1789066492882
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 56,
+    "time": 1789066492882
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066533372,
+  "confidence": 56,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 61,
+    "time": 1789066533381
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 61,
+    "time": 1789066533381
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789066533381
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 61,
+    "time": 1789066533381
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789066575386,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 61,
+    "time": 1789066575392
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 61,
+    "time": 1789066575392
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789066575392
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 61,
+    "time": 1789066575392
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789066614384,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 61,
+    "time": 1789066614390
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 61,
+    "time": 1789066614390
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 61,
+    "time": 1789066614390
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 61,
+    "time": 1789066614390
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789066654885,
+  "confidence": 61,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 68,
+    "time": 1789066654888
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 68,
+    "time": 1789066654888
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 68,
+    "time": 1789066654888
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 68,
+    "time": 1789066654888
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": false,
+  "time": 1789066693897,
+  "confidence": 68,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 58,
+    "time": 1789066693903
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 58,
+    "time": 1789066693903
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 58,
+    "time": 1789066693903
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 58,
+    "time": 1789066693903
+   }
+  ],
+  "actualResult": {
+   "name": "10"
+  },
+  "hit": false,
+  "time": 1789066698424,
+  "confidence": 58,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 53,
+    "time": 1789066698430
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 53,
+    "time": 1789066698430
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 53,
+    "time": 1789066698430
+   },
+   {
+    "game": {
+     "name": "CASH HUNT"
+    },
+    "confidence": 53,
+    "time": 1789066698430
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789066737372,
+  "confidence": 53,
+  "recalibrated": true,
+  "calibrationNote": "Recalibration triggered by MISS. Fresh ranking: analyzed repeat-pattern, trend, stability, Bayesian, Wilson LB, signal correlation. No automatic carryover \u2014 every outcome re-scored from scratch."
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 56,
+    "time": 1789066737381
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 56,
+    "time": 1789066737381
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 56,
+    "time": 1789066737381
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 56,
+    "time": 1789066737381
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066776481,
+  "confidence": 56,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 57,
+    "time": 1789066776490
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 57,
+    "time": 1789066776490
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 57,
+    "time": 1789066776490
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 57,
+    "time": 1789066776490
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066788297,
+  "confidence": 57,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 57,
+    "time": 1789066788301
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 57,
+    "time": 1789066788301
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 57,
+    "time": 1789066788301
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 57,
+    "time": 1789066788301
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066821397,
+  "confidence": 57,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "COIN FLIP"
+    },
+    "confidence": 62,
+    "time": 1789066821415
+   },
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 62,
+    "time": 1789066821415
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 62,
+    "time": 1789066821415
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 62,
+    "time": 1789066821415
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066857472,
+  "confidence": 62,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 68,
+    "time": 1789066857481
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 68,
+    "time": 1789066857481
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 68,
+    "time": 1789066857481
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 68,
+    "time": 1789066857481
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066858797,
+  "confidence": 68,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 68,
+    "time": 1789066858806
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 68,
+    "time": 1789066858806
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 68,
+    "time": 1789066858806
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 68,
+    "time": 1789066858806
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066899357,
+  "confidence": 68,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 69,
+    "time": 1789066899363
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 69,
+    "time": 1789066899363
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 69,
+    "time": 1789066899363
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 69,
+    "time": 1789066899363
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789066939949,
+  "confidence": 69,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 69,
+    "time": 1789066939957
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 69,
+    "time": 1789066939957
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 69,
+    "time": 1789066939957
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 69,
+    "time": 1789066939957
+   }
+  ],
+  "actualResult": {
+   "name": "1"
+  },
+  "hit": true,
+  "time": 1789066984856,
+  "confidence": 69,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 69,
+    "time": 1789066984866
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 69,
+    "time": 1789066984866
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 69,
+    "time": 1789066984866
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 69,
+    "time": 1789066984866
+   }
+  ],
+  "actualResult": {
+   "name": "2"
+  },
+  "hit": true,
+  "time": 1789066986380,
+  "confidence": 69,
+  "recalibrated": false
+ },
+ {
+  "prediction": [
+   {
+    "game": {
+     "name": "1"
+    },
+    "confidence": 69,
+    "time": 1789066986390
+   },
+   {
+    "game": {
+     "name": "2"
+    },
+    "confidence": 69,
+    "time": 1789066986390
+   },
+   {
+    "game": {
+     "name": "CRAZY TIME"
+    },
+    "confidence": 69,
+    "time": 1789066986390
+   },
+   {
+    "game": {
+     "name": "10"
+    },
+    "confidence": 69,
+    "time": 1789066986390
+   }
+  ],
+  "actualResult": {
+   "name": "5"
+  },
+  "hit": false,
+  "time": 1789067022289,
+  "confidence": 69,
+  "recalibrated": false
+ }
+]
