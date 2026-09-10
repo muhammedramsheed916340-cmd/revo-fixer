@@ -6262,3 +6262,27 @@ Stage Summary:
 - The stall-resilience picture is now complete: state survived 30.4 minutes of results-silence with zero data loss, normal cadence on recovery, and loadCritical unaffected — the strongest persistence evidence of the era.
 - Two-state tracking: ARCHIVE terminal record unchanged (git chain … → f8402f6 → 123e923, zero src/ drift); LIVE PROFILE 291 rounds, shadow OFF.
 - Next pass: loadCritical 2/load (7th?); persistence (>291); '1' 10-run continuation (second-longest — does it chase the 16 record? segment-regime watch); '10' 8-run (9th? — weakest-numeric decay continues); COIN FLIP occurrence watch (streak 10, quiet 19+); PACHINKO (38+ quiet); CRAZY TIME (88+ quiet — era's longest active drought); '5' (32+ quiet); second-200 window stability (+1.0pp — whipsaw check); feed post-stall gap census (any aftershock minors). Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+## Pass 113 (Task ID 158) — 2026-09-11 05:17 +08 — cron read-only monitoring
+- Trigger: Job ID 369099, 15-min cadence, 05:17:26 signal. Trace: cron-agent-loop-202609110517. Worklog precheck: 6,264 lines, pass 112 block present → proceeding as Pass 113.
+- GIT: chain … 123e923 → 387296d (pass 112's cron commit present). `git diff 9ec8c87 -- src/` = **0 lines** — 19th consecutive zero-drift check. Engine untouched.
+- PANEL: SHADOW OFF, "No validation started", paired rounds **0** — all 8 live Shadow A/B metrics unavailable for the 20th pass. Two-state tracking continues.
+- LIVE PROFILE: n=**309** (+18: #292-#309). Keys stable; shadowLedger ABSENT; expFlag null; no relaunch — persistence holds through the post-stall surge. Latest #309 at 05:17:17 (26.5s fresh).
+- LOADCRITICAL: **2/load, 7th consecutive pass** (107→113), byte-identical signature. Stable-persistent.
+- FEED: post-stall aftershock check NEGATIVE — new-window avg 49.1s, max 92s, **no gaps >100s**. The stall did not echo. Latest era census: …, 126, 148, 1823.
+- **BLOCK: 14/18 = 77.8% — second consecutive elite block post-stall** (73.3% → 77.8%). The recovery is not a blip; the era's strongest two-block stretch.
+- **'1' RUN BREAKS THE ERA RECORD: 18 consecutive '1' hits** (#278→#306, was 10 at pass 112; old era max was the 16-run of #207-#238). Window contribution: 8-of-8 '1' outcomes all hits (#292-#295 four straight with top='2' — set membership; #299 EXACT; #303/#305/#306). Census 97/123 = **78.9%** — second consecutive era-high (77.4 → 78.9). Run frozen at 18 pending next '1' (none in #307-#309). Miss indices stay 26 (last #277).
+- **'10' RUN EXTENDS TO 10**: #300/#308 M — ten consecutive (#177→#308), 124+ rounds since last hit (#164). Census 7/22 = **31.8%** — collapse deepens; weakest numeric by ~5pp over '5' (36.7%).
+- **COIN FLIP STREAK EXTENDS TO 11**: #297 M — the occurrence watch resolved immediately (first post-stall bonus was the streak's 11th). Census 4/19 = 21.1%. Quiet 12 rounds since.
+- CENSUS (n=309): baseline 198/309 = **64.1% — LIVE-ERA HIGH** (prior band 62.7-63.3); normals 175/255 = 68.6%; bonus 23/54 = 42.6% (CASH HUNT revival: #298 H set-membership, **#302 H EXACT top-pick conf 49** — first bonus exact match since PACHINKO #253); theo 255/309 = **82.5% — locked on the archived terminal value for the 2nd pass**. RECAL 107/309 = 34.6% (4 in-window: 298/301/302/309).
+- SECOND-200 WINDOW: (203-309) 71/107 = **66.4% vs first-200 63.0% (+3.4pp)** — largest margin of the post-106 era; the two elite blocks flipped the whipsaw decisively positive (62.2% → 64.0% → 66.4% over three passes).
+- OTHER SEGMENTS: '2' 60/80 = 75.0% (#296 EXACT; #304/#307/#309 H — #307 conf 74 hit, era-high-confidence conversion); CASH HUNT 9/15 = 60.0%; '5' 11/30 = 36.7% (#301 M, quiet 8). Droughts: PACHINKO 56 (since #253), CRAZY TIME **106** (since #203 — deepening era-record segment drought), COIN FLIP 12, '5' 8.
+- ZERO-ACTION COMPLIANCE: read-only probes only; no state modified, no engine touched, no shadow toggle. Evidence: scripts/data/pass113_history.json, pass113_errors.json, pass113_keys.json. Degraded set: EMPTY.
+
+Metrics (live profile): paired rounds 0 — all 8 fields unavailable; archived standing values (pass 93 final) remain the terminal record of the wiped session.
+
+Stage Summary:
+- Pass 113 is the record pass: the '1' segment broke the era's longest numeric hit-run (18, old 16) and posted its second consecutive census high (78.9%), the baseline reached its live-era high (64.1%), the second-200 window posted its widest positive margin (+3.4pp), and the post-stall environment stayed perfectly clean (no aftershock gaps, persistence intact, loadCritical frozen at 2/load). Meanwhile the weak tiers extended their own records in mirror image: '10' to a 10-miss run (31.8%), COIN FLIP to an 11-miss streak (21.1%) — the era's stratification ('1'/'2' vs '5'/'10' vs COIN FLIP) has never been sharper.
+- Two-state tracking: ARCHIVE terminal record unchanged (git chain … → 123e923 → 387296d, zero src/ drift); LIVE PROFILE 309 rounds, shadow OFF.
+- Next pass: loadCritical 2/load (8th?); persistence (>309); '1' 18-run (does the next '1' extend the record further — 19?); '10' 10-run (11th?); COIN FLIP 11-streak (12th?); CASH HUNT revival continuation (60.0% — two-hit window follow-up); CRAZY TIME drought (106+); PACHINKO (56+); '5' next occurrence; second-200 window (+3.4pp — hold or whipsaw back); baseline 64.1% era-high durability; feed stability. Degraded set: EMPTY. Protocol continues. Engine untouched.
