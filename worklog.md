@@ -6167,3 +6167,31 @@ Stage Summary:
 - COIN FLIP's 9-miss drought is the era's most one-sided active segment story (4/17 with zero consecutive-occurrence misses — pure isolation); CASH HUNT's post-unfreeze 2-hit run and the '2' tail cluster are the positive counterpart.
 - Two-state tracking: ARCHIVE terminal record unchanged (git chain … → 94f2fe0 → 6298955, zero src/ drift); LIVE PROFILE 248 rounds, shadow OFF.
 - Next pass: loadCritical 2/load persistence (grow/revert check — standing primary); persistence 15th pass (>248); feed stability; '2' cluster continuation (6-of-7 tail — run-length watch); COIN FLIP drought (9 misses — 10th? occurrence-starved); '10' 4-miss run continuation; '5' episodic (40.7%); second-200 window tracking (65.2% vs first-200 63.0%); recal band; loadCritical count check. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 154 (cron monitor — Job ID 369099, pass 109 — PACHINKO BACK-TO-BACK HITS: #252 H (top='2') + #253 H (top='PACHINKO', EXACT match) — the era's first consecutive PACHINKO outcomes, BOTH converted; census leaps 22.2% → 4/11 = 36.4%, the "weakest bonus" label eroding (trajectory 0/4 → 1/7 → 2/9 → 4/11); '10' DECAYS TO WEAKEST NUMERIC: 6 straight misses, census 7/19 = 36.8% overtaking '5' (37.9%); '5' pair #258/#259 (first consecutive-'5' misses since the #127-#130 mini-run); loadCritical 2/load HOLDS (third consecutive pass, stable); COIN FLIP occurrence-starved (no occurrence since #229, drought frozen at 9 misses); block 249-268 = 12/20 = 60.0% mid-range; second-200 window 42/66 = 63.6% (margin over first-200 narrowing to +0.6pp); new minor gap 148s (#251→#252); profile persists 15th pass (248 → 268 rows); shadow stays OFF; engine untouched)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 109, 04:17 +08). Engine integrity re-verified: src/ diff vs baseline 9ec8c87 = 0 lines; HEAD ec97cfb = pass 108's cron artifact.
+
+Work Log:
+- loadCritical COUNT: 2/load — HOLDS at the doubled state for the third consecutive pass (107/108/109), single unchanged signature; stable, no growth, no revert. Standing primary watch continues.
+- PROFILE PERSISTENCE: CONFIRMED 15TH CONSECUTIVE PASS — roundHistory 248 → 268 rows (+20 at ~43s cadence), same key set, no relaunch. Last round age 21s.
+- SHADOW STATE: revo_shadowLedger ABSENT, revo_expFlag null — no owner action. Panel verbatim unchanged (SHADOW OFF, "No validation started", 0 paired rounds). Replay counter 268 = n exact.
+- LIVE METRICS: all 8 requested fields UNAVAILABLE live (0 paired rounds). ARCHIVED standing record unchanged: n=200, base 60.5%, exp 61.0%, Δ+1, M2H 1/H2M 0, theo 82.5%, streak 182, verified 20v6 p=0.009.
+- PACHINKO BACK-TO-BACK HITS (SEGMENT EVENT): #252 HIT (top was '2', PACHINKO covered in the list) then #253 HIT with top='PACHINKO' — an EXACT top-pick match at conf 57, the segment's first. First consecutive PACHINKO outcomes of the era, both converted. Census 2/9 = 22.2% → 4/11 = 36.4%. Full trajectory: 0/4 (pass 102) → 1/7 (pass 103) → 2/9 (pass 107) → 4/11 (this pass). The "era-weakest bonus" label is eroding — the segment's two hits-per-four-occurrences recent window (3 of last 4: #211 H, #252 H, #253 H around #199 M) rivals mid-tier bonuses. COIN FLIP (4/17) inherits weakest-bonus outright.
+- '10' DECAYS TO WEAKEST NUMERIC: #250/#267 misses extend the run to SIX consecutive '10' misses (#231/#235/#250/#267 + the prior pair); census 7/19 = 36.8% — now BELOW '5' (37.9%), the first numeric-crown change of the era. '5' added its own pair #258/#259 (first consecutive-'5' misses since the #127-#130 mini-run) before going quiet. The two weakest numerics both sit in the 36-38% band; '1' (76.5%) and '2' (74.3%) hold the crown.
+- '1' TEXTURE: #249/#254 sandwich-style misses (hits between, no cluster); census 78/102 = 76.5% (stable); 24 miss indices.
+- COIN FLIP: NO occurrence since #229 — 39 rounds without the outcome; drought frozen at 9 misses, occurrence-starved rather than extending.
+- BLOCK/WINDOW: block 249-268 = 12/20 = 60.0% (mid-range after the 72.0% block). Second-200 window (203-268): 42/66 = 63.6% — margin over first-200 (63.0%) narrowed to +0.6pp; the window's early 72-76% blocks diluted by the mid-60s stretch.
+- OVERALL (n=268): baseline 169/268 = 63.1%; normals 148/220 = 67.3%; bonus 21/48 = 43.8% (PACHINKO pair lifted it); theo[1,2,5,10] frequency 220/268 = 82.1%.
+- RECAL: 95/268 = 35.4% — steady band, scattered singles.
+- FEED: one new minor gap 148s (#251→#252) — the first >100s gap since #22's recovery; still 7× below the stall class. New-window avg 43.3s. Gap census: …, 1047, 1136, 126, 148. Disruption ledger: 22 confirmed / 0 candidates.
+- ZERO-ACTION COMPLIANCE: no state modified, no engine touched, no shadow toggle. Evidence screenshot saved (scripts/data/pass109_fresh_profile.png); full-history dump scripts/data/pass109_history.json. Degraded set: EMPTY.
+
+Metrics (live profile): paired rounds 0 — all 8 fields unavailable; archived standing values (pass 93 final) remain the terminal record of the wiped session; milestone like-for-like (live first-200 vs archived 200) recorded at pass 106 as observational context only.
+
+Stage Summary:
+- Pass 109's story is segment re-ranking: PACHINKO — the pass-102 "perfect-miss" segment — landed back-to-back conversions including its first exact top-pick match, while '10' quietly decayed to the era's weakest numeric on a 6-miss run. The bonus hierarchy the era started with (CRAZY TIME strong, PACHINKO zero) has substantially rearranged within 268 rounds, and the numeric hierarchy now has a clear two-tier structure ('1'/'2' at 74-77% vs '5'/'10' at 37-38%).
+- Environment steady: loadCritical holds at 2/load (stable, symptom-free), feed added one 148s minor gap, no stall-class events.
+- Two-state tracking: ARCHIVE terminal record unchanged (git chain … → 6298955 → ec97cfb, zero src/ drift); LIVE PROFILE 268 rounds, shadow OFF.
+- Next pass: loadCritical 2/load check (fourth pass?); persistence 16th pass (>268); PACHINKO continuation (does the 2-hit run extend — segment-regime watch); '10' 6-miss run (7th? — weakest-numeric decay watch); '5' pair follow-up; COIN FLIP occurrence watch (drought at 39+ rounds); second-200 window tracking; feed minor-gap census; recal band. Degraded set: EMPTY. Protocol continues. Engine untouched.
