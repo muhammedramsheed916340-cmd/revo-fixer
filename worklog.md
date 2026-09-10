@@ -5943,3 +5943,28 @@ Stage Summary:
 - Pass 100 delivers the era's richest texture day: the third and densest '1'-exclusion episode (with the first consecutive-triple), a 10-round full-spectrum cold patch with clean 4-round recovery, and the CASH HUNT 5th conversion. The episodic-exclusion phenomenon is now at three independent instances — it is the cold-start engine's defining trait, exactly mirroring the archived session's character. The high block-to-block variance (38.9% → 75.0% across adjacent 18-20 round blocks) is the same texture the archived era showed around its own cold patches.
 - Milestone: this is monitoring pass 100. Session state: archived 200-round record terminal and intact; live post-reset profile at 123 rounds with shadow OFF; zero engine drift across all 100 passes; disruption ledger 20/0; the observation-only protocol has held throughout.
 - Next pass: persistence 7th pass (>123); '1'-episode #3 closure watch (did #120/#122 end it, or does the cluster re-form — ep1 and ep2 both had post-cluster isolated misses); cold-patch follow-up (does the 4-hit recovery hold — block variance normalization?); CASH HUNT 6th-hit watch; loadCritical count check. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 146 (cron monitor — Job ID 369099, pass 101 — EPISODE #3 CLOSED with the canonical isolated post-miss (#131, mirroring ep1's #24 / ep2's #39), followed by conversion runs incl. 4-straight '1' hits (#138-#141); census recovers 34→42/55 = 76.4%; cold-patch recovery HELD (block 124-142 at 57.9%, no re-formation); #142 CRAZY TIME HIT (rare-segment census 7/5 = 71.4%); mini '5'-run #127/#129/#130 noted; loadCritical stable 1/load; profile persists 7th pass (123 → 142 rows); shadow stays OFF; engine untouched)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 101, 02:17 +08). Engine integrity re-verified: src/ diff vs baseline 9ec8c87 = 0 lines; HEAD 64553ca = pass 100's cron artifact.
+
+Work Log:
+- loadCritical COUNT: 1/load — stable, standing known-defect unchanged, no escalation.
+- PROFILE PERSISTENCE: CONFIRMED 7TH CONSECUTIVE PASS — roundHistory 123 → 142 rows (~38s cadence), same key set, no relaunch. Latest age 52s at probe (above-average inter-round gap, within normal variance).
+- SHADOW STATE: revo_shadowLedger ABSENT, revo_expFlag null — no owner action. Panel verbatim unchanged (OFF, no metrics, 0 paired rounds). Replay counter 142 = n exact.
+- LIVE METRICS: all 8 requested fields UNAVAILABLE live (0 paired rounds). ARCHIVED standing record unchanged: n=200, base 60.5%, exp 61.0%, Δ+1, M2H 1/H2M 0, theo 82.5%, streak 182, verified 20v6 p=0.009.
+- EPISODE #3 CLOSED (closure watch resolved): one post-cluster isolated '1'-miss (#131) — exactly the pattern ep1 (#24 after #19/#20) and ep2 (#39 after #49/#51/#52) showed — then #132/#133 hits, #136 hit, and FOUR consecutive '1'-hits (#138-#141). Census 42/55 = 76.4% (recovered from 73.9%). The full episode anatomy is now: cluster → isolated post-miss → conversion run, consistent across ALL THREE episodes. This is the era's most well-replicated engine signature.
+- COLD-PATCH RECOVERY HELD: no re-formation of a miss patch; block 124-142 went 11/19 = 57.9% — modest, carried by a mini '5'-exclusion run (#127/#129/#130, 3 misses in 4 '5'-rounds) plus bonus misses (#128 PACHINKO, #135 COIN FLIP). The '5' run mirrors the episodic numeric-exclusion family ('1' ep1-3, '2' runs) now extended to a third outcome value.
+- RARE-SEGMENT CONVERSION CONTINUES: #142 CRAZY TIME HIT — census 7/5 = 71.4% (5 hits across 7 occurrences, both clustered-era and post-cluster). Baseline rare-bonus absorption remains a defining cold-start trait. CASH HUNT: no new occurrence (census stays 8/5); 6th-hit watch continues.
+- OVERALL (n=142): baseline 91/142 = 64.1%; normals 77/113 = 68.1%; bonus 14/29 = 48.3%.
+- FEED LIVENESS: max gap 215s (unchanged all-era), avg 43s. Disruption ledger: 20 confirmed / 0 candidates.
+- ZERO-ACTION COMPLIANCE: no state modified, no engine touched, no shadow toggle. Evidence screenshot saved (scripts/data/pass101_fresh_profile.png). Degraded set: EMPTY.
+
+Metrics (live profile): paired rounds 0 — all 8 fields unavailable; archived standing values (pass 93 final) remain the terminal record of the wiped session.
+
+Stage Summary:
+- The three-episode anatomy (cluster → isolated post-miss → conversion run) is now the best-characterized engine trait of either session, replicated identically across ep1/ep2/ep3 and extended by the '5' mini-run to a third outcome value. The cold-start baseline continues to mirror the archived session's exclusions while EXCEEDING its bonus handling (CRAZY TIME 5/7, CASH HUNT 5/8, aggregate 48.3% bonus vs the archived window's marked bonus weakness).
+- Accumulation: 142 rounds — 58 short of a 200-round window equivalent; ETA ≈ 02:55-03:00 +08 at current cadence. Shadow remains OFF (owner decision pending); the profile keeps accumulating regardless.
+- Two-state tracking: ARCHIVE terminal record unchanged (git chain … → 93be4f0 → 64553ca, zero src/ drift); LIVE PROFILE 142 rounds, shadow OFF.
+- Next pass: persistence 8th pass (>142); '5'-run follow-up (does the mini-run close like the '2' runs did?); CRAZY TIME continuation; CASH HUNT 6th-hit watch; '1'-episode #4 open watch (irregular spacing, no model); loadCritical count check. Degraded set: EMPTY. Protocol continues. Engine untouched.
