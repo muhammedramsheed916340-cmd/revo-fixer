@@ -6026,3 +6026,33 @@ Stage Summary:
 - Accumulation: 161 rounds — 39 short of a 200-round window equivalent; ETA ≈ 03:15-03:20 +08 at healthy cadence (stall pushed it back ~17 min). Shadow remains OFF (owner decision pending).
 - Two-state tracking: ARCHIVE terminal record unchanged (git chain … → f5eb3a82 → b0f94d0, zero src/ drift); LIVE PROFILE 161 rounds, shadow OFF.
 - Next pass: persistence 10th pass (>161); feed post-stall stability (secondary stalls? cadence re-baseline ex-#21); PACHINKO triple-occurrence watch (#160/#161 consecutive — 3rd in a row?); '1'-episode #4 (does #151 stay isolated?); '5' episodic continuation (7/18); top-pick '10'-bias persistence; CASH HUNT 6th-hit watch; CRAZY TIME occurrence watch (6/8); block-variance normalization (46.2%); loadCritical count check. Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+Task ID: 149 (cron monitor — Job ID 369099, pass 104 — FULL BLOCK REVERSION: block 162-186 = 19/25 = 76.0% (33.3% → 46.2% → 76.0% cycle complete), 8-hit run #179-#186 with era-high confidence 68-69 '1'-tops all hitting; EPISODE #4 RESOLVED with canonical anatomy (#151 isolated → #163 isolated → #168/#169 pair → conversion run; census holds 75.4%); feed post-stall CLEAN (new-window avg 35.9s max 66s, zero secondary stalls — disruption #21 stands alone); top-pick '10'-bias did NOT persist (slot rotates); +25 rounds = era's largest pass delta (post-stall catch-up); loadCritical stable 1/load; profile persists 10th pass (161 → 186 rows); shadow stays OFF; engine untouched)
+Agent: Z.ai Code (monitoring run, observation-only)
+Task: Monitor live Shadow A/B validation (pass 104, 03:02 +08). Engine integrity re-verified: src/ diff vs baseline 9ec8c87 = 0 lines; HEAD a2be1b4 = pass 103's cron artifact.
+
+Work Log:
+- loadCritical COUNT: 1/load — stable, standing known-defect unchanged, no escalation.
+- PROFILE PERSISTENCE: CONFIRMED 10TH CONSECUTIVE PASS — roundHistory 161 → 186 rows (+25, the era's LARGEST single-pass delta — post-stall catch-up burst at ~36s/round), same key set, no relaunch. First new round #162 at 02:47:58 (8s after #161), last #186 at 03:02:19.
+- SHADOW STATE: revo_shadowLedger ABSENT, revo_expFlag null — no owner action. Panel verbatim unchanged (SHADOW OFF, "No validation started", 0 paired rounds). Replay counter 186 = n exact.
+- LIVE METRICS: all 8 requested fields UNAVAILABLE live (0 paired rounds). ARCHIVED standing record unchanged: n=200, base 60.5%, exp 61.0%, Δ+1, M2H 1/H2M 0, theo 82.5%, streak 182, verified 20v6 p=0.009.
+- FEED POST-STALL STABILITY: CONFIRMED CLEAN — new-window avg 35.9s, max 66s, ZERO secondary stalls, no gaps >100s. All-era max remains the lone 1047s (disruption #21). Disruption ledger: 21 confirmed / 0 candidates. The stall was a one-off; era cadence now re-baselines at ~36-44s ex-stall.
+- BLOCK-VARIANCE CYCLE COMPLETE: block 162-186 = 19/25 = 76.0% — the full reversion arc 33.3% (143-148) → 46.2% (149-161) → 76.0% (162-186) mirrors the era's earlier 75.0% block (86-105). The cold patch fully resolved; the current block is the era's joint-strongest.
+- 8-HIT RUN #179-#186: after #177/#178 consecutive '10' misses, eight straight hits — including #180-#185 six consecutive '1'-outcomes all converting, on era-high confidence (68-69) '1'-top picks #184-#186 (all hit). tail-30 ends HHHHHHHH.
+- EPISODE #4 RESOLVED (canonical anatomy, 4th replication): #151 isolated → #163 isolated → #168/#169 CONSECUTIVE PAIR (matching ep1's #19/#20 two-miss peak) → conversion run #170-#185 with only #171 COIN FLIP intervening. '1' census 52/69 = 75.4% — HELD steady through the episode, the conversion run fully compensating the cluster. The four-episode replication (isolated → pair/cluster → conversion run) is now the era's most robust signature.
+- '5' CLOSED: #162 '5' HIT closed the #159 isolation immediately; no further '5' occurrence (last_idx=162). Census 8/19 = 42.1%.
+- TOP-PICK DRIFT DID NOT PERSIST: top='10' only 8/34 since #153; the slot cycled CASH HUNT (#164-#167) → CRAZY TIME (#170-#172, #178-#179) → COIN FLIP (#175-#177, #180-#183) → '1' (#184-#186). The pass-103 drift was transient rotation, not a regime change. Noted, closed.
+- RARE SEGMENTS: no new PACHINKO (1/7), CASH HUNT (5/9), CRAZY TIME (6/8) occurrences — all three censuses frozen this pass. COIN FLIP: #171 MISS — census 4/13 = 30.8% (isolated-miss pattern intact: #112/#124/#135/#148/#171).
+- OVERALL (n=186): baseline 118/186 = 63.4% (up from 61.5%); normals 102/149 = 68.5%; bonus 16/37 = 43.2%. '2' census 35/47 = 74.5% (11 straight hits after #153 M); '10' 7/14 = 50.0%.
+- RECAL FLAG: 65/186 = 34.9% — rate stable.
+- FEED LIVENESS: max gap 1047s (disruption #21, unchanged), all-era avg 47.7s (diluting toward healthy as clean rounds accumulate).
+- ZERO-ACTION COMPLIANCE: no state modified, no engine touched, no shadow toggle. Evidence screenshot saved (scripts/data/pass104_fresh_profile.png); full-history dump scripts/data/pass104_history.json. Degraded set: EMPTY.
+
+Metrics (live profile): paired rounds 0 — all 8 fields unavailable; archived standing values (pass 93 final) remain the terminal record of the wiped session.
+
+Stage Summary:
+- Pass 104 is the era's cleanest recovery pass: the block-variance cycle completed exactly as watched (76.0% reversion), the feed proved the stall was a one-off, episode #4 replicated the canonical anatomy a fourth time, and the profile absorbed its largest accumulation burst (+25) without a single secondary anomaly. The engine's cold-start texture — episodic numeric exclusions, bimodal bonus handling, high block variance with strong reversion — is now thoroughly characterized across 186 rounds.
+- Milestone: 14 rounds short of the 200-round window equivalent; at current cadence ETA ≈ 03:10-03:12 +08 — the NEXT pass will cross it. When crossed, the live profile becomes a like-for-like sample against the archived 200-round terminal record (as separate datasets, never pooled).
+- Two-state tracking: ARCHIVE terminal record unchanged (git chain … → b0f94d0 → a2be1b4, zero src/ drift); LIVE PROFILE 186 rounds, shadow OFF.
+- Next pass: 200-ROUND MILESTONE watch (ETA this pass); persistence 11th pass (>186); does the 8-hit run extend or break (era-run-length record watch: prior best was the archived era's 182-round streak context, live-era best 8); PACHINKO/CASH HUNT/CRAZY TIME occurrence watch (all frozen — next occurrence texture); '1' post-conversion-run watch (does a new exclusion form after the run, per episode anatomy?); COIN FLIP isolated-miss continuation (30.8%); block 162-186 successor texture (76.0% → ?); loadCritical count check. Degraded set: EMPTY. Protocol continues. Engine untouched.
