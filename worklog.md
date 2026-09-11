@@ -7681,3 +7681,30 @@ Stage Summary:
 - Environment: no closed minor this pass (43 stands); errors 10/7/3 held; persistence keys intact; browser reused.
 - Two-state tracking: ARCHIVE terminal record unchanged (git chain … → f31276f, zero src/ drift); LIVE PROFILE 1,145 rounds, shadow OFF.
 - Next pass: **★★ STALL #11 AGE-TRACKING (open gap 722s at re-probe — closes under 1,237s = outside top-8? or climbs toward 1,607/2,456/2,635? every tick re-measures) ★★**; **75 ×4 → retest/break (76+ = all-time era-hour record)**; **'1' run (1124,12) → 13+ (joint-12th all-time; 30-record the horizon)**; **80-LINE (79.9% — 3 straight '1'-hits cross exactly)**; **'2' H-run 5 → 6+ (77.5%)**; exact cadence (229 @ 20.0% — stays on the line?); '5' (M-run 2 → revival re-attempt? 30.9%); CRAZY TIME (quiet 28+ — floor 50.0%?); COIN FLIP (2nd fixation arc? quiet 35+); PACHINKO (signals-top validation @58 tie? 26.2%); CASH HUNT (quiet 51+); bonus (39.6%); recal (33.2%); window (71.4% → 6th straight above-baseline?); tail-30 (73.3%); second-200 (+1.8pp); feed (44th minor when the stall closes?); persistence (>1145); error layer (16th frozen load?). Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+## Pass 171 (Task ID 216) — 2026-09-11 19:47 +08 — cron read-only monitoring
+- Trigger: Job ID 369099, 15-min cadence, 19:47:42 signal. Trace: cron-agent-loop-202609111947. Worklog precheck: 7,683 lines, pass 170 block present → proceeding as Pass 171.
+- GIT: chain … a4bff95 → f31276f → 923f108 (pass 170's cron commit present). `git diff 9ec8c87 -- src/` = **0 lines** — 77th consecutive zero-drift check. Engine untouched.
+- PANEL: SHADOW OFF ("No validation" context confirmed), paired rounds **0** — all 8 live Shadow A/B metrics unavailable for the 78th pass. Archived standing values (pass 93 final: n=200, baseline 60.5% vs experimental 61.0%, verified 20v6, p=0.009) remain the terminal record.
+- **★ STALL #11 CLOSED at 1,340.7s = ERA 7TH-LONGEST GAP (44th >100s minor) ★**: the gap (#1145→#1146, 11:24:03→11:46:24) ran ~620s past Pass 170's 722s re-probe before resolving — into the all-time top-8 (displacing 1,260s to 8th), below 1,421/1,538/1,607/1,823/2,456/2,635. Resume was near-instant: #1146→#1147 = **1s**.
+- **POST-STALL BURST: 5 ROUNDS IN 128s, 4-of-5 = 80.0% — 6TH STRAIGHT ABOVE-BASELINE**: #1146 (PACHINKO top @58 → '2' cross-pay hit — the signals-top call validated), #1147 (**'2' EXACT @63**, 1s later), #1148 ('2' @70 → '1' cross-pay hit), #1149 ('5' @70 → **CASH HUNT hit**), #1150 ('2' @75 → '1' MISS).
+- **★ RUN (1124,13) SEALED — DIED AT #1150 (@75 MISS) ★**: #1148 extended the new '1' run to 13 (sole 12th-longest era run, clear of (170,12)), then #1150's '1'-miss @75 killed it. **80-LINE MISSED AGAIN**: '1' 1-of-2 in-window → census 79.9 → **79.7% (-0.2)** (370/464).
+- **75 RE-PRINT (5th of the era-hour)**: conf ladder rebuilt 58 → 63 → 70 → 70 → **75** through the burst; ceiling stands at 75 (no 76).
+- **'2' H-RUN 7 ACTIVE**: #1146, #1147 (exact), #1148 join the five from P170's window — seven consecutive '2'-actuals all hits; census 77.5 → **77.7%**.
+- **CASH HUNT HIT** (#1149 cross-pay @70) — first since #1094; census 51.2 → **52.3% (+1.1)**, quiet 51 snapped; bonus 39.6 → 39.9% (1-of-1).
+- **EXACTS ×1** (#1147 '2' @63) — era 229 → **230** (230/1150 = **20.0% — line held**).
+- **RECAL ×0** — the 2-streak died; overall 33.2 → **33.0% (-0.2)**.
+- Census: baseline 64.5% flat; normals 69.2% flat; theo 84.1% flat; second-200 **+1.9pp**; tail-30 73.3 → **76.7% (+3.4)**.
+- SEGMENTS: PACHINKO own-actual zero (quiet 9, 26.2% frozen — the @58 top call paid via '2' cross-pay instead); CRAZY TIME zero (quiet 33, 50.0% frozen); COIN FLIP zero (quiet 40, 36.2% frozen); '5' zero (quiet 8, 30.9%, M-run 2); '10' zero (quiet 15, 39.3%, H-run 2). Signals close **'2' @60 four-way tie ('2'/'1'/PACHINKO/CRAZY TIME)**, updated 11:48:32.
+- FEED: window avg 32.0s excl stall, max 93s; no minor besides the stall itself (44 stands); rapid pairs #1146→#1147 (1s), #1149→#1150 (2s).
+- ERRORS: **10/7/3 HELD** (16th consecutive movement-free load); keys stable; browser reused; panel OFF (NoVal idx 7027).
+- ZERO-ACTION COMPLIANCE: read-only probes only; no state modified, no engine touched, no shadow toggle, no restart attempts. Evidence: scripts/data/pass171_history.json, pass171_errors.json, pass171_keys.json, pass171_sig.json, pass171_panel.txt (+ pass171_panel_raw.json); scripts/pass171_analysis.py (+ pass171_analysis_out.txt). Degraded set: EMPTY.
+
+Metrics (live profile): paired rounds 0 — all 8 fields unavailable; archived standing values (pass 93 final) remain the terminal record of the wiped session.
+
+Stage Summary:
+- Pass 171 resolved the stall question and banked the burst: stall #11 closed at 1,340.7s — era 7th-longest, the 44th minor — and the feed resumed with a 1s gap into five rounds at 80.0%, a PACHINKO-top call cashed via '2' cross-pay, a '2' exact, a CASH HUNT revival after 51 quiet rounds, and a conf ladder that climbed all the way back to 75. The cost: #1150's '1'-miss @75 sealed the (1124,13) run and pushed the 80-line crossing back again (79.7%).
+- Environment: 44th >100s minor = stall #11 itself (1,340.7s); errors 10/7/3 held; persistence keys intact; browser reused.
+- Two-state tracking: ARCHIVE terminal record unchanged (git chain … → 923f108, zero src/ drift); LIVE PROFILE 1,150 rounds, shadow OFF.
+- Next pass: **★ '2' H-RUN 7 → 8+ (77.7% — longest '2' arc of the era-hour?)**; **80-LINE (79.7% — 4 straight '1'-hits now required)**; **75 ×5 → 76+ break watch (all-time era-hour record)**; exact cadence (230 @ 20.0% — holds?); CASH HUNT follow-through (52.3%, last two appearances both hits); '1' run rebuild (post-(1124,13)); '5' (M-run 2 → 3+? 30.9%); '10' (quiet 15+); CRAZY TIME (quiet 33+); COIN FLIP (quiet 40+ — 2nd fixation arc?); PACHINKO (quiet 9+ — next top-arc?); bonus (39.9%); recal (33.0% — new streak?); window (80.0% → 7th straight above-baseline?); tail-30 (76.7%); second-200 (+1.9pp); feed (45th minor?); persistence (>1150); error layer (17th frozen load?). Degraded set: EMPTY. Protocol continues. Engine untouched.

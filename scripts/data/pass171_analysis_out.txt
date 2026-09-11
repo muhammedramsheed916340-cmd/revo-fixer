@@ -1,0 +1,55 @@
+TOTAL n=1150 (pass170 ended 1145; persistence OK +5)
+PANEL: OFF=True, NoVal idx=7027
+latest #1150 at 11:48:32 (76s fresh)
+
+== NEW ROUNDS #1146-#1150 ==
+#1146 11:46:24 top=PACHINKO   conf= 58 actual=2          hit=True   
+#1147 11:46:25 top=2          conf= 63 actual=2          hit=True  EXACT-top 
+#1148 11:46:57 top=2          conf= 70 actual=1          hit=True   
+#1149 11:48:30 top=5          conf= 70 actual=CASH HUNT  hit=True   
+#1150 11:48:32 top=2          conf= 75 actual=1          hit=False  
+
+STALL-CLASS GAP CLOSED: 1340.7s (# 1145->1146) — era #7 closed gap
+era >100s count: 44 (was 43; 44TH MINOR = the stall itself), top-8: [(2635, '#1029->#1030'), (2456, '#641->#642'), (1823, '#276->#277'), (1607, '#580->#581'), (1538, '#672->#673'), (1421, '#841->#842'), (1341, '#1145->#1146'), (1260, '#974->#975')]
+FEED window (excl stall): avg 32.0s, max 93s; minors>100s excl stall: 0
+post-stall burst: 5 rounds; first gap after stall close: 1s (# 1146->1147)
+
+CENSUS n=1150: baseline 742/1150 = 64.5% | normals 669/967 = 69.2% | bonus 73/183 = 39.9% | theo 967/1150 = 84.1% | recal 380/1150 = 33.0%
+second-200 (203-1150): 615/948 = 64.9% vs 63.0% -> +1.9pp
+tail-30: 23/30 = 76.7%
+window rate (#1146+): 4/5 = 80.0%
+
+SEGMENTS:
+  1            370/464 =  79.7%  quiet   0  (last hit #1148)
+  2            226/291 =  77.7%  quiet   3  (last hit #1147)
+  5             38/123 =  30.9%  quiet   8  (last hit #1119)
+  10            35/ 89 =  39.3%  quiet  15  (last hit #1135)
+  COIN FLIP     25/ 69 =  36.2%  quiet  40  (last hit #1110)
+  CASH HUNT     23/ 44 =  52.3%  quiet   1  (last hit #1149)
+  PACHINKO      11/ 42 =  26.2%  quiet   9  (last hit #1041)
+  CRAZY TIME    14/ 28 =  50.0%  quiet  33  (last hit #1023)
+
+TRAILING RUNS:
+  2: H-run 7 active
+  10: H-run 2 active
+  CASH HUNT: H-run 2 active
+  5: M-run 2 active
+  CRAZY TIME: M-run 2 active
+  PACHINKO: M-run 2 active
+
+ERA '1' RUNS >=10: [(88, 10), (170, 12), (207, 16), (278, 20), (321, 18), (385, 15), (421, 15), (510, 25), (587, 21), (733, 11), (766, 22), (840, 14), (909, 28), (1051, 30), (1124, 13)]
+
+recal in-window (0): []
+'10' ERA HIT-ARCS >=6: [] (era record 10)
+exact-tops in-window (1): [(1147, '2', '2', 63)]
+conf seq #1146+: [(1146, 58), (1147, 63), (1148, 70), (1149, 70), (1150, 75)]
+era conf floor: 24 | era conf ceiling: 75
+'2' census: 226/291 = 77.7%
+'1' census: 370/464 = 79.7%
+PACHINKO census: 11/42 = 26.2%
+COIN FLIP census: 25/69 = 36.2%
+CASH HUNT in-window: [(1149, '5', True, 70)]
+
+ERRORS: total 10, loadCritical-bearing 7, uncaught-promise family 3
+KEYS: ['revo_lastSignals', 'revo_roundHistory']
+SIGNALS: updated 11:48:32, top=2 conf=60, ranks=[('2', 60), ('1', 60), ('PACHINKO', 60), ('CRAZY TIME', 60)]
