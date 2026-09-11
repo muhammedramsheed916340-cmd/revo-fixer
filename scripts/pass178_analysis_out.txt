@@ -1,0 +1,78 @@
+TOTAL n=1257 (pass177 frozen at 1237; persistence OK +20)
+PANEL: OFF=True, NoVal idx=5694
+latest #1257 at 13:32:33 UTC (131s fresh at analysis)
+
+== NEW ROUNDS #1238-#1257 ==
+#1238 13:21:09 top=2          conf= 75 actual=1          hit=True   
+#1239 13:21:12 top=1          conf= 75 actual=1          hit=True  EXACT-top 
+#1240 13:21:37 top=1          conf= 75 actual=1          hit=True  EXACT-top 
+#1241 13:22:18 top=1          conf= 75 actual=1          hit=True  EXACT-top 
+#1242 13:23:00 top=1          conf= 75 actual=5          hit=False  
+#1243 13:23:45 top=1          conf= 60 actual=5          hit=False  RECAL
+#1244 13:23:55 top=1          conf= 56 actual=5          hit=False  RECAL
+#1245 13:24:30 top=1          conf= 45 actual=1          hit=True  EXACT-top RECAL
+#1246 13:25:10 top=1          conf= 53 actual=5          hit=False  
+#1247 13:25:48 top=1          conf= 38 actual=5          hit=True   RECAL
+#1248 13:26:31 top=1          conf= 53 actual=1          hit=True  EXACT-top 
+#1249 13:27:15 top=5          conf= 59 actual=1          hit=True   
+#1250 13:27:55 top=5          conf= 63 actual=1          hit=True   
+#1251 13:28:40 top=5          conf= 63 actual=2          hit=False  
+#1252 13:29:24 top=5          conf= 55 actual=2          hit=False  RECAL
+#1253 13:30:22 top=1          conf= 56 actual=COIN FLIP  hit=False  RECAL
+#1254 13:31:12 top=1          conf= 50 actual=1          hit=True  EXACT-top RECAL
+#1255 13:31:52 top=1          conf= 58 actual=10         hit=False  
+#1256 13:32:28 top=1          conf= 43 actual=2          hit=True   RECAL
+#1257 13:32:33 top=1          conf= 58 actual=2          hit=True   
+
+STALL #13 CLOSED: 1257.8s (#1237->#1238, landed 13:21:09 UTC / 21:21:09 local) — era #9, outside top-8
+  missed #8 by 2.2s (needed >1,260); displaced 1,237 from #9
+era >100s count: 49 (was 48; 49TH+ MINOR), top-10: [(2635, '#1029->#1030'), (2456, '#641->#642'), (1823, '#276->#277'), (1607, '#580->#581'), (1538, '#672->#673'), (1421, '#841->#842'), (1341, '#1145->#1146'), (1260, '#974->#975'), (1258, '#1237->#1238'), (1237, '#795->#796')]
+FEED window (excl stall): avg 36.0s, max 58s; minors>100s in-window excl stall: 0
+OPEN GAP at analysis: 131s (#1257 -> pending)
+
+CENSUS n=1257: baseline 814/1257 = 64.8% | normals 729/1056 = 69.0% | bonus 85/201 = 42.3% | theo 1056/1257 = 84.0% | recal 415/1257 = 33.0%
+second-200 (203-1257): 687/1055 = 65.1% vs 63.0% -> +2.1pp
+tail-30: 22/30 = 73.3%
+window rate (#1238+): 12/20 = 60.0% (baseline 64.8%)
+
+SEGMENTS:
+  1            402/504 =  79.8%  quiet   3  (last hit #1254)
+  2            247/319 =  77.4%  quiet   0  (last hit #1257)
+  5             42/136 =  30.9%  quiet  10  (last hit #1247)
+  10            38/ 97 =  39.2%  quiet   2  (last hit #1237)
+  COIN FLIP     26/ 74 =  35.1%  quiet   4  (last hit #1153)
+  CASH HUNT     29/ 51 =  56.9%  quiet  38  (last hit #1219)
+  PACHINKO      11/ 43 =  25.6%  quiet  56  (last hit #1041)
+  CRAZY TIME    19/ 33 =  57.6%  quiet  48  (last hit #1209)
+
+TRAILING RUNS:
+  1: H-run 15 active
+  2: H-run 2 active
+  CASH HUNT: H-run 4 active
+  COIN FLIP: M-run 3 active
+  CRAZY TIME: H-run 5 active
+  PACHINKO: M-run 3 active
+
+TRAILING TOP-ARCS:
+  1: top-arc 5
+
+ERA '1' RUNS >=10: [(88, 10), (170, 12), (207, 16), (278, 20), (321, 18), (385, 15), (421, 15), (510, 25), (587, 21), (733, 11), (766, 22), (840, 14), (909, 28), (1051, 30), (1124, 13), (1181, 15), (1222, 15)]
+ERA '2' RUNS >=8: [(48, 14), (154, 14), (240, 9), (290, 13), (514, 8), (562, 8), (659, 11), (696, 9), (723, 12), (825, 12), (868, 11), (921, 22), (1078, 8), (1136, 8), (1171, 9)] (1171,9) next target; all-time (921,22)
+
+recal in-window (8): [1243, 1244, 1245, 1247, 1252, 1253, 1254, 1256]
+exact-tops in-window (6): [(1239, '1', '1', 75), (1240, '1', '1', 75), (1241, '1', '1', 75), (1245, '1', '1', 45), (1248, '1', '1', 53), (1254, '1', '1', 50)]
+ERA EXACTS: 252/1257 = 20.0% (was 246 @ 19.9%)
+conf seq #1238+: [(1238, 75), (1239, 75), (1240, 75), (1241, 75), (1242, 75), (1243, 60), (1244, 56), (1245, 45), (1246, 53), (1247, 38), (1248, 53), (1249, 59), (1250, 63), (1251, 63), (1252, 55), (1253, 56), (1254, 50), (1255, 58), (1256, 43), (1257, 58)]
+era conf floor: 24 | era conf ceiling: 75 | @75 prints: 23 | >=76 prints: 0
+2 in-window: [(1251, '5', False, 63), (1252, '5', False, 55), (1256, '1', True, 43), (1257, '1', True, 58)]
+1 in-window: [(1238, '2', True, 75), (1239, '1', True, 75), (1240, '1', True, 75), (1241, '1', True, 75), (1245, '1', True, 45), (1248, '1', True, 53), (1249, '5', True, 59), (1250, '5', True, 63), (1254, '1', True, 50)]
+10 in-window: [(1255, '1', False, 58)]
+5 in-window: [(1242, '1', False, 75), (1243, '1', False, 60), (1244, '1', False, 56), (1246, '1', False, 53), (1247, '1', True, 38)]
+COIN FLIP in-window: [(1253, '1', False, 56)]
+
+ERRORS: total 12, loadCritical-bearing 8, uncaught-promise family 4
+ERROR DIFF vs pass177: +1 -0
+  NEW: SyntaxError: Failed to execute 'json' on 'Response': Unexpected end of JSON input
+    at RevoApp.useEffect.loadCritical (http://localhost:3000/_next/static/chun
+KEYS: ["revo_lastSignals","revo_roundHistory"]
+SIGNALS: updated 13:32:33 UTC, top=1 conf=64, ranks=[('1', 64), ('2', 64), ('CRAZY TIME', 64), ('10', 64)]
