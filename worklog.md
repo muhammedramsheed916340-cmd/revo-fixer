@@ -7708,3 +7708,30 @@ Stage Summary:
 - Environment: 44th >100s minor = stall #11 itself (1,340.7s); errors 10/7/3 held; persistence keys intact; browser reused.
 - Two-state tracking: ARCHIVE terminal record unchanged (git chain … → 923f108, zero src/ drift); LIVE PROFILE 1,150 rounds, shadow OFF.
 - Next pass: **★ '2' H-RUN 7 → 8+ (77.7% — longest '2' arc of the era-hour?)**; **80-LINE (79.7% — 4 straight '1'-hits now required)**; **75 ×5 → 76+ break watch (all-time era-hour record)**; exact cadence (230 @ 20.0% — holds?); CASH HUNT follow-through (52.3%, last two appearances both hits); '1' run rebuild (post-(1124,13)); '5' (M-run 2 → 3+? 30.9%); '10' (quiet 15+); CRAZY TIME (quiet 33+); COIN FLIP (quiet 40+ — 2nd fixation arc?); PACHINKO (quiet 9+ — next top-arc?); bonus (39.9%); recal (33.0% — new streak?); window (80.0% → 7th straight above-baseline?); tail-30 (76.7%); second-200 (+1.9pp); feed (45th minor?); persistence (>1150); error layer (17th frozen load?). Degraded set: EMPTY. Protocol continues. Engine untouched.
+
+---
+## Pass 172 (Task ID 217) — 2026-09-11 20:02 +08 — cron read-only monitoring
+- Trigger: Job ID 369099, 15-min cadence, 20:02:43 signal. Trace: cron-agent-loop-202609112002. Worklog precheck: 7,710 lines, pass 171 block present → proceeding as Pass 172.
+- GIT: chain … f31276f → 923f108 → f7302ab (pass 171's cron commit present). `git diff 9ec8c87 -- src/` = **0 lines** — 78th consecutive zero-drift check. Engine untouched.
+- PANEL: SHADOW OFF ("No validation" context confirmed), paired rounds **0** — all 8 live Shadow A/B metrics unavailable for the 79th pass. Archived standing values (pass 93 final: n=200, baseline 60.5% vs experimental 61.0%, verified 20v6, p=0.009) remain the terminal record.
+- **'2' H-RUN 8 SEALED — CROWNED BY AN EXACT**: #1151 ('2' EXACT @60 RECAL) completed eight straight '2'-hits (#1136→#1151, the longest '2' streak recorded in this worklog) — then the segment went silent; #1163's miss closed census 77.7 → **77.5% (-0.2)**.
+- **★ BONUS INFERNO — 7-of-8 (87.5%) IN-WINDOW ★**: #1153 COIN FLIP hit, #1156/#1158/#1165/#1167 CRAZY TIME hits, #1159 + #1160 CASH HUNT hits — only #1152 missed. Census bonus 39.9 → **41.9% (+2.0)**.
+- **★ CASH HUNT OWN-TOP EXACT @59 (#1159) — FIRST TRACKED SINCE COIN FLIP #1031 (P165) ★**: 25/46 = **54.3% (+2.0)**, last four appearances all hits; #1160 added a cross-pay @63 under '10' top.
+- **★ CRAZY TIME REVIVAL — H-RUN 4 ACTIVE ★**: 4-of-4 in-window (#1156, #1158, #1165, #1167 — two under '10' top at conf 38); census 50.0 → **56.2% (+6.2)**, quiet 33 → 0.
+- **'10' TOP-FIXATION ×8 + CONF SLIDE**: the engine's top call printed '10' for 8 straight rounds (#1160-#1167) while '10' went 0-of-1 as actual (#1157 miss; census 39.3 → 38.9%); conf ladder slid 63 → 51 → 50 → 45 → **38 → 46 → 38** (window band 38-64; no 75+ print — the ×5 75-plateau untested, ceiling stands).
+- **'1' M-RUN 3 — 80-LINE DRIFTS AWAY**: 1-of-4 in-window (#1155 the only hit); census 79.7 → **79.1% (-0.6)** (371/469); the (1124,13) sequel run never formed.
+- **WINDOW 52.9% (9/17) — BELOW BASELINE, 6-STREAK ENDED**: baseline 64.5 → 64.4% (-0.1); normals 69.2 → 68.8% (-0.4); theo 84.1 → 83.6% (-0.5); second-200 +1.9 → +1.7pp; **tail-30 76.7 → 63.3% (-13.4)**.
+- **RECAL ×8 — ERA-HOUR'S HEAVIEST (47.1% density)**: #1151, #1153, #1155, #1158, #1162, #1163, #1164, #1167 — incl a 3-streak #1162-#1164; overall 33.0 → 33.2%.
+- **EXACTS ×2** (#1151 '2' @60, #1159 CASH HUNT @59) — era 230 → **232** (232/1167 = 19.9%).
+- SEGMENTS: COIN FLIP 1-of-2 (36.2 → 36.6%, quiet 14); '5' 0-of-1 — M-run 3 (30.6%); PACHINKO zero (quiet 26, 26.2% frozen); '10' quiet 10. Signals close **CRAZY TIME @53 four-way tie (CRAZY TIME/CASH HUNT/'10'/'5)**, updated 12:03:31.
+- FEED: avg 52.9s excl minors, max 123s — **45th minor (#1157→#1158, 123s) + 46th (#1164→#1165, 102s), both below top-8**; rapid pairs #1165→#1166 (2s), #1166→#1167 (6s).
+- ERRORS: **10/7/3 HELD** (17th consecutive movement-free load); keys stable; browser reused; panel OFF (NoVal idx 7083).
+- ZERO-ACTION COMPLIANCE: read-only probes only; no state modified, no engine touched, no shadow toggle, no restart attempts. Evidence: scripts/data/pass172_history.json, pass172_errors.json, pass172_keys.json, pass172_sig.json, pass172_panel.txt (+ pass172_panel_raw.json); scripts/pass172_analysis.py (+ pass172_analysis_out.txt). Degraded set: EMPTY.
+
+Metrics (live profile): paired rounds 0 — all 8 fields unavailable; archived standing values (pass 93 final) remain the terminal record of the wiped session.
+
+Stage Summary:
+- Pass 172 caught the regime flipping: the '2' machine sealed its 8-run with an exact crown and then vanished, the engine's top call fixated on '10' for eight rounds while the bonus layer caught fire (7-of-8, 87.5%) behind a CASH HUNT own-top exact and a full CRAZY TIME revival, and the conf ladder slid from 63 to 38. The '1' layer went cold (M-run 3, census 79.1%), the window printed 52.9% to end the six-pass above-baseline streak, and recal hit its era-hour-heaviest density (8-of-17).
+- Environment: 45th minor (#1157→#1158, 123s) + 46th (#1164→#1165, 102s); errors 10/7/3 held; persistence keys intact; browser reused.
+- Two-state tracking: ARCHIVE terminal record unchanged (git chain … → f7302ab, zero src/ drift); LIVE PROFILE 1,167 rounds, shadow OFF.
+- Next pass: **★ CRAZY TIME H-RUN 4 → 5+ (56.2% — era-high extension?)**; **CASH HUNT heat (54.3% — 5th straight appearance?)**; **'10' fixation ×8 → 9+ or break (38.9%; conf 38 slide → 24-floor retest?)**; **'1' M-run 3 → 4+ (79.1% — 80-line fading)**; **75 ×5 → 76+ break (untested this window)**; exact cadence (232 @ 19.9% — 20% line slip?); '2' rebuild (77.5%); '5' M-run 3 → 4+ (30.6%); COIN FLIP (36.6% — 2nd fixation?); PACHINKO (quiet 26+); bonus (41.9% — holds above 40?); recal (33.2% — new streak?); window (52.9% → below-baseline repeat?); tail-30 (63.3%); second-200 (+1.7pp); feed (47th minor?); persistence (>1167); error layer (18th frozen load?). Degraded set: EMPTY. Protocol continues. Engine untouched.
