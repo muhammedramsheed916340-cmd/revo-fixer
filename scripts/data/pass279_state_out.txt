@@ -1,0 +1,68 @@
+PANEL_CHARS=47380
+N_ROUNDS=120
+CENSUS=80/120=66.67%
+CEIL65=78 SURPLUS=2
+WINDOW_99_120=18/22=81.82%
+LIVE_MISS_RUN=0
+MAX_H_RUN=10
+MAX_M_RUN=9
+RUNS_TAIL=[('M', 2), ('H', 5), ('M', 1), ('H', 3), ('M', 1), ('H', 9)]
+WINDOW_MARKS=H M M H H H H H M H H H M H H H H H H H H H
+WINDOW_ROUND_DETAIL=[(99, '1', 'H', 54), (100, '10', 'm', 62), (101, '2', 'm', 49), (102, '5', 'H', 48), (103, '1', 'H', 57), (104, '1', 'H', 62), (105, '2', 'H', 62), (106, '2', 'H', 67), (107, 'COIN FLIP', 'm', 74), (108, '5', 'H', 59), (109, '1', 'H', 67), (110, '5', 'H', 68), (111, '10', 'm', 68), (112, '1', 'H', 55), (113, '1', 'H', 68), (114, '1', 'H', 68), (115, '1', 'H', 68), (116, '5', 'H', 68), (117, '1', 'H', 70), (118, '10', 'H', 70), (119, '5', 'H', 70), (120, '10', 'H', 70)]
+LAST5=5/5 LAST10=9/10 LAST20=17/20 LAST25=20/25 LAST50=33/50 LAST100=63/100
+RECAL_N=38
+RESCUE_ROUNDS=[11, 16, 18, 21, 27, 30, 32, 38, 42, 45, 55, 58, 60, 63, 77, 81, 89, 93, 98, 101, 107, 111] N=22
+RESCUE_99=False
+MISS_ROUNDS=[11, 16, 18, 21, 27, 30, 32, 38, 42, 44, 45, 50, 51, 52, 53, 54, 55, 57, 58, 60, 63, 69, 70, 71, 72, 73, 74, 75, 76, 77, 79, 80, 81, 89, 93, 98, 100, 101, 107, 111]
+NEW_MISSES_SINCE_P278=[100, 101, 107, 111]
+COMPOSITION={'2': 30, '5': 19, '1': 45, 'COIN FLIP': 9, '10': 10, 'CASH HUNT': 4, 'CRAZY TIME': 2, 'PACHINKO': 1}
+PACHINKO_ACTUAL_ROUNDS=[90]
+BONUS_ACTUALS_N=16 BONUS_HITS=4
+BONUS_NEW_SINCE_P278=[(107, 'COIN FLIP', 'm')]
+ONE_ACTUAL_ROUNDS=[8, 9, 14, 17, 20, 24, 25, 26, 31, 33, 34, 36, 41, 46, 51, 52, 54, 56, 61, 62, 65, 66, 67, 68, 75, 79, 80, 81, 85, 86, 88, 91, 92, 94, 96, 97, 99, 103, 104, 109, 112, 113, 114, 115, 117]
+ONE_ACTUAL_IN_WINDOW=[(99, 'H'), (103, 'H'), (104, 'H'), (109, 'H'), (112, 'H'), (113, 'H'), (114, 'H'), (115, 'H'), (117, 'H')]
+RANK1_EXACT_HITS=17
+WINDOW_RANK1_EXACTS=[(104, '1'), (113, '1'), (114, '1'), (115, '1'), (120, '10')]
+FIVE_HITS_END_AT=119
+FIVE_ACTUAL_WINDOW=[(102, 'H'), (108, 'H'), (110, 'H'), (116, 'H'), (119, 'H')]
+GAPS_N=119 AVG=40.8s MIN=1.463s MIN_AT=#66
+STALLS_GE90=[(30, 121.498), (50, 95.905), (90, 91.449)]
+NEW_WINDOW_GAPS_GE60=[(102, 79.5), (107, 60.0), (117, 80.8)]
+NEW_WINDOW_GAPS_GE45=[(102, 79.5), (105, 54.0), (107, 60.0), (108, 51.1), (111, 46.5), (115, 48.0), (117, 80.8)]
+SPAN_E3=4857.7s
+LAST_ROUND_TS=23:49:16.990
+CONF_99_120=[54, 62, 49, 48, 57, 62, 62, 67, 74, 59, 67, 68, 68, 55, 68, 68, 68, 68, 70, 70, 70, 70]
+CONF54_SETTLED=[60, 83, 99]
+CONF33_SETTLED=[78]
+CONF_MIN_SETTLED_POST_OPEN=33
+CONF_MAX_SETTLED_POST_OPEN=74
+LAST_ROUND_N=120 ACTUAL=10 HIT=True CONF=70
+LAST_PREDS=['10', '1', '5', 'CASH HUNT']
+SIGNALS_N=4
+SIGNAL: 10 conf=71 rank=1 range=[70, 88] sigs=['recent-active', 'trending-up', 'verified (weak)']
+SIGNAL: 1 conf=71 rank=2 range=[85, 95] sigs=['recent-active', 'trending-up', 'verified (weak)']
+SIGNAL: 5 conf=71 rank=3 range=[75, 90] sigs=['recent-active', 'verified (weak)', 'shift-adaptive']
+SIGNAL: CASH HUNT conf=71 rank=4 range=[65, 87] sigs=['verified (weak)', 'shift-adaptive']
+CHK_SHADOW_OFF=True
+CHK_DEBUG_EVENT=True
+CHK_DEBUG_PERF=True
+CHK_BANNER_ANY_MISS=False
+CHK_BANNER_TEXT=9× HIT STREAK
+CHK_HIT_STREAK=True
+CHK_PATTERN_SHIFT=True
+CHK_TVD_MATCH=0.84
+CHK_ARCHIVE=False
+CHK_COUNTER_1249=True
+CHK_LOCK_MODERATE=True
+CHK_LOCK_LOW=True
+CHK_RECAL_TS=
+CHK_INSUFFICIENT=
+CHK_VALIDATION_MENTION=True
+LEDGER_LAST25_REGION=LAST 25 | 85% | n=25 | LAST 50 | 66% | n
+DECISION_REGION=DECISION ENGINE | 9× HIT | READY | LAST RESULT | 10 | STATUS | HIT | CONFIDENCE | 71% | STRONG | DECISION | BET | RISK: | LOW | PREVIOUS PREDICTION → ACTUAL RESULT | 10 | 1 | 5 | C
+RCA_REGION=RCA + recalibration. Not treated as a bet signal. |  | 2 | PACHINKO | ★ | COIN FLIP | ★ | CRAZY TIME | ★ | LAST LIVE RES
+PIPELINE_REGION=PIPELINE AUDIT) | 2 events logged | Event# | Actual | Old Pred (LOCKED) | H/M | N Before | N After | New Pred | Pred# | Lock | 120 | 10 | [10,1,5,CASH HUNT] | HIT | 119 | 120 | [10,1,5,CASH HUNT] | 121 |  | 119 | 5 | [10,1,5,CASH HUNT] | HIT | 118 | 119 | [10,1,5,CASH HUNT] | 120 |  | Pipeline proof: Old prediction settled BEFORE history update. New prediction uses updated history (N+1). Prediction Y tested against r
+PERF_REGION=PERFORMANCE DEBUG — 10 | 3:49:16 PM | n=2 | SRC→APP (NOW) | 41.3s | APP→UI (NOW) | 0ms | APP→PRED (NOW) | 4ms | TOTAL→UI (NOW) | 41.3s | TOTAL→PRED (NOW) | 41.3s | EVENTS | 2 | stale:0 dup:0 | AGGREGATED LIVE STATISTICS (GENUINE NEW EVENTS ONLY, N=2) | SOURCE→APP | Avg: 22.2s | P95: 41.3s | Min: 3.0
+AI_REGION=AI ANALYSIS SUMMARY | 30 spins analyzed • Entropy 72% • Hottest: 5 • Overdue: 2 • Volatility 22/100 • Longest streak: 1 ×4 | VARIANCE & Z-SCORE ANALYS
+TOPCARD_REGION=ROUND HISTORY |  Clear | HIT | PREDICTED: | 10 | 1 | 5 | CASH HUNT | ACTUAL: | 10 | 03:49 pm | Confidence: 70% | HIT | PREDICTED: | 10 | 1 | 5 | CASH HUNT | ACTUAL: | 5 | 03:49 pm | Confidence: 70% | HIT | PREDICTED: | 5 | 1 | 10 | CASH HUNT | ACTUAL: | 10 | 03:48 pm | Confidence: 70% | HIT | PREDICTED: | 5 | 10 | COIN
+THRESHOLD_REGION=NOT FOUND
