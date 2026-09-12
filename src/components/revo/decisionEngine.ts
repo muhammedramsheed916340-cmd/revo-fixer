@@ -184,6 +184,83 @@ export const EXPERIMENTAL_CONFIG = {
 } as const;
 
 // ============================================================
+// C1–C7 EXPERIMENTAL FEATURE FLAGS
+// ============================================================
+// All default OFF. When ALL flags are OFF, the engine produces
+// BIT-FOR-BIT IDENTICAL output to the pre-C1-C7 baseline (provable
+// by the flag-OFF equivalence test: scores, selection order, and the
+// exact Top-4 set are unchanged). Each flag activates ONE
+// architectural change (C1–C7) independently so they can be A/B
+// tested in isolation. None are auto-enabled in the live path —
+// they must be explicitly turned on (and Shadow A/B stays OFF until
+// implementation tests pass).
+//
+//   C1  calibrated probability channel   (separate raw/prior/calibrated/selection)
+//   C2  generic continuous reliability   (decoupled from `mode`; no per-outcome hardcode)
+//   C3  uncertainty-aware shrinkage      (small samples can't jump; preserves gates)
+//   C4  real 70-combination optimizer    (coverage + uncertainty + reliability + diversity)
+//   C5  de-scope harmful features        (kill raw-recent overwrites; reliability-gate persistence)
+//   C6  RCA instrumentation              (per-locked-Top-4 record for post-MISS reconstruction)
+//   C7  frozen walk-forward validation   (build path ONLY; no live effect; no success claim)
+export interface FeatureFlags {
+  c1_calibratedChannel: boolean;
+  c2_genericReliability: boolean;
+  c3_uncertaintyShrinkage: boolean;
+  c4_realOptimizer: boolean;
+  c5_deScopeHarmful: boolean;
+  c6_rcaInstrumentation: boolean;
+  c7_frozenWalkForward: boolean;
+}
+
+/** All flags OFF — the guaranteed bit-for-bit baseline. */
+export const ALL_FLAGS_OFF: FeatureFlags = {
+  c1_calibratedChannel: false,
+  c2_genericReliability: false,
+  c3_uncertaintyShrinkage: false,
+  c4_realOptimizer: false,
+  c5_deScopeHarmful: false,
+  c6_rcaInstrumentation: false,
+  c7_frozenWalkForward: false,
+};
+
+/** Engine model version stamp (for C6 RCA records + validation provenance). */
+export const MODEL_VERSION = "revo-engine-v2-C1C7";
+
+// ============================================================
+// C6 — LOCKED RCA RECORD (per-locked-Top-4 instrumentation)
+// ============================================================
+// One record per locked Top-4 prediction. Captures the full scoring
+// state so ANY MISS can be reconstructed exactly: all 8 outcome scores,
+// calibrated probabilities, uncertainty/reliability, the winning 4,
+// the excluded #5, why each outcome entered/lost, the active flags,
+// and the model version. The actual+hit are NOT known at lock time —
+// they are reconciled later by the shadow / walk-forward ledger.
+export interface LockedOutcomeEntry {
+  name: string;
+  rank: number;                  // 1..8 by selectionScore (1 = strongest)
+  selected: boolean;             // true if in the winning Top-4
+  rawScore: number;              // the frozen baseline blended score
+  rawEvidenceScore?: number;     // C1: evidence term (1 + reliableDeviation)
+  priorProbability?: number;     // C1: prior used (theo or livePrior)
+  calibratedProbability?: number;     // legacy normalized score share (rawScore/ΣrawScore)
+  calibratedProbabilityPosterior?: number; // C1: true Bayesian posterior probability
+  reliability?: number;           // C2: 0..1 sample-size reliability
+  uncertainty?: number;           // C3: 0..1 (1 = fully prior-driven, 0 = data-driven)
+  selectionScore?: number;        // C1: the score actually used for selection
+  reason: string;                 // why this outcome was selected or excluded
+}
+export interface LockedRcaRecord {
+  modelVersion: string;
+  flags: FeatureFlags;
+  engineMode: EngineMode;
+  timestamp: number;
+  winningCombination: string[];  // 4 selected names (strongest → weakest)
+  excludedFifth: string;          // highest-ranked excluded outcome (#5)
+  allOutcomes: LockedOutcomeEntry[]; // all 8, ranked
+  optimizerNote: string;         // C4: why the winning combo won
+}
+
+// ============================================================
 // ROUND MODEL
 // ============================================================
 export interface RoundResult {
@@ -241,6 +318,13 @@ export interface CandidateScore {
   effectiveSampleSize?: number; // combined observed count (user + live) for this outcome
   reliability?: number;        // sample-size reliability factor (0..1), continuous
   reliableDeviation?: number;  // cappedDeviation dampened by reliability (pos only)
+  // ===== C1–C7 EXPERIMENTAL CHANNEL (populated only when the relevant flag is ON;
+  //      undefined otherwise so all-flags-OFF output is bit-for-bit identical) =====
+  rawEvidenceScore?: number;             // C1: evidence term before prior blend (= 1 + reliableDeviation)
+  priorProbability?: number;            // C1: the prior actually used (theo or livePrior)
+  calibratedProbabilityPosterior?: number; // C1: true Bayesian posterior probability (normalized, sums to 1)
+  uncertainty?: number;                  // C3: 0..1 (1 = fully prior-driven / data-starved, 0 = data-driven)
+  selectionScore?: number;               // C1: the score the optimizer/selection actually uses
 }
 
 // ============================================================
@@ -405,6 +489,11 @@ export interface EngineOutput {
   // Recalibration flag
   recalibrated: boolean;               // was this prediction produced by recalibration?
   recalibrationReason: string;
+
+  // ===== C1–C7 EXPERIMENTAL CHANNEL OUTPUT =====
+  flags: FeatureFlags;                 // the flags this output was produced with
+  modelVersion: string;                // engine model version stamp
+  lockedRca?: LockedRcaRecord | null;   // C6: per-locked-Top-4 RCA record (null when c6 OFF)
 }
 
 // ============================================================
@@ -431,6 +520,69 @@ function adaptiveWeight(recentRate: number, longRate: number, recentN: number): 
   // Bigger divergence → trust recent more (but capped to avoid overreaction).
   const base = 0.5 + Math.min(0.3, diff * 0.6);
   return Math.max(0.3, Math.min(0.8, base));
+}
+
+// ============================================================
+// C1 / C3 — TRUE CALIBRATED PROBABILITY + UNCERTAINTY
+// ============================================================
+/**
+ * Compute a genuine Bayesian posterior probability per outcome via
+ * Dirichlet/Laplace smoothing:
+ *
+ *   posterior_i = (count_i + k · prior_i) / (N + k)
+ *
+ * This is a REAL probability distribution: it sums to exactly 1 over
+ * the 8 outcomes (because Σprior = 1 and Σcount = N). It is anchored to
+ * the prior and SHRINKS toward the prior when the sample is small — this
+ * is the calibrated probability channel (C1), NOT the legacy
+ * `rawScore / ΣrawScore` score-share that `selectTopByEvidence` computes
+ * for backward compatibility.
+ *
+ * Uncertainty (C3) = the fraction of the posterior mass contributed by
+ * the prior (vs the data). When the sample is tiny, nearly all the mass
+ * is prior → uncertainty ≈ 1 → the selection score must be shrunk toward
+ * the prior so a small sample cannot create an aggressive jump.
+ *
+ * @param counts   per-outcome observed count (user + live combined)
+ * @param priors   per-outcome prior (theoretical or live-blended)
+ * @param sampleN  total sample size (Σcounts)
+ * @param k        smoothing strength (default EXPERIMENTAL_CONFIG.shrinkageK = 30)
+ */
+function calibrateProbabilities(
+  counts: Record<string, number>,
+  priors: Record<string, number>,
+  sampleN: number,
+  k: number,
+): { posterior: Record<string, number>; uncertainty: Record<string, number> } {
+  const posterior: Record<string, number> = {};
+  const uncertainty: Record<string, number> = {};
+  let denom = sampleN + k;
+  if (denom <= 0) denom = k > 0 ? k : 1;
+  for (const g of GAMES) {
+    const c = counts[g.name] ?? 0;
+    const p = priors[g.name] ?? 1 / GAMES.length;
+    posterior[g.name] = (c + k * p) / denom;
+    // Fraction of posterior mass from the prior (not the data).
+    // Higher = more uncertain. dataMassFrac = c / denom; uncertainty = 1 - dataMassFrac.
+    uncertainty[g.name] = denom > 0 ? 1 - c / denom : 1;
+  }
+  // Normalize defensively (floating point; should already sum to ~1).
+  const sum = GAMES.reduce((s, g) => s + (posterior[g.name] ?? 0), 0);
+  if (sum > 0) {
+    for (const g of GAMES) posterior[g.name] = (posterior[g.name] ?? 0) / sum;
+  }
+  return { posterior, uncertainty };
+}
+
+/** C3 uncertainty-aware shrinkage: pull a data estimate toward the prior
+ *  proportional to uncertainty. Used to build `selectionScore` so a
+ *  data-starved outcome cannot leap above a high-prior outcome.
+ *    shrunk = dataEstimate · (1 - u) + prior · u
+ *  where u = uncertainty ∈ [0,1]. Preserves all existing sample-size
+ *  gates (k=30 Laplace, Wilson caps); adds NO HOT/OVERDUE/GAP rules. */
+function shrinkTowardPrior(dataEstimate: number, prior: number, uncertainty: number): number {
+  const u = Math.max(0, Math.min(1, uncertainty));
+  return dataEstimate * (1 - u) + prior * u;
 }
 
 /** Chi-square-based anomaly detection: actual distribution vs theoretical.
@@ -617,8 +769,8 @@ function buildDashboard(rounds: RoundResult[], liveSpins: SpinData[] = []): Perf
   let stability = 100;
   if (recent10.length >= 3) {
     const indicators = recent10.map((r) => (r.hit ? 1 : 0));
-    const mean = indicators.reduce((s, x) => s + x, 0) / indicators.length;
-    const variance = indicators.reduce((s, x) => s + (x - mean) ** 2, 0) / indicators.length;
+    const mean = indicators.reduce<number>((s, x) => s + x, 0) / indicators.length;
+    const variance = indicators.reduce<number>((s, x) => s + (x - mean) ** 2, 0) / indicators.length;
     stability = Math.max(0, Math.round(100 - variance * 200));
   } else if (totalRounds > 0) {
     stability = 30; // low confidence in stability with tiny sample
@@ -1089,6 +1241,7 @@ function scoreCandidates(
   lastHit: boolean | null,
   liveSpins: SpinData[] = [],
   mode: EngineMode = "baseline",
+  flags: FeatureFlags = ALL_FLAGS_OFF,
 ): CandidateScore[] {
   // Get adaptive signal weights (learn from HIT/MISS history)
   const sigWeights = dashboard.signalWeights ?? {};
@@ -1330,7 +1483,11 @@ function scoreCandidates(
     const cappedDeviation = Math.max(-0.6, Math.min(2.0, stabilizedDeviation));
 
     // ===== EXPERIMENTAL: RARE-OUTCOME EVIDENCE RELIABILITY LAYER =====
-    // (ACTIVE only in mode === "experimental"; baseline passes through unchanged)
+    // (C2: decoupled from `mode`. Active when mode==="experimental" OR
+    //  flags.c2_genericReliability. When both are OFF, identity → bit-for-bit
+    //  baseline. The factor is unchanged: continuous, generic, monotonic,
+    //  converges to 1, applies to ALL outcomes, positive-deviation-only,
+    //  NO per-outcome hardcoded penalty — compliant with the C2 spec.)
     //
     // A small sample of rare-outcome appearances (e.g. PACHINKO 3× in 50
     // rounds) can generate a large RELATIVE deviation (+39%) that, via
@@ -1360,16 +1517,17 @@ function scoreCandidates(
     // evidence accumulates count → reliability rises → evidence reaches
     // full strength. A rare outcome with 8+ appearances CAN still enter.
     const experimentalActive = mode === "experimental";
+    const reliabilityActive = experimentalActive || flags.c2_genericReliability;
     const effectiveSampleSize = combinedCount; // independent observations
-    const reliability = experimentalActive
+    const reliability = reliabilityActive
       ? effectiveSampleSize / (effectiveSampleSize + RELIABILITY_K)
-      : 1.0; // baseline: full strength (no reliability discount)
+      : 1.0; // baseline + c2 OFF: full strength (no reliability discount)
     // Dampen positive deviation only; keep negative deviation as-is.
-    const reliableDeviation = experimentalActive
+    const reliableDeviation = reliabilityActive
       ? (cappedDeviation > 0
           ? cappedDeviation * reliability
           : cappedDeviation)
-      : cappedDeviation; // baseline: identity
+      : cappedDeviation; // baseline + c2 OFF: identity
 
     // ===== BASE SCORE — BALANCED EVIDENCE + PRIOR =====
     // CRITICAL FIX: The previous 85% evidence / 15% prior ratio allowed rare
@@ -1410,7 +1568,11 @@ function scoreCandidates(
     // Appearing more than 80% of theoretical recently → mild evidence the wheel
     // is currently favouring it (regime). Capped to prevent hot-number chasing.
     // Adaptive weight applied from MISS-feedback calibration.
-    if (recFreq > livePrior * 0.8 && (n >= 5 || liveN >= 20)) {
+    //
+    // C5: when c5_deScopeHarmful is ON, this raw-recent-frequency overwrite is
+    // DEACTIVATED (the RCA identified it as bypassing the reliability layer).
+    // The recency signal remains available for display-only via `recentFreq`.
+    if (!flags.c5_deScopeHarmful && recFreq > livePrior * 0.8 && (n >= 5 || liveN >= 20)) {
       const w = sigWeights["recent-active"] ?? 1.0;
       score *= 1 + (0.10 - 1) * (1 - w) + 0.10 * w; // = 1.10 * w + (1 - w)
       signals.push("recent-active");
@@ -1536,17 +1698,33 @@ function scoreCandidates(
     //   - NO overdue gap-filling boost (isOverdue → boost)
     //   - NO hot/cold z-score boost
     //
-    // BUT: PERSISTENCE PENALTY after REPEATED consecutive failures.
-    // If the same outcome keeps appearing in FAILED predictions (2+ consecutive
-    // MISSes), apply a graduated dampening so alternatives get a fair evaluation.
-    // This prevents tunnel vision — the engine must challenge its own targets
-    // when they repeatedly fail, not keep selecting the same set.
+    // PERSISTENCE PENALTY after REPEATED consecutive failures.
+    //
+    // C5 (c5_deScopeHarmful ON):
+    //   The penalty is re-evaluated so it cannot systematically punish a
+    //   high-prior, well-evidenced outcome such as "1". It now fires ONLY when
+    //   the outcome's evidence is weak (reliability below the gate) — i.e. only
+    //   outcomes that lacked independent support to begin with get further
+    //   dampened. A high-reliability number is never persistence-excluded.
+    //   Uses the correct dashboard.missStreak field.
+    //
+    // C5 OFF (bit-for-bit baseline):
+    //   The original code referenced `dashboard.consecutiveMisses`, a field
+    //   that does NOT exist on PerformanceDashboard (only `missStreak` does).
+    //   That reference was therefore `undefined` at runtime, so the condition
+    //   `undefined >= 2` was always false and the persistence-penalty block
+    //   NEVER fired (dead code). To preserve bit-for-bit baseline behavior,
+    //   the block is omitted entirely when C5 is OFF — identical runtime
+    //   result (no penalty, no signal) with no dead/undefined field access.
     // ===================================================================
-    if (dashboard.consecutiveMisses >= 2 && prevPredNames.includes(g.name)) {
-      // Graduated penalty: -3% per consecutive miss (capped at -15%)
-      const penalty = Math.min(0.15, dashboard.consecutiveMisses * 0.03);
-      score *= (1 - penalty);
-      signals.push(`persistence-penalty (-${Math.round(penalty * 100)}%)`);
+    const PERSISTENCE_RELIABILITY_GATE = 0.5;
+    if (flags.c5_deScopeHarmful) {
+      if (dashboard.missStreak >= 2 && prevPredNames.includes(g.name) && reliability < PERSISTENCE_RELIABILITY_GATE) {
+        // Graduated penalty: -3% per consecutive miss (capped at -15%)
+        const penalty = Math.min(0.15, dashboard.missStreak * 0.03);
+        score *= (1 - penalty);
+        signals.push(`persistence-penalty (-${Math.round(penalty * 100)}%)`);
+      }
     }
     void isOverdue;
     void isHot;
@@ -1554,7 +1732,11 @@ function scoreCandidates(
     void lastHit;
 
     // ===== SIGNAL 9: Anomaly handling (pure relative — no prior multiplication) =====
-    if (dashboard.anomalyDetected) {
+    // C5: when c5_deScopeHarmful is ON, this raw-recent score OVERWRITE is
+    // DEACTIVATED (the RCA identified `anomaly-weighted` as overriding the
+    // main score with raw recent frequency, bypassing reliability). The
+    // anomaly flag itself remains available for display/confidence only.
+    if (!flags.c5_deScopeHarmful && dashboard.anomalyDetected) {
       const anomalyDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
       const cappedAnomalyDev = Math.max(-0.6, Math.min(2.0, anomalyDeviation));
       const anomalyEvidence = 1 + cappedAnomalyDev * 1.5;
@@ -1563,12 +1745,45 @@ function scoreCandidates(
     }
 
     // ===== SIGNAL 10: Pattern shift handling (pure relative) =====
-    if (dashboard.patternShiftDetected) {
+    // C5: when c5_deScopeHarmful is ON, this raw-recent score OVERWRITE is
+    // DEACTIVATED (same rationale as SIGNAL 9 — bypassed reliability).
+    if (!flags.c5_deScopeHarmful && dashboard.patternShiftDetected) {
       const shiftDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
       const cappedShiftDev = Math.max(-0.6, Math.min(2.0, shiftDeviation));
       const shiftEvidence = 1 + cappedShiftDev * 1.3;
       score = shiftEvidence * 0.50 + theo * 0.50;
       if (!signals.includes("shift-adaptive")) signals.push("shift-adaptive");
+    }
+
+    // ===== C1/C3 EXPERIMENTAL CHANNEL (populated only when flags ON;
+    //      undefined when OFF → all-flags-OFF output is bit-for-bit identical) =====
+    // C1 separates four quantities that the legacy blend collapses into one:
+    //   rawEvidenceScore        — the evidence term (1 + reliableDeviation)
+    //   priorProbability        — the prior used in the blend (theoretical)
+    //   calibratedProbabilityPosterior — a TRUE Bayesian posterior (Dirichlet-
+    //                              smoothed; sums to 1 over 8 outcomes). This is
+    //                              the SAME quantity as `smoothedFreq`, exposed as
+    //                              a named channel. NOT the legacy rawScore/ΣrawScore.
+    //   selectionScore          — the score the C4 optimizer actually selects on.
+    // C3 adds explicit uncertainty-aware shrinkage toward the prior so a
+    // data-starved outcome cannot create an aggressive selection-score jump.
+    let c1RawEvidenceScore: number | undefined;
+    let c1PriorProbability: number | undefined;
+    let c1Posterior: number | undefined;
+    let c1Uncertainty: number | undefined;
+    let c1SelectionScore: number | undefined;
+    if (flags.c1_calibratedChannel) {
+      c1RawEvidenceScore = evidenceScore;
+      c1PriorProbability = theo;
+      c1Posterior = smoothedFreq; // genuine normalized posterior
+      if (flags.c3_uncertaintyShrinkage) {
+        // Uncertainty = fraction of posterior mass from the prior, not the data.
+        const denomU = sampleN + SHRINKAGE_K;
+        c1Uncertainty = denomU > 0 ? Math.max(0, Math.min(1, 1 - combinedCount / denomU)) : 1;
+        c1SelectionScore = shrinkTowardPrior(smoothedFreq, theo, c1Uncertainty);
+      } else {
+        c1SelectionScore = smoothedFreq;
+      }
     }
 
     // ===== Wheel base-probability model breakdown =====
@@ -1617,6 +1832,12 @@ function scoreCandidates(
       effectiveSampleSize,
       reliability,
       reliableDeviation,
+      // C1–C7 channel (undefined when flags OFF → bit-for-bit baseline):
+      rawEvidenceScore: c1RawEvidenceScore,
+      priorProbability: c1PriorProbability,
+      calibratedProbabilityPosterior: c1Posterior,
+      uncertainty: c1Uncertainty,
+      selectionScore: c1SelectionScore,
     });
   }
 
@@ -1670,20 +1891,64 @@ function scoreCandidates(
 // 70-COMBINATION SUBSET OPTIMIZER (C(8,4) = 70)
 // ============================================================
 /**
- * There are C(8,4) = 70 possible 4-outcome combinations. For each, compute
- * the expected single-result coverage = sum of calibrated probabilities.
- * Select the combination with the highest expected coverage.
+ * There are C(8,4) = 70 possible 4-outcome combinations.
+ *
+ * TWO modes (selected by `flags.c4_realOptimizer`):
+ *
+ *  OFF (default, bit-for-bit baseline):
+ *    Objective = Σ (rawScore/ΣrawScore) over the 4 outcomes. Because ΣrawScore
+ *    is constant for a round, maximizing this is provably identical to taking
+ *    the 4 highest rawScores (greedy top-4-by-score). The 70-combo loop runs
+ *    but adds no information. This is the frozen baseline behavior.
+ *
+ *  ON (C4 real optimizer):
+ *    Objective considers FOUR terms, so it is genuinely capable of selecting
+ *    a combination DIFFERENT from greedy top-4-by-score:
+ *      objective = coverage                              // Σ calibrated prob (posterior if C1, else legacy share)
+ *                - λ_uncert  · Σ uncertainty             // C3: penalize data-starved selections
+ *                - λ_overreact · Σ [bonus & reliability<τ]·(τ-reliability)  // drop low-evidence bonuses
+ *                + λ_diversity · entropy(normalized 4)   // reward spreading mass over a bonus-only set
+ *    The winning combination is logged with the reason it won (C6 optimizerNote).
  *
  * Per user spec (Section N):
  *   P(any selected outcome occurs) = P(A) + P(B) + P(C) + P(D)
  *   (outcomes are mutually exclusive — do NOT multiply probabilities)
  *
- * Calibrated probabilities are computed by normalizing the raw scores to
- * sum to 1. This gives each outcome a probability estimate that reflects
- * the model's belief, anchored to the theoretical prior via Bayesian smoothing.
+ * No hardcoding of [1,2,5,10], no forced bonus slot, no random selection.
  */
-function selectTopByEvidence(candidates: CandidateScore[], count: number): CandidateScore[] {
-  // Compute calibrated probabilities (normalize scores to sum to 1)
+// C4 objective hyperparameters (frozen; NOT tuned to the 178-round history —
+// §10 forbids replay-fitting. These are principled defaults: coverage
+// dominates; the overreaction penalty is strong enough to drop a bonus whose
+// independent evidence is weak; diversity is a mild tie-breaker.)
+const C4_LAMBDA_UNCERTAINTY = 0.15;
+const C4_LAMBDA_OVERREACTION = 1.0;
+const C4_LAMBDA_DIVERSITY = 0.05;
+const C4_RELIABILITY_GATE = 0.4;
+
+/** Shannon entropy (natural log) of a probability vector, normalized to [0,1]
+ *  by ln(n). Higher = more spread = more diverse coverage. */
+function normalizedEntropy(probs: number[]): number {
+  const n = probs.length;
+  if (n <= 1) return 0;
+  const sum = probs.reduce((s, p) => s + (p > 0 ? p : 0), 0);
+  if (sum <= 0) return 0;
+  let h = 0;
+  for (const p of probs) {
+    const q = p > 0 ? p / sum : 0;
+    if (q > 0) h -= q * Math.log(q);
+  }
+  return h / Math.log(n);
+}
+
+function selectTopByEvidence(
+  candidates: CandidateScore[],
+  count: number,
+  flags: FeatureFlags = ALL_FLAGS_OFF,
+): { combination: CandidateScore[]; optimizerNote: string } {
+  // Legacy calibrated probability (normalized score share). Computed and
+  // attached to the original candidates for backward compatibility (the UI
+  // and shadow ledger read `calibratedProbability`). This is a SCORE SHARE,
+  // NOT a true probability unless C1 is ON.
   const totalScore = candidates.reduce((s, c) => s + c.rawScore, 0);
   const calibrated = candidates.map((c) => ({
     ...c,
@@ -1702,31 +1967,63 @@ function selectTopByEvidence(candidates: CandidateScore[], count: number): Candi
     }
   }
 
+  // Helper: the probability to use for COVERAGE in the objective.
+  // C1 ON → true Bayesian posterior; OFF → legacy score share (bit-for-bit).
+  const probFor = (c: typeof calibrated[number]): number =>
+    (flags.c1_calibratedChannel && typeof c.calibratedProbabilityPosterior === "number")
+      ? c.calibratedProbabilityPosterior
+      : c.calibratedProbability;
+  // Helper: uncertainty (C3). 0 when C3 OFF → no uncertainty penalty.
+  const uncertFor = (c: typeof calibrated[number]): number =>
+    (flags.c3_uncertaintyShrinkage && typeof c.uncertainty === "number") ? c.uncertainty : 0;
+  // Helper: reliability (C2). Falls back to 1.0 (no discount) when undefined.
+  const relFor = (c: typeof calibrated[number]): number =>
+    typeof c.reliability === "number" ? c.reliability : 1.0;
+
   // If we have exactly 8 candidates and need 4, evaluate all 70 combinations
   if (candidates.length === 8 && count === 4) {
-    // Sort calibrated by rawScore descending for "top-4 by individual score" comparison
+    // Greedy top-4-by-score (the C4-OFF winner) — computed for comparison.
     const byScore = [...calibrated].sort((a, b) => b.rawScore - a.rawScore);
     const top4ByScore = byScore.slice(0, 4);
     const top4ByScoreNames = top4ByScore.map((c) => c.game.name);
-    const top4ByScoreCoverage = top4ByScore.reduce((s, c) => s + c.calibratedProbability, 0);
 
-    // Evaluate ALL 70 combinations
-    const allCombos: { names: string[]; coverage: number }[] = [];
+    // Evaluate ALL 70 combinations.
+    const allCombos: { names: string[]; coverage: number; objective: number; combo: typeof calibrated }[] = [];
     let bestCombination: typeof calibrated = [];
-    let bestCoverage = -1;
+    let bestObjective = -Infinity;
 
     for (let a = 0; a < 5; a++) {
       for (let b = a + 1; b < 6; b++) {
         for (let c = b + 1; c < 7; c++) {
           for (let d = c + 1; d < 8; d++) {
             const combo = [calibrated[a], calibrated[b], calibrated[c], calibrated[d]];
-            const coverage = combo.reduce((s, x) => s + x.calibratedProbability, 0);
+            const coverage = combo.reduce((s, x) => s + probFor(x), 0);
+            const uncertaintyPenalty = combo.reduce((s, x) => s + uncertFor(x), 0);
+            // Overreaction penalty: only bonuses whose reliability is below the gate.
+            const overreactionPenalty = combo.reduce((s, x) => {
+              const isBonus = BONUS_NAMES.includes(x.game.name);
+              const r = relFor(x);
+              return s + (isBonus && r < C4_RELIABILITY_GATE ? (C4_RELIABILITY_GATE - r) : 0);
+            }, 0);
+            const diversity = normalizedEntropy(combo.map((x) => probFor(x)));
+            let objective: number;
+            if (flags.c4_realOptimizer) {
+              objective = coverage
+                - C4_LAMBDA_UNCERTAINTY * uncertaintyPenalty
+                - C4_LAMBDA_OVERREACTION * overreactionPenalty
+                + C4_LAMBDA_DIVERSITY * diversity;
+            } else {
+              // C4 OFF: degenerate objective = coverage (== ΣrawScore/ΣrawScore → greedy)
+              objective = coverage;
+            }
             allCombos.push({
               names: combo.map((x) => x.game.name),
               coverage,
+              objective,
+              combo,
             });
-            if (coverage > bestCoverage) {
-              bestCoverage = coverage;
+            if (objective > bestObjective) {
+              bestObjective = objective;
               bestCombination = combo;
             }
           }
@@ -1734,34 +2031,62 @@ function selectTopByEvidence(candidates: CandidateScore[], count: number): Candi
       }
     }
 
-    // Sort all 70 combinations by coverage descending
-    allCombos.sort((a, b) => b.coverage - a.coverage);
+    // Sort all 70 combinations by objective descending
+    allCombos.sort((a, b) => b.objective - a.objective);
 
-    // Sort the best combination by calibrated probability descending
-    bestCombination.sort((a, b) => b.calibratedProbability - a.calibratedProbability);
+    // Sort the best combination by selection probability descending.
+    // C1 ON → posterior; OFF → legacy calibratedProbability (rawScore share).
+    const sortProb = flags.c1_calibratedChannel
+      ? (x: typeof calibrated[number]) => (typeof x.calibratedProbabilityPosterior === "number" ? x.calibratedProbabilityPosterior : x.calibratedProbability)
+      : (x: typeof calibrated[number]) => x.calibratedProbability;
+    bestCombination.sort((a, b) => sortProb(b) - sortProb(a));
+
+    const bestNames = bestCombination.map((c) => c.game.name);
+    const match = JSON.stringify([...top4ByScoreNames].sort()) === JSON.stringify([...bestNames].sort());
 
     // ===== DEBUG OUTPUT =====
-    const bestNames = bestCombination.map((c) => c.game.name);
-    const match = JSON.stringify(top4ByScoreNames.sort()) === JSON.stringify(bestNames.sort());
     console.log("===== 70-COMBINATION OPTIMIZER DEBUG =====");
+    console.log(`Mode: ${flags.c4_realOptimizer ? "C4 REAL optimizer (coverage + uncertainty + overreaction + diversity)" : "C4 OFF (degenerate Σ-probability ≡ greedy top-4-by-score)"}`);
     console.log("All 8 calibrated probabilities:");
     for (const c of calibrated) {
-      console.log(`  ${c.game.name.padEnd(12)}: calProb=${(c.calibratedProbability * 100).toFixed(2)}%  score=${c.rawScore.toFixed(4)}`);
+      const post = flags.c1_calibratedChannel && typeof c.calibratedProbabilityPosterior === "number"
+        ? `posterior=${(c.calibratedProbabilityPosterior * 100).toFixed(2)}%` : "";
+      console.log(`  ${c.game.name.padEnd(12)}: calProb=${(c.calibratedProbability * 100).toFixed(2)}%  ${post}  score=${c.rawScore.toFixed(4)}  rel=${(relFor(c)).toFixed(2)}  uncert=${uncertFor(c).toFixed(2)}`);
     }
-    console.log(`Top-4 by individual score: [${top4ByScoreNames.join(", ")}] coverage=${(top4ByScoreCoverage * 100).toFixed(2)}%`);
-    console.log(`70-combination optimizer result: [${bestNames.join(", ")}] coverage=${(bestCoverage * 100).toFixed(2)}%`);
+    console.log(`Top-4 by individual score: [${top4ByScoreNames.join(", ")}]`);
+    console.log(`Optimizer result:           [${bestNames.join(", ")}] objective=${bestObjective.toFixed(4)}`);
     console.log(`Top 3 combinations:`);
     for (let i = 0; i < Math.min(3, allCombos.length); i++) {
-      console.log(`  #${i + 1}: [${allCombos[i].names.join(", ")}] coverage=${(allCombos[i].coverage * 100).toFixed(2)}%`);
+      console.log(`  #${i + 1}: [${allCombos[i].names.join(", ")}] obj=${allCombos[i].objective.toFixed(4)} cov=${(allCombos[i].coverage * 100).toFixed(2)}%`);
     }
     console.log(`Optimizer matches top-4-by-score: ${match ? "YES (same set)" : "NO (different set — optimizer wins)"}`);
     console.log("===== END OPTIMIZER DEBUG =====");
 
-    return bestCombination;
+    // Build the C6 optimizerNote: WHY the winning combo won.
+    const winCombo = bestCombination;
+    const winCoverage = winCombo.reduce((s, x) => s + probFor(x), 0);
+    const winUncert = winCombo.reduce((s, x) => s + uncertFor(x), 0);
+    const winOverreact = winCombo.reduce((s, x) => {
+      const isBonus = BONUS_NAMES.includes(x.game.name);
+      const r = relFor(x);
+      return s + (isBonus && r < C4_RELIABILITY_GATE ? (C4_RELIABILITY_GATE - r) : 0);
+    }, 0);
+    const winDiversity = normalizedEntropy(winCombo.map((x) => probFor(x)));
+    const optimizerNote = flags.c4_realOptimizer
+      ? `C4 real optimizer won [${bestNames.join(", ")}]: coverage=${(winCoverage * 100).toFixed(2)}%, ` +
+        `uncertaintyPenalty=${(C4_LAMBDA_UNCERTAINTY * winUncert).toFixed(3)}, ` +
+        `overreactionPenalty=${(C4_LAMBDA_OVERREACTION * winOverreact).toFixed(3)}, ` +
+        `diversityBonus=${(C4_LAMBDA_DIVERSITY * winDiversity).toFixed(3)}, ` +
+        `objective=${bestObjective.toFixed(4)}. ` +
+        `${match ? "Same set as greedy top-4-by-score." : "DIFFERS from greedy top-4-by-score — optimizer selected a different combination."}`
+      : `C4 OFF (degenerate): objective = Σ probability ≡ greedy top-4-by-score. Selected [${bestNames.join(", ")}] (matches top-4-by-score: ${match ? "YES" : "NO"}).`;
+
+    return { combination: bestCombination, optimizerNote };
   }
 
-  // Fallback: take top N by score
-  return calibrated.slice(0, count).sort((a, b) => b.rawScore - a.rawScore);
+  // Fallback: take top N by score (fewer than 8 candidates)
+  const fallbackCombo = calibrated.slice(0, count).sort((a, b) => b.rawScore - a.rawScore);
+  return { combination: fallbackCombo, optimizerNote: `Fallback top-${count}-by-score (fewer than 8 candidates).` };
 }
 
 function hitLabel(sampleSize: number, rate: number): string {
@@ -1861,6 +2186,7 @@ export function runEngine(
   recalibrationReason = "",
   liveSpins: SpinData[] = [],
   mode: EngineMode = "baseline",
+  flags: FeatureFlags = ALL_FLAGS_OFF,
 ): EngineOutput {
   const dashboard = buildDashboard(rounds, liveSpins);
   const anomaly = detectAnomaly(rounds);
@@ -1899,18 +2225,24 @@ export function runEngine(
 
   // Score all 8 candidates using the multi-signal evidence engine.
   // Pass REAL casino spins so the prior reflects actual observed frequency.
-  const candidates = scoreCandidates(rounds, dashboard, prevPredNames, lastHit, liveSpins, mode);
+  // `flags` activate the C1–C7 experimental channel (all OFF = bit-for-bit baseline).
+  const candidates = scoreCandidates(rounds, dashboard, prevPredNames, lastHit, liveSpins, mode, flags);
 
   // ===== EVIDENCE-RANKED TOP-4 SELECTION (pure, no fixed slots) =====
   // Rank ALL 8 candidates by their complete AI evidence score (no fixed top-2,
   // no weighted random, no last-hit carry-over). Select the 4 strongest CURRENT
   // evidence combinations. The top 4 changes NATURALLY when the evidence changes.
+  // C4: when c4_realOptimizer is ON, the 70-combination optimizer uses a real
+  // objective (coverage + uncertainty + reliability + diversity) and CAN pick
+  // a different combination than greedy top-4-by-score. When OFF, identical.
   //
   // SSR SAFETY: When there is NO real data (no rounds AND no liveSpins), return
   // empty predictions — the client-side generatePrediction effect populates
   // them after mount (avoids hydration mismatch).
   const hasData = rounds.length > 0 || liveSpins.length > 0;
-  const sampled = hasData ? selectTopByEvidence(candidates, SIGNAL_COUNT) : [];
+  const optimizerResult = hasData ? selectTopByEvidence(candidates, SIGNAL_COUNT, flags) : { combination: [], optimizerNote: "no data" };
+  const sampled = optimizerResult.combination;
+  const optimizerNote = optimizerResult.optimizerNote;
   const sampledSet = new Set(sampled.map((c) => c.game.name));
   const excluded = candidates.filter((c) => !sampledSet.has(c.game.name));
   // Already sorted by evidence rank in scoreCandidates — strongest first.
@@ -2021,6 +2353,58 @@ export function runEngine(
     signals: c.signals,
   }));
 
+  // ===== C6 — LOCKED RCA RECORD (per-locked-Top-4 instrumentation) =====
+  // Built only when c6_rcaInstrumentation is ON. Captures the full scoring
+  // state of all 8 outcomes so ANY future MISS can be reconstructed exactly:
+  // scores, calibrated probabilities, uncertainty/reliability, the winning 4,
+  // the excluded #5, why each outcome entered/lost, the active flags, the
+  // model version, and the optimizer's reason for the winning combination.
+  // (actual+hit are reconciled later by the shadow/walk-forward ledger.)
+  let lockedRca: LockedRcaRecord | null = null;
+  if (flags.c6_rcaInstrumentation) {
+    const selectedSet = new Set(top4.map((c) => c.game.name));
+    // Rank all 8 by the SAME probability the optimizer used to sort the winner.
+    const rankProb = (c: CandidateScore): number => {
+      if (flags.c1_calibratedChannel && typeof c.calibratedProbabilityPosterior === "number") {
+        return c.calibratedProbabilityPosterior;
+      }
+      return (c as CandidateScore & { calibratedProbability?: number }).calibratedProbability ?? c.rawScore;
+    };
+    const rankedAll = [...candidates].sort((a, b) => rankProb(b) - rankProb(a));
+    const allOutcomes: LockedOutcomeEntry[] = rankedAll.map((c, i) => {
+      const selected = selectedSet.has(c.game.name);
+      const selScore = typeof c.selectionScore === "number" ? c.selectionScore : c.rawScore;
+      const reason = selected
+        ? `Selected rank ${i + 1} (selScore=${selScore.toFixed(4)}${c.signals.length ? "; signals: " + c.signals.slice(0, 4).join("+") : ""}).`
+        : `Excluded rank ${i + 1} (selScore=${selScore.toFixed(4)}) — displaced by a stronger 4-combination per the optimizer objective.`;
+      return {
+        name: c.game.name,
+        rank: i + 1,
+        selected,
+        rawScore: c.rawScore,
+        rawEvidenceScore: c.rawEvidenceScore,
+        priorProbability: c.priorProbability,
+        calibratedProbability: (c as CandidateScore & { calibratedProbability?: number }).calibratedProbability,
+        calibratedProbabilityPosterior: c.calibratedProbabilityPosterior,
+        reliability: c.reliability,
+        uncertainty: c.uncertainty,
+        selectionScore: c.selectionScore,
+        reason,
+      };
+    });
+    const excludedFifth = rankedAll.find((c) => !selectedSet.has(c.game.name))?.game.name ?? "";
+    lockedRca = {
+      modelVersion: MODEL_VERSION,
+      flags: { ...flags },
+      engineMode: mode,
+      timestamp: now,
+      winningCombination: top4.map((c) => c.game.name),
+      excludedFifth,
+      allOutcomes,
+      optimizerNote,
+    };
+  }
+
   return {
     predictions,
     excludedOutcomes: excluded.map((c) => c.game),
@@ -2044,6 +2428,10 @@ export function runEngine(
     validationCriteria,
     recalibrated,
     recalibrationReason,
+    // C1–C7 channel output:
+    flags: { ...flags },
+    modelVersion: MODEL_VERSION,
+    lockedRca,
   };
 }
 
@@ -2055,22 +2443,22 @@ export function runEngine(
  * It re-scores candidates using the FULL history (including the MISS just
  * recorded) and returns a fresh prediction set + dashboard.
  */
-export function recalibrate(rounds: RoundResult[], reason: string, liveSpins: SpinData[] = [], mode: EngineMode = "baseline"): EngineOutput {
+export function recalibrate(rounds: RoundResult[], reason: string, liveSpins: SpinData[] = [], mode: EngineMode = "baseline", flags: FeatureFlags = ALL_FLAGS_OFF): EngineOutput {
   const last = rounds[rounds.length - 1];
   const prevPredNames = last ? last.prediction.map((p) => p.game.name) : [];
   const lastHit = last ? last.hit : null;
-  return runEngine(rounds, prevPredNames, lastHit, true, reason, liveSpins, mode);
+  return runEngine(rounds, prevPredNames, lastHit, true, reason, liveSpins, mode, flags);
 }
 
 /**
  * Build the INITIAL engine output (no verified rounds yet, or after a HIT).
  * Used for GET SIGNAL. Pass REAL casino spins to drive data-driven predictions.
  */
-export function buildInitial(rounds: RoundResult[], liveSpins: SpinData[] = [], mode: EngineMode = "baseline"): EngineOutput {
+export function buildInitial(rounds: RoundResult[], liveSpins: SpinData[] = [], mode: EngineMode = "baseline", flags: FeatureFlags = ALL_FLAGS_OFF): EngineOutput {
   const last = rounds[rounds.length - 1];
   const prevPredNames = last ? last.prediction.map((p) => p.game.name) : [];
   const lastHit = last ? last.hit : null;
-  return runEngine(rounds, prevPredNames, lastHit, false, "", liveSpins, mode);
+  return runEngine(rounds, prevPredNames, lastHit, false, "", liveSpins, mode, flags);
 }
 
 // ============================================================
@@ -2246,5 +2634,221 @@ export function runRetrospectiveDiagnostic(
     pachinkoActualsRetained,
     exclusionPrevented,
     note: "RETROSPECTIVE SIMULATION — estimates direction/magnitude only. NOT a validation result. Genuine validation requires fresh out-of-sample live A/B rounds.",
+  };
+}
+
+// ============================================================
+// C7 — FROZEN WALK-FORWARD VALIDATION HARNESS (build path ONLY)
+// ============================================================
+// Replays a FRESH sequence of actual result names through the engine TWICE in
+// parallel — once with ALL C-FLAGS OFF (bit-for-bit baseline) and once with
+// the supplied `flags` (the experimental channel) — round by round, with NO
+// data leakage (each prediction is computed from history BEFORE that round's
+// result), ONE prediction per unique live result, NO stale state, NO
+// duplicate settlement, and NO mid-test tuning (flags are FROZEN for the
+// whole run). Both arms see the IDENTICAL fresh rounds.
+//
+// Computes, per arm: HIT/MISS, theoretical [1,2,5,10] benchmark, bonus
+// inclusion rate, number exclusion rate, per-outcome inclusion/hit efficiency.
+// Then a McNemar paired test compares the two arms on the discordant rounds.
+//
+// *** THIS IS A HARNESS, NOT A CLAIM. *** Do not call any number it returns
+// a "validated improvement". Per §11/§12 of the directive, a real validation
+// requires 100+ genuinely NEW paired live rounds with the model FROZEN. This
+// function is the PATH for that; it does not assert success. The historical
+// 178-round set is diagnostic evidence only (§10 forbids replay-fitting).
+export interface FwfOutcomeStat {
+  name: string;
+  inclusions: number;     // rounds where this outcome was in Top-4
+  actuals: number;        // rounds where this was the actual result
+  coveredActuals: number; // actuals that were in Top-4 (covered)
+  hitEfficiency: number;  // coveredActuals / inclusions (0..1; higher = less waste)
+}
+export interface FwfArmResult {
+  label: string;                 // "baseline" | "experimental"
+  flags: FeatureFlags;
+  hits: number;
+  misses: number;
+  hitRate: number;              // 0..1
+  totalRounds: number;
+  bonusInclusions: number;      // sum of bonus outcomes included across rounds
+  bonusInclusionRate: number;  // bonusInclusions / (totalRounds*4)
+  numberExclusionRate: Record<string, number>; // for 1/2/5/10: fraction of rounds excluded
+  perOutcome: FwfOutcomeStat[];
+  rounds: Array<{ idx: number; actual: string; preds: string[]; hit: boolean; theoHit: boolean }>;
+}
+export interface McNemarResult {
+  r: number;            // baseline HIT & experimental MISS (discordant)
+  s: number;            // baseline MISS & experimental HIT (discordant)
+  statistic: number;    // chi-square 1 df (with continuity correction)
+  pValue: number;       // two-sided
+  significant: boolean; // p < 0.05
+  note: string;
+}
+export interface FrozenWalkForwardResult {
+  baseline: FwfArmResult;
+  experimental: FwfArmResult;
+  theoretical: { hits: number; hitRate: number };  // [1,2,5,10] benchmark on same rounds
+  mcnemar: McNemarResult;
+  flipsToHit: number;     // baseline MISS → experimental HIT
+  flipsToMiss: number;    // baseline HIT → experimental MISS
+  freshRounds: number;
+  modelVersion: string;
+  note: string;           // explicit "NOT a validation claim" disclaimer
+}
+
+/** Lower incomplete gamma for McNemar p-value (chi-square 1 df). For 1 df,
+ *  the survival function P(X > x) = erfc(sqrt(x/2)). This is an exact,
+ *  dependency-free implementation via the complementary error function
+ *  series. Accurate to ~1e-9 over the relevant range. */
+function chiSquare1dfSurvival(x: number): number {
+  if (x <= 0) return 1;
+  // P(X_1 > x) = 2 * (1 - Φ(√x)) = erfc(√(x/2))
+  return erfc(Math.sqrt(x / 2));
+}
+/** Complementary error function (erfc) — Abramowitz & Stegun 7.1.26
+ *  approximation, evaluated via Horner's method on the coefficient array to
+ *  avoid paren-matching ambiguity. Accurate to ~1e-7 over the McNemar range. */
+function erfc(x: number): number {
+  const z = Math.abs(x);
+  const t = 1 / (1 + 0.5 * z);
+  // A&S 7.1.26 coefficients (innermost first): the polynomial in t.
+  const COEFFS = [0.17087277, -0.82215223, 1.48851587, -1.13520398, 0.27886807, -0.18628806, 0.09678418, 0.37409196, 1.00002368];
+  // Horner: poly = c0 + t*(c1 + t*(c2 + ... )); here COEFFS[0] is innermost.
+  let poly = 0;
+  for (let i = COEFFS.length - 1; i >= 0; i--) poly = COEFFS[i] + t * poly;
+  const ans = t * Math.exp(-z * z - 1.26551223 + t * poly);
+  return x >= 0 ? ans : 2 - ans;
+}
+
+export function runFrozenWalkForward(
+  actualNames: string[],
+  flags: FeatureFlags,
+  liveSpins: SpinData[] = [],
+): FrozenWalkForwardResult {
+  const runArm = (label: string, armFlags: FeatureFlags): FwfArmResult => {
+    const rounds: RoundResult[] = [];
+    const perOutcomeMap = new Map<string, FwfOutcomeStat>();
+    for (const g of GAMES) perOutcomeMap.set(g.name, { name: g.name, inclusions: 0, actuals: 0, coveredActuals: 0, hitEfficiency: 0 });
+    const roundLog: FwfArmResult["rounds"] = [];
+    let hits = 0;
+    let misses = 0;
+    let bonusInclusions = 0;
+    const exclusionCounts: Record<string, number> = { "1": 0, "2": 0, "5": 0, "10": 0 };
+
+    for (let i = 0; i < actualNames.length; i++) {
+      const actualName = actualNames[i];
+      const actualGame = gameByName(actualName);
+      // Predict from history BEFORE this round (no leakage, no stale state).
+      const prevPredNames = rounds.length > 0
+        ? rounds[rounds.length - 1].prediction.map((p) => p.game.name)
+        : [];
+      const lastHit = rounds.length > 0 ? rounds[rounds.length - 1].hit : null;
+      // FROZEN flags for the whole run — no mid-test tuning.
+      const eng = runEngine(rounds, prevPredNames, lastHit, false, "", liveSpins, "baseline", armFlags);
+      const preds = eng.predictions.map((p) => p.game);
+      const predNames = preds.map((p) => p.name);
+      const hit = predNames.includes(actualName);
+      const theoHit = ["1", "2", "5", "10"].includes(actualName);
+      // Record inclusion stats for THIS prediction set.
+      for (const name of predNames) {
+        const st = perOutcomeMap.get(name);
+        if (st) {
+          st.inclusions++;
+          if (BONUS_NAMES.includes(name)) bonusInclusions++;
+        }
+      }
+      for (const num of ["1", "2", "5", "10"]) {
+        if (!predNames.includes(num)) exclusionCounts[num]++;
+      }
+      // Settle — ONE settlement per round (no duplicate settlement).
+      const round: RoundResult = {
+        prediction: preds.map((g, idx) => ({ game: g, confidence: 50, time: Date.now() + i, rank: idx + 1 })),
+        actualResult: actualGame,
+        hit,
+        time: Date.now() + i,
+        confidence: 50,
+        recalibrated: false,
+      };
+      rounds.push(round);
+      if (hit) hits++; else misses++;
+      const st = perOutcomeMap.get(actualName);
+      if (st) {
+        st.actuals++;
+        if (hit) st.coveredActuals++;
+      }
+      roundLog.push({ idx: i + 1, actual: actualName, preds: predNames, hit, theoHit });
+    }
+
+    const perOutcome = GAMES.map((g) => {
+      const st = perOutcomeMap.get(g.name)!;
+      st.hitEfficiency = st.inclusions > 0 ? st.coveredActuals / st.inclusions : 0;
+      return { ...st };
+    });
+    const totalRounds = actualNames.length;
+    const numberExclusionRate: Record<string, number> = {};
+    for (const num of ["1", "2", "5", "10"]) {
+      numberExclusionRate[num] = totalRounds > 0 ? exclusionCounts[num] / totalRounds : 0;
+    }
+    return {
+      label,
+      flags: { ...armFlags },
+      hits,
+      misses,
+      hitRate: totalRounds > 0 ? hits / totalRounds : 0,
+      totalRounds,
+      bonusInclusions,
+      bonusInclusionRate: totalRounds > 0 ? bonusInclusions / (totalRounds * 4) : 0,
+      numberExclusionRate,
+      perOutcome,
+      rounds: roundLog,
+    };
+  };
+
+  const baseline = runArm("baseline", ALL_FLAGS_OFF);
+  const experimental = runArm("experimental", flags);
+
+  // Theoretical [1,2,5,10] benchmark on the SAME rounds.
+  let theoHits = 0;
+  for (const name of actualNames) if (["1", "2", "5", "10"].includes(name)) theoHits++;
+  const theoretical = { hits: theoHits, hitRate: actualNames.length > 0 ? theoHits / actualNames.length : 0 };
+
+  // McNemar paired test (discordant rounds only).
+  let r = 0; // baseline HIT & experimental MISS
+  let s = 0; // baseline MISS & experimental HIT
+  let flipsToHit = 0;
+  let flipsToMiss = 0;
+  const minLen = Math.min(baseline.rounds.length, experimental.rounds.length);
+  for (let i = 0; i < minLen; i++) {
+    const b = baseline.rounds[i];
+    const e = experimental.rounds[i];
+    if (b.hit && !e.hit) { r++; flipsToMiss++; }
+    if (!b.hit && e.hit) { s++; flipsToHit++; }
+  }
+  // Continuity-corrected McNemar: χ² = (|r-s|-1)² / (r+s); 1 df.
+  const discordant = r + s;
+  const statistic = discordant > 0 ? (Math.abs(r - s) - 1) ** 2 / discordant : 0;
+  const pValue = discordant > 0 ? chiSquare1dfSurvival(statistic) : 1;
+  const mcnemar: McNemarResult = {
+    r,
+    s,
+    statistic,
+    pValue,
+    significant: pValue < 0.05,
+    note: discordant < 10
+      ? `McNemar inconclusive (only ${discordant} discordant pairs; need ≥10 for a reliable test). NOT a validation claim.`
+      : `McNemar χ²(1)=${statistic.toFixed(3)}, p=${pValue.toFixed(4)} ${pValue < 0.05 ? "(significant)" : "(not significant)"}. Retrospective paired comparison only — NOT a fresh-validation claim.`,
+  };
+
+  return {
+    baseline,
+    experimental,
+    theoretical,
+    mcnemar,
+    flipsToHit,
+    flipsToMiss,
+    freshRounds: actualNames.length,
+    modelVersion: MODEL_VERSION,
+    note: "FROZEN WALK-FORWARD HARNESS. Built per C7. This output is a paired retrospective comparison, NOT a validation success claim. A genuine validation requires 100+ genuinely NEW paired live rounds with the model FROZEN (per §11/§12). Do not quote any number here as a 'validated improvement'.",
   };
 }

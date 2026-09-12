@@ -11,13 +11,19 @@ import {
   type CandidateScore,
   type PerformanceDashboard,
   type EngineMode,
+  type FeatureFlags,
+  type FrozenWalkForwardResult,
+  type LockedRcaRecord,
   WHEEL_SEGMENTS,
   WHEEL_TOTAL_SEGMENTS,
   THEORETICAL,
   EXPERIMENTAL_CONFIG,
+  ALL_FLAGS_OFF,
+  MODEL_VERSION,
   buildInitial,
   recalibrate,
   runRetrospectiveDiagnostic,
+  runFrozenWalkForward,
   type RetroDiagnostic,
 } from "./decisionEngine";
 
@@ -366,6 +372,100 @@ function subscribeExpFlag(cb: () => void): () => void {
   };
 }
 
+// ============================================================
+// C1–C7 EXPERIMENTAL FEATURE FLAGS — bit-for-bit OFF by default
+// ============================================================
+// Mirrors the EXP_FLAG_KEY pattern above. Stored as a single JSON blob
+// under `revo_cFlags`. The server snapshot is ALWAYS ALL_FLAGS_OFF so the
+// active displayed prediction (baseline path) is bit-for-bit identical to
+// production. These flags ONLY thread into the EXPERIMENTAL shadow engine
+// calls (4 sites) — never the live baseline `buildInitial(roundHistory, liveSpins)`.
+const CFLAGS_KEY = "revo_cFlags";
+
+/** Stable server snapshot — always ALL_FLAGS_OFF (never reads localStorage). */
+const EMPTY_CFLAGS: FeatureFlags = ALL_FLAGS_OFF;
+
+// Cached client snapshot — useSyncExternalStore requires getSnapshot to return
+// a referentially STABLE value when the underlying data has not changed, or it
+// loops infinitely ("Maximum update depth exceeded"). We cache the parsed
+// object and invalidate it on write / storage event (mirrors readShadowLedger).
+let cachedCFlags: FeatureFlags | undefined;
+let cachedCFlagsRaw = "";
+
+function readCFlags(): FeatureFlags {
+  if (typeof window === "undefined") return ALL_FLAGS_OFF;
+  try {
+    const raw = localStorage.getItem(CFLAGS_KEY) ?? "";
+    // Return the cached reference when the raw string is unchanged → stable
+    // snapshot for useSyncExternalStore (prevents the infinite-render loop).
+    if (raw === cachedCFlagsRaw && cachedCFlags !== undefined) {
+      return cachedCFlags;
+    }
+    cachedCFlagsRaw = raw;
+    if (!raw) {
+      cachedCFlags = ALL_FLAGS_OFF;
+      return cachedCFlags;
+    }
+    const parsed = JSON.parse(raw) as Partial<FeatureFlags> | null;
+    if (!parsed || typeof parsed !== "object") {
+      cachedCFlags = ALL_FLAGS_OFF;
+      return cachedCFlags;
+    }
+    // Merge over ALL_FLAGS_OFF so any missing key defaults to false.
+    cachedCFlags = {
+      c1_calibratedChannel: !!parsed.c1_calibratedChannel,
+      c2_genericReliability: !!parsed.c2_genericReliability,
+      c3_uncertaintyShrinkage: !!parsed.c3_uncertaintyShrinkage,
+      c4_realOptimizer: !!parsed.c4_realOptimizer,
+      c5_deScopeHarmful: !!parsed.c5_deScopeHarmful,
+      c6_rcaInstrumentation: !!parsed.c6_rcaInstrumentation,
+      c7_frozenWalkForward: !!parsed.c7_frozenWalkForward,
+    };
+    return cachedCFlags;
+  } catch {
+    cachedCFlags = ALL_FLAGS_OFF;
+    return cachedCFlags;
+  }
+}
+
+function writeCFlags(flags: FeatureFlags) {
+  try {
+    localStorage.setItem(CFLAGS_KEY, JSON.stringify(flags));
+  } catch {
+    /* ignore */
+  }
+  cachedCFlagsRaw = ""; // invalidate cache so the next read picks up the new value
+  cFlagListeners.forEach((l) => l());
+}
+
+// Subscribers for the C-flags store (useSyncExternalStore pattern).
+const cFlagListeners = new Set<() => void>();
+function subscribeCFlags(cb: () => void): () => void {
+  cFlagListeners.add(cb);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === CFLAGS_KEY) {
+      cachedCFlagsRaw = ""; // invalidate on cross-tab changes
+      cb();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    cFlagListeners.delete(cb);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+// Display metadata for the 7 C-flags (order = C1..C7). Pure data, no closures.
+const FLAG_META: Array<{ key: keyof FeatureFlags; desc: string }> = [
+  { key: "c1_calibratedChannel", desc: "True Bayesian posterior probability channel" },
+  { key: "c2_genericReliability", desc: "Generic sample-size reliability (decoupled from mode)" },
+  { key: "c3_uncertaintyShrinkage", desc: "Uncertainty-aware shrinkage toward prior" },
+  { key: "c4_realOptimizer", desc: "Real 70-combination optimizer (coverage+uncertainty+reliability+diversity)" },
+  { key: "c5_deScopeHarmful", desc: "De-scope raw-recent overwrites + reliability-gate persistence" },
+  { key: "c6_rcaInstrumentation", desc: "Per-locked-Top-4 RCA record for post-MISS reconstruction" },
+  { key: "c7_frozenWalkForward", desc: "Frozen walk-forward validation harness (build path)" },
+];
+
 // Subscribers for the shadow ledger.
 const shadowListeners = new Set<() => void>();
 function subscribeShadow(cb: () => void): () => void {
@@ -570,6 +670,35 @@ export function RevoGame() {
     return () => clearInterval(t);
   }, []);
 
+  // ===== C1–C7 EXPERIMENTAL FEATURE FLAGS (shadow engine only) =====
+  // Declared here (before generatePrediction) because generatePrediction and
+  // selectActualResult thread `cFlags` into their experimental shadow builds.
+  // Server snapshot = ALL_FLAGS_OFF (bit-for-bit baseline). These flags ONLY
+  // thread into the 4 experimental shadow buildInitial/recalibrate calls —
+  // NEVER the live baseline `buildInitial(roundHistory, liveSpins)`.
+  const cFlags: FeatureFlags = useSyncExternalStore(
+    subscribeCFlags,
+    readCFlags,
+    () => EMPTY_CFLAGS, // server snapshot — stable constant
+  );
+
+  const toggleCFlag = useCallback((key: keyof FeatureFlags) => {
+    const current = readCFlags();
+    const next: FeatureFlags = { ...current, [key]: !current[key] };
+    writeCFlags(next);
+    cFlagListeners.forEach((l) => l());
+  }, []);
+
+  // ===== C7 FROZEN WALK-FORWARD RESULT (build path only — NOT a validation claim) =====
+  const [fwfResult, setFwfResult] = useState<FrozenWalkForwardResult | null>(null);
+
+  const runFwf = useCallback(() => {
+    const allRounds = readRoundHistory();
+    const actualNames = allRounds.map((r) => r.actualResult.name);
+    const spins = getLiveSpins();
+    setFwfResult(runFrozenWalkForward(actualNames, cFlags, spins));
+  }, [cFlags]);
+
   // ===== GENERATE PREDICTION (initial only — NO auto-refresh) =====
   // Prediction is LOCKED once generated. It only changes when a new LIVE
   // result arrives (via selectActualResult). No countdown, no refresh,
@@ -596,9 +725,10 @@ export function RevoGame() {
     // + all 8 calibrated probs) so it's available at settlement time.
     baselineLockedData = extractEngineData(eng);
     // Seed the experimental engine's locked prediction too (same history).
-    const expEng = buildInitial(allRounds, spins, "experimental");
+    // C-flags threaded in here (shadow only — baseline path stays untouched).
+    const expEng = buildInitial(allRounds, spins, "experimental", cFlags);
     expLockedData = extractEngineData(expEng);
-  }, []);
+  }, [cFlags]);
 
   // AUTO-GENERATE on mount ONLY (no countdown refresh)
   const autoStarted = useRef(false);
@@ -659,6 +789,27 @@ export function RevoGame() {
     }
   }, []);
 
+  // ===== C6 LOCKED RCA (experimental shadow engine's lockedRca, build-path only) =====
+  // Mirrored from the latest experimental engine build via a state so the
+  // viewer can render winningCombination / excludedFifth / optimizerNote
+  // when c6_rcaInstrumentation is ON and the shadow engine is enabled.
+  // NOTE: `cFlags` is declared above (before generatePrediction) because
+  // generatePrediction threads it into the experimental shadow build call.
+  const [expLockedRca, setExpLockedRca] = useState<LockedRcaRecord | null>(null);
+  useEffect(() => {
+    if (!experimentalEnabled || !cFlags.c6_rcaInstrumentation) {
+      setExpLockedRca(null);
+      return;
+    }
+    // Rebuild the experimental engine (build path only) purely to surface
+    // its lockedRca field for the viewer. This does NOT affect the live or
+    // shadow settlement lifecycle — it's a read-only display rebuild.
+    const allRounds = readRoundHistory();
+    const spins = getLiveSpins();
+    const eng = buildInitial(allRounds, spins, "experimental", cFlags);
+    setExpLockedRca(eng.lockedRca ?? null);
+  }, [experimentalEnabled, cFlags, roundHistory, liveSpins]);
+
   // ============================================================
   // CORE ENGINE PIPELINE — runs on EVERY live result / manual selection
   // ============================================================
@@ -691,7 +842,7 @@ export function RevoGame() {
         saveSignals(preds);
         // SHADOW: capture baseline locked data + seed experimental.
         baselineLockedData = extractEngineData(eng);
-        const expEng0 = buildInitial(allRounds, spins, "experimental");
+        const expEng0 = buildInitial(allRounds, spins, "experimental", cFlags);
         expLockedData = extractEngineData(expEng0);
         return;
       }
@@ -807,9 +958,10 @@ export function RevoGame() {
         writeShadowLedger([...prevLedger, row].slice(-200));
 
         // Regenerate experimental for the NEXT round (uses updated history).
+        // C-flags threaded in here (shadow only — baseline path untouched).
         const expEng = !hit
-          ? recalibrate(updated, "Shadow recalibration (experimental mode)", spins, "experimental")
-          : buildInitial(updated, spins, "experimental");
+          ? recalibrate(updated, "Shadow recalibration (experimental mode)", spins, "experimental", cFlags)
+          : buildInitial(updated, spins, "experimental", cFlags);
         expLockedData = extractEngineData(expEng);
       }
 
@@ -817,7 +969,7 @@ export function RevoGame() {
       // the next settlement has access to it. (Hoisted baselineEng above.)
       baselineLockedData = extractEngineData(baselineEng);
     },
-    [predictions, savedSignals, lastRecalibration, experimentalEnabled],
+    [predictions, savedSignals, lastRecalibration, experimentalEnabled, cFlags],
   );
 
   const clearHistory = useCallback(() => {
@@ -2053,6 +2205,162 @@ export function RevoGame() {
             </div>
           )}
         </div>
+
+        {/* ===== C1–C7 EXPERIMENTAL FLAGS (bit-for-bit OFF by default) ===== */}
+        <section className="mt-4 rounded-2xl border border-[#1e2240] bg-[#141827] p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#448AFF]">
+              <i className="fas fa-flag" /> C1–C7 EXPERIMENTAL FLAGS (bit-for-bit OFF)
+            </span>
+            <span className="rounded-full bg-[#1e2240] px-2 py-0.5 text-[9px] font-bold uppercase text-[#8899cc]">
+              {MODEL_VERSION}
+            </span>
+          </div>
+
+          <div className="mb-3 rounded-lg border border-[#448AFF]/20 bg-[#448AFF]/5 p-2 text-[9px] leading-relaxed text-[#8899cc]">
+            <b className="text-[#448AFF]">All flags OFF = bit-for-bit production baseline.</b>{" "}
+            Shadow A/B remains OFF until you enable it above. These flags ONLY affect
+            the experimental shadow engine — never the active displayed prediction.
+          </div>
+
+          {/* 7 toggle switches — mirrors the experimentalEnabled toggle styling */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {FLAG_META.map((f) => {
+              const on = cFlags[f.key];
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => toggleCFlag(f.key)}
+                  className={`flex items-start justify-between gap-3 rounded-lg border p-2.5 text-left transition-colors ${
+                    on
+                      ? "border-[#448AFF]/40 bg-[#448AFF]/8"
+                      : "border-[#1e2240] bg-[#0d1020]/60 hover:bg-[#0d1020]"
+                  }`}
+                  aria-pressed={on}
+                  aria-label={`Toggle ${f.key}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <code className="rounded bg-[#0d1020] px-1 text-[9px] font-bold text-[#448AFF]">{f.key}</code>
+                      {on && <span className="text-[8px] font-bold uppercase text-[#2ed573]">ON</span>}
+                    </div>
+                    <div className="mt-1 text-[9px] leading-snug text-[#8899cc]">{f.desc}</div>
+                  </div>
+                  <span
+                    className={`mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase ${
+                      on ? "bg-[#2ed573]/20 text-[#2ed573]" : "bg-[#1e2240] text-[#5a6a99]"
+                    }`}
+                  >
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${on ? "bg-[#2ed573]" : "bg-[#5a6a99]"}`} />
+                    {on ? "ON" : "OFF"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ===== C7 FROZEN WALK-FORWARD button + result viewer ===== */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#ffa502]/30 bg-gradient-to-r from-[#ffa502]/10 to-transparent p-2.5">
+            <button
+              type="button"
+              onClick={runFwf}
+              className="flex items-center gap-2 rounded-md bg-[#ffa502] px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#0a0b14] shadow-md transition hover:bg-[#ff9f1c]"
+              title="Runs the C7 frozen walk-forward harness on current round history: current flags vs ALL_FLAGS_OFF baseline, with theoretical [1,2,5,10] reference. Build path only — NOT a validation claim."
+            >
+              <i className="fas fa-play" /> Run C7 Frozen Walk-Forward (current flags vs baseline)
+            </button>
+            <span className="text-[9px] text-[#5a6a99]">
+              {roundHistory.length} round{roundHistory.length !== 1 ? "s" : ""} available
+            </span>
+          </div>
+
+          {fwfResult ? (
+            <div className="mt-3 rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-3">
+              {/* Headline KPIs */}
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-lg font-black text-white">{fwfResult.freshRounds}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Fresh Rounds</div>
+                </div>
+                <div className="rounded border border-[#00d4ff]/30 bg-[#00d4ff]/8 p-2 text-center">
+                  <div className="text-lg font-black text-[#00d4ff]">{(fwfResult.baseline.hitRate * 100).toFixed(1)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Baseline HIT ({fwfResult.baseline.hits}/{fwfResult.baseline.totalRounds})</div>
+                </div>
+                <div className="rounded border border-[#a855f7]/30 bg-[#a855f7]/8 p-2 text-center">
+                  <div className="text-lg font-black text-[#a855f7]">{(fwfResult.experimental.hitRate * 100).toFixed(1)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Experimental HIT ({fwfResult.experimental.hits}/{fwfResult.experimental.totalRounds})</div>
+                </div>
+                <div className="rounded border border-[#FFD700]/30 bg-[#FFD700]/8 p-2 text-center">
+                  <div className="text-lg font-black text-[#FFD700]">{(fwfResult.theoretical.hitRate * 100).toFixed(1)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Theoretical [1,2,5,10] ({fwfResult.theoretical.hits}/{fwfResult.freshRounds})</div>
+                </div>
+              </div>
+
+              {/* Flips + bonus inclusion rate */}
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded border border-[#2ed573]/30 bg-[#2ed573]/8 p-2 text-center">
+                  <div className="text-sm font-black text-[#2ed573]">{fwfResult.flipsToHit}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">MISS→HIT saved</div>
+                </div>
+                <div className="rounded border border-[#ff4757]/30 bg-[#ff4757]/8 p-2 text-center">
+                  <div className="text-sm font-black text-[#ff4757]">{fwfResult.flipsToMiss}</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">HIT→MISS lost</div>
+                </div>
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-sm font-black text-[#00d4ff]">{(fwfResult.baseline.bonusInclusionRate * 100).toFixed(1)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Base Bonus Inc Rate</div>
+                </div>
+                <div className="rounded border border-[#1e2240] bg-[#0d1020]/60 p-2 text-center">
+                  <div className="text-sm font-black text-[#a855f7]">{(fwfResult.experimental.bonusInclusionRate * 100).toFixed(1)}%</div>
+                  <div className="text-[8px] uppercase tracking-wider text-[#5a6a99]">Exp Bonus Inc Rate</div>
+                </div>
+              </div>
+
+              {/* McNemar note */}
+              <div className="mb-2 rounded-lg border border-[#1e2240] bg-[#0d1020]/40 p-2 text-[9px] text-[#8899cc]">
+                <b className="text-[#8899cc]">McNemar:</b> {fwfResult.mcnemar.note}{" "}
+                (χ² = {fwfResult.mcnemar.statistic.toFixed(2)}, p = {fwfResult.mcnemar.pValue.toExponential(2)}
+                {fwfResult.mcnemar.significant ? ", significant" : ", not significant"})
+              </div>
+
+              {/* Prominent disclaimer */}
+              <div className="rounded-lg border border-[#ff4757]/40 bg-[#ff4757]/8 p-2.5 text-[10px] font-bold leading-relaxed text-[#ff4757]">
+                <i className="fas fa-triangle-exclamation mr-1" />
+                {fwfResult.note}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 py-3 text-center text-xs text-[#5a6a99]">
+              <i className="fas fa-flask mb-1 text-xl text-[#5a6a99]" />
+              <div>Press “Run C7 Frozen Walk-Forward” to replay current history through both arms.</div>
+              <div className="text-[9px] mt-1">Build path only — NOT a validation claim.</div>
+            </div>
+          )}
+
+          {/* ===== C6 LOCKED RCA viewer (only when c6 ON + shadow ON) ===== */}
+          {cFlags.c6_rcaInstrumentation && experimentalEnabled && expLockedRca ? (
+            <div className="mt-3 rounded-lg border border-[#2ed573]/30 bg-[#2ed573]/5 p-3">
+              <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-[#2ed573]">
+                <i className="fas fa-microscope" /> C6 Locked RCA (latest experimental lock)
+              </div>
+              <div className="mb-1.5 text-[10px] text-[#8899cc]">
+                <b className="text-white">Winning Top-4:</b>{" "}
+                <span className="font-mono text-[#2ed573]">{expLockedRca.winningCombination.join(" · ")}</span>
+              </div>
+              <div className="mb-1.5 text-[10px] text-[#8899cc]">
+                <b className="text-white">Excluded #5:</b>{" "}
+                <span className="font-mono text-[#ff4757]">{expLockedRca.excludedFifth}</span>
+              </div>
+              <div className="text-[10px] leading-relaxed text-[#8899cc]">
+                <b className="text-white">Optimizer note:</b> {expLockedRca.optimizerNote}
+              </div>
+              <div className="mt-1.5 text-[8px] text-[#5a6a99]">
+                modelVersion: {expLockedRca.modelVersion} · timestamp: {new Date(expLockedRca.timestamp).toLocaleString()} · mode: {expLockedRca.engineMode}
+              </div>
+            </div>
+          ) : null}
+        </section>
 
         {/* ===== WHEEL BASE-PROBABILITY MODEL (54 segments) ===== */}
         <WheelProbabilityPanel candidateScores={view.candidateScores} />
