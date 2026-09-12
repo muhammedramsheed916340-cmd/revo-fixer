@@ -1,0 +1,125 @@
+==========================================================================
+S1 BENCHMARKS on same 178 stored rounds
+==========================================================================
+  A stored dynamic baseline : 118/178 = 66.29%   [95% CI 59.3 .. 73.2]
+  C theoretical [1,2,5,10]  : 153/178 = 85.96%   [95% CI 80.9 .. 91.1]
+  D random Top-4            : 50.00% (analytical; sim 49.93%)
+  deficit A-C               : -35 rounds = -19.66 pp
+  McNemar paired test       : b=41 (baseline-hit/dynamic-miss), c=6 (dynamic-hit/baseline-miss)
+  McNemar chi2=24.6, p = 7.07e-07  -> deficit is NOT sampling noise
+
+==========================================================================
+S2 WHEEL STRUCTURE TESTS (is there anything to exploit?)
+==========================================================================
+  chi-square GOF (7 dof): stat=1.40, p=0.986  -> CONSISTENT with i.i.d. 54-segment wheel
+    1:74(e69)  2:41(e43)  5:24(e23)  10:14(e13)  PACHINKO:5(e7)  COIN FLIP:12(e13)  CASH HUNT:5(e7)  CRAZY TIME:3(e3)
+  bonus runs test: observed runs=41, expected=44.0, z=-0.93, p=0.351 -> no clustering evidence
+  P(bonus|prev bonus) = 5/25 = 20.0%   P(bonus|prev number) = 20/152 = 13.2%
+  2x2 transition chi2=0.36, p=0.548 -> no next-round dependence (i.i.d. holds)
+  '1' lag-1 phi autocorrelation = +0.011 (n=177 pairs) -> ~0, i.i.d.
+
+==========================================================================
+S3 BONUS-SLOT ECONOMICS (stored locked Top-4)
+==========================================================================
+  rounds by #bonus in Top-4: k=0: 20, k=1: 71, k=2: 79, k=3: 8
+  rounds with >=1 bonus slot: 158/178 = 88.8%  (bonus actual rate: 25/178 = 14.0%)
+  outcome      slots  slot%  prior%  over hits   eff%  slot-eff vs prior
+  1              158  88.8%  38.89%  2.3x   62  39.2%  1.01x
+  2              131  73.6%  24.07%  3.1x   28  21.4%  0.89x
+  5               97  54.5%  12.96%  4.2x   16  16.5%  1.27x
+  10              73  41.0%   7.41%  5.5x    6   8.2%  1.11x
+  PACHINKO        49  27.5%   3.70%  7.4x    1   2.0%  0.55x
+  COIN FLIP       75  42.1%   7.41%  5.7x    3   4.0%  0.54x
+  CASH HUNT       70  39.3%   3.70% 10.6x    2   2.9%  0.77x
+  CRAZY TIME      59  33.1%   1.85% 17.9x    0   0.0%  0.00x
+  TOTAL bonus slots 253 (35.5% of 712 slots) -> 6 hits, efficiency 2.37%
+  'unnecessary bonus inclusions' (bonus in Top-4 AND number actual missed): 41 rounds = 35% of misses-causing rounds
+  (each such round had 1+ bonus slot that a [1,2,5,10] lock would have used for the actual number)
+  exchange rate: 41 number-misses bought 6 bonus-hits  (need <=2:1 for CF-slot breakeven, ~1:1 for CH/P)
+
+==========================================================================
+S4 MECHANISM RECONSTRUCTION (deterministic from stored history)
+==========================================================================
+  pattern-shift OVERWRITE regime active (TVD>0.6, score := 1+1.3*dev10): 93/178 rounds
+    rounds: #15-#18, #20-#37, #39-#44, #48-#51, #57-#59, #68-#71, #83-#89, #94-#100, #116-#127, #129-#131, #136, #138, #145-#155, #157, #160-#161, #167, #169-#172, #175-#178
+    (in these rounds every outcome's score = pure last-10 recency deviation x1.3 + prior x0.5)
+  anomaly OVERWRITE regime active (rolling chi2>18.5): 3/178 rounds #10, #16-#17
+  persistence-penalty regime active (consecMisses>=2 at scoring time): 23/178 rounds
+    of those, '1' was in the punished previous prediction 14 times (penalty -3..-15% on a 38.9%-prior outcome)
+
+==========================================================================
+S5 CONFIDENCE CALIBRATION (displayed conf ~= P(actual in Top-4))
+==========================================================================
+  overall: mean displayed conf = 57.5  vs realized HIT rate = 66.29%
+    conf [30,45): n= 23, mean conf 38.5, realized  52.2%  (gap +13.7 pp)
+    conf [45,55): n= 26, mean conf 50.9, realized  53.8%  (gap +3.0 pp)
+    conf [55,65): n= 65, mean conf 58.9, realized  70.8%  (gap +11.9 pp)
+    conf [65,76): n= 59, mean conf 69.0, realized  69.5%  (gap +0.5 pp)
+  recalibrated-flag rounds: 57, HIT rate within them 36/57 = 63.2%
+
+==========================================================================
+S6 PER-MISS LEDGER WITH DISPLACEMENT ATTRIBUTION (60 misses)
+==========================================================================
+  # 11 act=COIN FLIP   locked=[2,5,CASH HUNT,PACHINKO] kB=2 conf=55 displacer=PACHINKO    STRUCTURAL(bonus-uncovered)
+  # 16 act=5           locked=[1,2,COIN FLIP,PACHINKO] kB=2 conf=55 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  # 18 act=2           locked=[1,CASH HUNT,COIN FLIP,PACHINKO] kB=3 conf=55 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  # 21 act=10          locked=[1,2,COIN FLIP,PACHINKO] kB=2 conf=69 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  # 27 act=CASH HUNT   locked=[1,10,2,PACHINKO] kB=1 conf=70 displacer=PACHINKO    STRUCTURAL(bonus-uncovered)
+  # 30 act=CRAZY TIME  locked=[1,10,2,CASH HUNT] kB=1 conf=70 displacer=-           STRUCTURAL(bonus-uncovered)
+  # 32 act=2           locked=[1,10,CASH HUNT,CRAZY TIME] kB=2 conf=68 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 38 act=5           locked=[1,2,CASH HUNT,CRAZY TIME] kB=2 conf=70 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 42 act=CASH HUNT   locked=[1,2,5,CRAZY TIME] kB=1 conf=70 displacer=CRAZY TIME  STRUCTURAL(bonus-uncovered)
+  # 44 act=10          locked=[1,2,5,CASH HUNT] kB=1 conf=70 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 45 act=COIN FLIP   locked=[1,2,5,CASH HUNT] kB=1 conf=58 displacer=CASH HUNT   STRUCTURAL(bonus-uncovered)
+  # 50 act=CRAZY TIME  locked=[2,CASH HUNT,COIN FLIP,PACHINKO] kB=3 conf=70 displacer=-           STRUCTURAL(bonus-uncovered)
+  # 51 act=1           locked=[2,CASH HUNT,COIN FLIP,CRAZY TIME] kB=3 conf=62 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 52 act=1           locked=[2,CASH HUNT,COIN FLIP,CRAZY TIME] kB=3 conf=57 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 53 act=5           locked=[1,2,CASH HUNT,CRAZY TIME] kB=2 conf=55 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 54 act=1           locked=[2,5,CASH HUNT,CRAZY TIME] kB=2 conf=46 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 55 act=COIN FLIP   locked=[1,2,CASH HUNT,CRAZY TIME] kB=2 conf=39 displacer=CRAZY TIME  STRUCTURAL(bonus-uncovered)
+  # 57 act=COIN FLIP   locked=[1,2,CASH HUNT,CRAZY TIME] kB=2 conf=53 displacer=CRAZY TIME  STRUCTURAL(bonus-uncovered)
+  # 58 act=2           locked=[1,5,COIN FLIP,CRAZY TIME] kB=2 conf=39 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 60 act=2           locked=[1,5,COIN FLIP,CRAZY TIME] kB=2 conf=54 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 63 act=10          locked=[1,2,COIN FLIP,CRAZY TIME] kB=2 conf=65 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 69 act=CASH HUNT   locked=[1,10,2,COIN FLIP] kB=1 conf=72 displacer=-           STRUCTURAL(bonus-uncovered)
+  # 70 act=COIN FLIP   locked=[1,10,CASH HUNT,PACHINKO] kB=2 conf=57 displacer=CASH HUNT   STRUCTURAL(bonus-uncovered)
+  # 71 act=2           locked=[1,10,CASH HUNT,COIN FLIP] kB=2 conf=52 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 72 act=5           locked=[1,10,CASH HUNT,COIN FLIP] kB=2 conf=46 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 73 act=5           locked=[1,CASH HUNT,COIN FLIP,CRAZY TIME] kB=3 conf=43 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 74 act=2           locked=[1,5,CASH HUNT,COIN FLIP] kB=2 conf=35 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 75 act=1           locked=[2,5,CASH HUNT,COIN FLIP] kB=2 conf=35 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 76 act=2           locked=[1,5,CASH HUNT,COIN FLIP] kB=2 conf=34 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 77 act=10          locked=[2,5,CASH HUNT,COIN FLIP] kB=2 conf=34 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 79 act=1           locked=[2,5,CASH HUNT,COIN FLIP] kB=2 conf=49 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 80 act=1           locked=[2,5,CASH HUNT,COIN FLIP] kB=2 conf=40 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 81 act=1           locked=[2,5,CASH HUNT,CRAZY TIME] kB=2 conf=40 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  # 89 act=COIN FLIP   locked=[1,2,CRAZY TIME,PACHINKO] kB=2 conf=68 displacer=CRAZY TIME  STRUCTURAL(bonus-uncovered)
+  # 93 act=5           locked=[1,2,CASH HUNT,COIN FLIP] kB=2 conf=67 displacer=CASH HUNT   AVOIDABLE(baseline-lock)
+  # 98 act=2           locked=[1,5,COIN FLIP,PACHINKO] kB=2 conf=62 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #100 act=10          locked=[1,5,CRAZY TIME,PACHINKO] kB=2 conf=62 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  #101 act=2           locked=[1,10,5,PACHINKO] kB=1 conf=49 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #107 act=COIN FLIP   locked=[1,10,2,5] kB=0 conf=74 displacer=10          STRUCTURAL(bonus-uncovered)
+  #111 act=10          locked=[1,2,5,COIN FLIP] kB=1 conf=68 displacer=COIN FLIP   AVOIDABLE(baseline-lock)
+  #121 act=PACHINKO    locked=[1,10,5,CASH HUNT] kB=1 conf=71 displacer=CASH HUNT   STRUCTURAL(bonus-uncovered)
+  #122 act=2           locked=[1,10,CASH HUNT,PACHINKO] kB=2 conf=56 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #124 act=2           locked=[1,10,CASH HUNT,PACHINKO] kB=2 conf=59 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #125 act=1           locked=[10,2,CASH HUNT,PACHINKO] kB=2 conf=45 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #126 act=1           locked=[10,2,5,PACHINKO] kB=1 conf=38 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #128 act=1           locked=[10,2,CASH HUNT,PACHINKO] kB=2 conf=53 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #129 act=PACHINKO    locked=[1,10,2,5] kB=0 conf=42 displacer=-           STRUCTURAL(bonus-uncovered)
+  #131 act=10          locked=[1,2,CASH HUNT,PACHINKO] kB=2 conf=52 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #134 act=PACHINKO    locked=[1,10,2,5] kB=0 conf=63 displacer=-           STRUCTURAL(bonus-uncovered)
+  #135 act=COIN FLIP   locked=[1,10,2,PACHINKO] kB=1 conf=54 displacer=PACHINKO    STRUCTURAL(bonus-uncovered)
+  #137 act=1           locked=[2,CASH HUNT,COIN FLIP,PACHINKO] kB=3 conf=57 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #139 act=1           locked=[2,CASH HUNT,COIN FLIP,PACHINKO] kB=3 conf=52 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #142 act=5           locked=[1,10,2,PACHINKO] kB=1 conf=62 displacer=PACHINKO    AVOIDABLE(baseline-lock)
+  #148 act=PACHINKO    locked=[1,5,CASH HUNT,CRAZY TIME] kB=2 conf=69 displacer=CRAZY TIME  STRUCTURAL(bonus-uncovered)
+  #150 act=2           locked=[1,5,CASH HUNT,CRAZY TIME] kB=2 conf=62 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  #156 act=2           locked=[1,5,CASH HUNT,CRAZY TIME] kB=2 conf=69 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  #158 act=10          locked=[1,2,CASH HUNT,CRAZY TIME] kB=2 conf=63 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  #162 act=COIN FLIP   locked=[1,10,2,CASH HUNT] kB=1 conf=63 displacer=CASH HUNT   STRUCTURAL(bonus-uncovered)
+  #166 act=CRAZY TIME  locked=[1,10,2,COIN FLIP] kB=1 conf=68 displacer=-           STRUCTURAL(bonus-uncovered)
+  #168 act=5           locked=[1,10,COIN FLIP,CRAZY TIME] kB=2 conf=63 displacer=CRAZY TIME  AVOIDABLE(baseline-lock)
+  AVOIDABLE-by-[1,2,5,10]-lock: 41   STRUCTURAL (bonus actual, not covered): 19
+
+done -> scripts/data/diag_final_rca_out.txt
