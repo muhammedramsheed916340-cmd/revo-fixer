@@ -1,0 +1,64 @@
+PANEL_CHARS=42827
+N_ROUNDS=77
+CENSUS=47/77=61.04%
+CEIL65=51 SURPLUS=-4
+BASE65_PCT=65.2916
+WINDOW_55_77=9/23=39.13%
+LIVE_MISS_RUN=9
+MAX_H_RUN=10
+MAX_M_RUN=9 (at idx [29])
+RUNS_TAIL=[('H', 1), ('M', 2), ('H', 1), ('M', 1), ('H', 2), ('M', 1), ('H', 5), ('M', 9)]
+LAST5=0/5 LAST10=1/10 LAST25=9/25 LAST50=25/50
+RECAL_N=27 ROUNDS=[12, 17, 19, 22, 28, 31, 33, 39, 43, 45, 46, 51, 52, 53, 54, 56, 58, 59, 61, 64, 70, 71, 72, 73, 74, 76, 77]
+HIT_AFTER_MISS_ROUNDS=[12, 17, 19, 22, 28, 31, 33, 39, 43, 46, 56, 59, 61, 64]
+LIVE_MISS_ROUNDS=[69, 70, 71, 72, 73, 74, 75, 76, 77]
+MISS_ROUNDS=[11, 16, 18, 21, 27, 30, 32, 38, 42, 44, 45, 50, 51, 52, 53, 54, 55, 57, 58, 60, 63, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+HIT_ROUNDS_LAST20=[59, 61, 62, 64, 65, 66, 67, 68]
+COMPOSITION={'2': 21, '5': 12, '1': 25, 'COIN FLIP': 7, '10': 6, 'CASH HUNT': 4, 'CRAZY TIME': 2}
+PACHINKO_ACTUAL_ROUNDS=[]
+BONUS_ACTUALS_N=13
+BONUS_BOOK=[(11, 'COIN FLIP', 'm'), (12, 'COIN FLIP', 'H'), (27, 'CASH HUNT', 'm'), (30, 'CRAZY TIME', 'm'), (42, 'CASH HUNT', 'm'), (43, 'CASH HUNT', 'H'), (45, 'COIN FLIP', 'm'), (50, 'CRAZY TIME', 'm'), (55, 'COIN FLIP', 'm'), (57, 'COIN FLIP', 'm'), (64, 'COIN FLIP', 'H'), (69, 'CASH HUNT', 'm'), (70, 'COIN FLIP', 'm')]
+BONUS_HIT_RATE=3/13=23.1%
+FIVE_ACTUAL_ROUNDS=[2, 3, 4, 5, 6, 10, 15, 16, 38, 53, 72, 73]
+RANK1_EXACT_HITS=8
+GAPS_N=76 AVG=40.8s MIN=1.463s MIN_AT=#66
+STALLS_GE90=[(30, 121.498), (50, 95.905)]
+SPAN_E3=3100.5s
+NEW_WINDOW_GAPS_GE60=[(64, 61.467), (69, 86.978), (70, 76.391)]
+CONF_MIN=24 AT=#1
+CONF_MAX=72
+CONF_PATH_50_77=[70, 62, 57, 55, 46, 39, 38, 53, 39, 39, 54, 51, 59, 65, 56, 65, 70, 70, 70, 72, 57, 52, 46, 43, 35, 35, 34, 34]
+CONF33_ROUNDS=[]
+CONF_WINDOW_55_77=[39, 38, 53, 39, 39, 54, 51, 59, 65, 56, 65, 70, 70, 70, 72, 57, 52, 46, 43, 35, 35, 34, 34]
+LAST_ROUND_N=77 ACTUAL=10 HIT=False CONF=34
+LAST_PREDS=['COIN FLIP', 'CASH HUNT', '5', '2']
+SIGNALS_N=4
+SIGNAL: CASH HUNT range=[65, 87] keys=['confidence', 'game', 'label', 'rank', 'signals', 'time']
+SIGNAL: 5 range=[75, 90] keys=['confidence', 'game', 'label', 'rank', 'signals', 'time']
+SIGNAL: COIN FLIP range=[68, 89] keys=['confidence', 'game', 'label', 'rank', 'signals', 'time']
+SIGNAL: 2 range=[80, 92] keys=['confidence', 'game', 'label', 'rank', 'signals', 'time']
+SIGNALS_RAW_HEAD=[{"game": {"name": "CASH HUNT", "imageKey": "CASH HUNT", "confidenceRange": [65, 87], "isBonus": true}, "confidence": 33, "time": 1789226399769, "rank": 1, "label": "strongest evidence", "signals": ["recent-active", "pattern-stable", "verified (weak)", "cash hunt-recent-active"]}, {"game": {"name": "5", "imageKey": "5", "confidenceRange": [75, 90], "isBonus": false}, "confidence": 33, "time": 1789226399769, "rank": 2, "label": "second strongest", "signals": ["recent-active", "trending-up", "pattern-stable", "verified (weak)"]}, {"game": {"name": "COIN FLIP", "imageKey": "COIN FLIP", "confidenc
+CHK_SHADOW_OFF_BANNER=True
+CHK_DEBUG_EVENT_LOG=True
+CHK_DEBUG_PERF=True
+CHK_MISS_STREAK_BANNER=True
+CHK_HIT_STREAK_BANNER=False
+CHK_PATTERN_SHIFT=False
+CHK_ARCHIVE_SECTION=False
+CHK_REWIND_LABEL=False
+CHK_COUNTER_1249=True
+CHK_TPC_LABEL=False
+CHK_TOTAL_PRED_COVERAGE=True
+CHK_BENCH_LABEL=False
+CHK_LOW_CONF_LABEL=True
+CHK_STRONG_LABEL=True
+CHK_MODERATE_LABEL=True
+CHK_LOCKED_15_20=True
+CHK_PRED78_CASH_HUNT_RANK1=True
+CHK_BANNER_9X=True
+CHK_RISK_HIGH=True
+CHK_VALIDATION_SET_EQUAL=True
+CHK_NO_BONUS_BLIND_SPOT=True
+CHK_INSUFFICIENT_SAMPLE=True
+TIMESTAMP_LAST_ROUND=20:49:59.760
+TIMESTAMP_FIRST_ROUND=19:58:19.285
