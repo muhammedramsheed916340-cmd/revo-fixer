@@ -8141,3 +8141,37 @@ Stage Summary:
 - Two-state tracking: ARCHIVE terminal record unchanged (pass 93 final, 20v6 p=0.009); ERA-1 (TERMINATED 22:01:45) 918/1406 = 65.2916% all-time peak (now EXCEEDED by ERA-3's 66.29% single-pass reading); ERA-2 (TERMINATED ~22:27) 18/28 = 64.29%; **ERA-3 (LIVE, profile 533d4c3b): n=178 at the 00:34:29 probe — 118/178 = 66.29% (surplus +2), live 10× HIT (record-tying), exact 27, recal 57 (37/60 = 61.7% rescue), bonus actuals 25 (6 hits), bench [5,CF,1,2] @70 STRONG / RISK LOW, conf floor 33 / max 75 (new), STALL ledger 6 (#46 133.5s era record; shape 6-for-6), PATTERN SHIFT lit 2nd read TVD 0.81, counters REWIND 11th (1.2k reverted), ring 1000-capped 0-error, shadow OFF (282nd consecutive)**.
 - **Next pass: 11× ALL-TIME RECORD WATCH** (live 10×; Pred#179 [5,CF,1,2] @70 — a HIT sets 11, a MISS ends it; banner would read 11× HIT STREAK); '5' rank-1 audition book (first '5'-rank-1 settles #177/#178 were H/H — stint continues; a '5' actual at rank-1 = 2nd bonus-... '5' is a NUMBER: a '5' rank-1 exact adds to the 27); COIN FLIP OVERDUE arc (gap 14⚠️ — first bonus overdue flag: forced-miss-while-excluded pattern watch, CF currently bench rank-2 so it CAN hit); STRONG @70 lock survival (first STRONG since P279; conf 75 max under pressure); census consolidation (surplus +2 — can it grow to +3/+4 or revert; era peak 66.67 P279 vs 66.29 now); window regime (2 warm in a row — 3rd would kill flip-flop talk entirely); STALL #48 (6 in 178, two era-record-scale events this window); REWIND 12th pass (1.2k wobble settled?); LAST25 7th read (PERMANENT); 'excluded evidence' 5th read (2 absences in a row — flapping or regime change?); ARCHIVE 13th probe; VALIDATION 10th read; replay parity; rollback-watch (COMMIT-EARLY in place); Shadow A/B (OFF, 283rd). Degraded set carried + updates: WORKSPACE ROLLBACK P273 + ERA-2 PROFILE LOSS P273 + PAGE-JS WEDGE P272 + PROFILE-WIPE P272 + `close` destructive + ARCHIVE-FOOTER REWIND (1,249/128, 11th pass; **1.3k→1.2k reversion P282 — P281 tick transient**) + recompile storm (FR in-ring 10, rebuild completed 330ms) + DYNAMIC BANNER LABEL P276 (HIT form held 2 passes at 2×→10×) + **LAST25←L20 LEDGER BUG — PERMANENT (6 confirmations P277–P282)** + DEBUG-STRIP P276 RESOLVED transient (6th clean read) + **PATTERN SHIFT LIT REGIME (0.61→0.81, 2 consecutive — no longer flapping)** + TREND POSITIVE STREAK (2 reads: +25.3, +5.6) + TPC NEW HIGH (83.3) + 'EXCLUDED-EVIDENCE LINE absent ×2 (P281–P282)' + presentation flapping + probe-format history + VALIDATION-mismatch history + PIPELINE-AUDIT rolling buffer (n=2) + panel-size regime change + **STALL→bonus-actual shape 6-FOR-6 incl. era-record #46 (era-3: #30 CT m, #50 CT m, #90 P HIT, #129 P m, #166 CT m, #171 CF HIT)**. **Protocol continues. Engine untouched by monitor.**
 
+
+---
+## Development Phase Pivot — Top-4 Coverage Optimization (DIAGNOSTIC ONLY, no code changes)
+
+**Trigger:** User directive — monitoring STOPPED; pivot to prediction-engine development. Target: 100% Top-4 HIT / 0 MISS (development target, not a guarantee). Per spec §14, deliver a diagnostic report BEFORE any production code change.
+
+**Actions taken:**
+- Deleted monitoring cron **369099** (Shadow A/B Validation Monitor) — surveillance stopped per directive. Did NOT restart any cron.
+- Mapped prediction-engine architecture (`src/components/revo/decisionEngine.ts`, 2251 lines): 54-segment wheel priors, `scoreCandidates` feature engine, `selectTopByEvidence` optimizer, `honestConfidence`, `runEngine`/`buildInitial`/`recalibrate` lifecycle, `runRetrospectiveDiagnostic` walk-forward replay.
+- Determined LIVE prediction path runs in **BASELINE mode** (experimental reliability layer gated OFF by `experimentalEnabled` flag; Shadow A/B OFF 281+ passes → experimental never validated live).
+- Ran RCA on clean walk-forward validation set `scripts/data/pass282_history.json` (178 rounds, baseline-mode, no leakage in settlement lifecycle).
+
+**Key findings (quantified on 178 rounds):**
+- Benchmark A (dynamic baseline, stored): **118/178 = 66.29%**
+- Benchmark B (experimental, engine replay): **125/178 = 70.22%** (only +4 misses recovered)
+- Benchmark C (theoretical [1,2,5,10]): **153/178 = 85.96%**
+- Benchmark D (random Top-4): **50.00%**
+- Dynamic loses to theoretical by **−19.66 pp**.
+- Dynamic×theoretical contingency: Both HIT 112 | dyn-only 6 | theo-only **41 (AVOIDABLE model failure)** | neither 19 (unavoidable bonus-actual).
+- **41 of 60 misses are avoidable** (a number actual displaced by a bonus); 19 unavoidable (bonus-actual floor ≈ 10.7%).
+- **Smoking gun:** bonus slots used 253, HIT 6, wasted 247 (2.4% efficiency). CRAZY TIME (1.85% prior, 3 actuals, 0 covered) included in 33% of rounds.
+- Root cause: `score = 0.5·(1+reliableDeviation) + 0.5·theo` — the 50% prior weight compresses the prior advantage; in baseline mode reliability is OFF so a single rare-outcome appearance inflates its score above high-prior numbers.
+- The 70-combination optimizer is a **mathematical no-op** (maximizes ΣcalibratedProbability = ΣrawScore/ΣrawScore = greedy top-4-by-score).
+- `calibratedProbability` is a normalized score share, **not a calibrated probability**; no calibration step exists.
+- The reliability layer is bypassed by raw-recent-frequency signal factors (`recent-active`, `anomaly-weighted`, `shift-adaptive` overrides at lines 1413, 1557-1572).
+- No data leakage in settlement lifecycle (old lock → result → settle → append → runEngine(updated) → new lock).
+
+**Proposed changes (NOT implemented — awaiting approval):** P1 enable experimental live (LOW risk, +4) → P2 true Bayesian calibrated probability model (root-cause fix) → P3 route all signals through shrinkage (close bypass leak) → P4 real combination optimizer (calibration+uncertainty+overreaction penalties) → P5 calibration instrumentation → P6 per-MISS RCA records → P7 frozen 100-200-round walk-forward validation (the only honest proof path).
+
+**Deliverables (read-only):** `DIAGNOSTIC_REPORT.md`, `scripts/rca_top4_diagnostic.py`, `scripts/replay_top4.ts`, `scripts/data/replay_top4_result.json`.
+
+**Stage Summary:**
+- Monitoring fully stopped (cron 369099 deleted). No production code modified. Diagnostic report complete per §14. Realistic ceiling on this data ≈ 86% (theoretical level); 100% is not mathematically achievable on random rounds (10.7% unavoidable bonus-actual floor) and remains a development direction, not a guarantee. Awaiting approval to begin P1-P7 implementation under walk-forward parity gates.
+

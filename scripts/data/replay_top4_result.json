@@ -1,0 +1,147 @@
+{
+  "n": 178,
+  "actual_distribution": {
+    "1": 74,
+    "2": 41,
+    "5": 24,
+    "10": 14,
+    "COIN FLIP": 12,
+    "CASH HUNT": 5,
+    "CRAZY TIME": 3,
+    "PACHINKO": 5
+  },
+  "benchmark_A_dynamic_baseline_stored": 118,
+  "benchmark_B_experimental_replay": {
+    "hits": 125,
+    "misses": 53,
+    "hitRate": 0.702247191011236
+  },
+  "baseline_replay": {
+    "hits": 121,
+    "misses": 57,
+    "hitRate": 0.6797752808988764
+  },
+  "benchmark_C_theoretical_12510": 153,
+  "benchmark_C_rate": 0.8595505617977528,
+  "bonus_actuals_total": 25,
+  "flipsToHit_miss_to_hit": 4,
+  "flipsToMiss_hit_to_miss": 0,
+  "net_gain_experimental": 4,
+  "pachinkoInclusions_baseline": 31,
+  "pachinkoInclusions_experimental": 31,
+  "pachinko_actuals": 5,
+  "pachinkoCoveredActuals_experimental": 0,
+  "exclusionRates_baseline": {
+    "1": 0.12921348314606743,
+    "2": 0.19101123595505617,
+    "5": 0.3539325842696629,
+    "10": 0.46629213483146065
+  },
+  "exclusionRates_experimental": {
+    "1": 0.12359550561797752,
+    "2": 0.1797752808988764,
+    "5": 0.3595505617977528,
+    "10": 0.4157303370786517
+  },
+  "perOutcome_baseline": [
+    {
+      "name": "1",
+      "inclusions": 155,
+      "actuals": 74,
+      "coveredActuals": 61
+    },
+    {
+      "name": "2",
+      "inclusions": 144,
+      "actuals": 41,
+      "coveredActuals": 31
+    },
+    {
+      "name": "5",
+      "inclusions": 115,
+      "actuals": 24,
+      "coveredActuals": 17
+    },
+    {
+      "name": "10",
+      "inclusions": 95,
+      "actuals": 14,
+      "coveredActuals": 7
+    },
+    {
+      "name": "PACHINKO",
+      "inclusions": 31,
+      "actuals": 5,
+      "coveredActuals": 0
+    },
+    {
+      "name": "COIN FLIP",
+      "inclusions": 78,
+      "actuals": 12,
+      "coveredActuals": 4
+    },
+    {
+      "name": "CASH HUNT",
+      "inclusions": 50,
+      "actuals": 5,
+      "coveredActuals": 1
+    },
+    {
+      "name": "CRAZY TIME",
+      "inclusions": 40,
+      "actuals": 3,
+      "coveredActuals": 0
+    }
+  ],
+  "perOutcome_experimental": [
+    {
+      "name": "1",
+      "inclusions": 156,
+      "actuals": 74,
+      "coveredActuals": 62
+    },
+    {
+      "name": "2",
+      "inclusions": 146,
+      "actuals": 41,
+      "coveredActuals": 32
+    },
+    {
+      "name": "5",
+      "inclusions": 114,
+      "actuals": 24,
+      "coveredActuals": 18
+    },
+    {
+      "name": "10",
+      "inclusions": 104,
+      "actuals": 14,
+      "coveredActuals": 7
+    },
+    {
+      "name": "PACHINKO",
+      "inclusions": 31,
+      "actuals": 5,
+      "coveredActuals": 0
+    },
+    {
+      "name": "COIN FLIP",
+      "inclusions": 81,
+      "actuals": 12,
+      "coveredActuals": 5
+    },
+    {
+      "name": "CASH HUNT",
+      "inclusions": 43,
+      "actuals": 5,
+      "coveredActuals": 1
+    },
+    {
+      "name": "CRAZY TIME",
+      "inclusions": 33,
+      "actuals": 3,
+      "coveredActuals": 0
+    }
+  ],
+  "note": "RETROSPECTIVE SIMULATION — estimates direction/magnitude only. NOT a validation result. Genuine validation requires fresh out-of-sample live A/B rounds."
+}

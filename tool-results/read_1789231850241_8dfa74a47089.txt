@@ -1,0 +1,582 @@
+     1→  1080→ * NEW: When `liveSpins` (REAL casino spins from CasinoScores API) is available
+     2→  1081→ * with 20+ spins, the long-term frequency is computed from REAL casino data —
+     3→  1082→ * NOT just the tiny user-verified round history. This produces data-driven,
+     4→  1083→ * VARIED predictions instead of always picking the theoretical top-4 [1,2,5,10].
+     5→  1084→ */
+     6→  1085→function scoreCandidates(
+     7→  1086→  rounds: RoundResult[],
+     8→  1087→  dashboard: PerformanceDashboard,
+     9→  1088→  prevPredNames: string[],
+    10→  1089→  lastHit: boolean | null,
+    11→  1090→  liveSpins: SpinData[] = [],
+    12→  1091→  mode: EngineMode = "baseline",
+    13→  1092→): CandidateScore[] {
+    14→  1093→  // Get adaptive signal weights (learn from HIT/MISS history)
+    15→  1094→  const sigWeights = dashboard.signalWeights ?? {};
+    16→  1095→  const n = rounds.length;
+    17→  1096→  const hist = rounds.map((r) => r.actualResult);
+    18→  1097→
+    19→  1098→  // Per-game frequency across ALL verified rounds (user history)
+    20→  1099→  const freqAll = new Map<string, number>();
+    21→  1100→  for (const g of GAMES) freqAll.set(g.name, 0);
+    22→  1101→  for (const h of hist) freqAll.set(h.name, (freqAll.get(h.name) ?? 0) + 1);
+    23→  1102→
+    24→  1103→  // ===== REAL CASINO SPIN FREQUENCY (long-term prior from live data) =====
+    25→  1104→  // Map live spins (aiStats sector names) to engine game names + count.
+    26→  1105→  const liveN = liveSpins.length;
+    27→  1106→  const liveFreqAll = new Map<string, number>();
+    28→  1107→  for (const g of GAMES) liveFreqAll.set(g.name, 0);
+    29→  1108→  for (const s of liveSpins) {
+    30→  1109→    const gameName = SPIN_TO_GAME_NAME[s.sector] ?? s.sector;
+    31→  1110→    if (liveFreqAll.has(gameName)) {
+    32→  1111→      liveFreqAll.set(gameName, (liveFreqAll.get(gameName) ?? 0) + 1);
+    33→  1112→    }
+    34→  1113→  }
+    35→  1114→  // Use real casino frequency as long-term prior when we have 20+ real spins.
+    36→  1115→  // Otherwise fall back to theoretical probability.
+    37→  1116→  const useLivePrior = liveN >= 20;
+    38→  1117→  const livePriorFor = (gameName: string): number => {
+    39→  1118→    if (!useLivePrior) return THEORETICAL[gameName] ?? 0.1;
+    40→  1119→    return liveN > 0 ? (liveFreqAll.get(gameName) ?? 0) / liveN : (THEORETICAL[gameName] ?? 0.1);
+    41→  1120→  };
+    42→  1121→
+    43→  1122→  // ===== RECENT LIVE SPIN FREQUENCY (last 10 real spins) =====
+    44→  1123→  const liveRecent = liveSpins.slice(0, 10); // newest first in API response
+    45→  1124→  const liveRecentN = liveRecent.length;
+    46→  1125→  const liveRecentFreq = new Map<string, number>();
+    47→  1126→  for (const g of GAMES) liveRecentFreq.set(g.name, 0);
+    48→  1127→  for (const s of liveRecent) {
+    49→  1128→    const gameName = SPIN_TO_GAME_NAME[s.sector] ?? s.sector;
+    50→  1129→    if (liveRecentFreq.has(gameName)) {
+    51→  1130→      liveRecentFreq.set(gameName, (liveRecentFreq.get(gameName) ?? 0) + 1);
+    52→  1131→    }
+    53→  1132→  }
+    54→  1133→
+    55→  1134→  // Per-game frequency in recent 10 USER-VERIFIED rounds (short-term)
+    56→  1135→  const recentHist = hist.slice(-10);
+    57→  1136→  const recentFreq = new Map<string, number>();
+    58→  1137→  for (const g of GAMES) recentFreq.set(g.name, 0);
+    59→  1138→  for (const h of recentHist) recentFreq.set(h.name, (recentFreq.get(h.name) ?? 0) + 1);
+    60→  1139→
+    61→  1140→  // Gap analysis per game
+    62→  1141→  const gaps: Record<string, number> = {};
+    63→  1142→  const gapHistories: Record<string, number[]> = {};
+    64→  1143→  for (const g of GAMES) { gaps[g.name] = n; gapHistories[g.name] = []; }
+    65→  1144→  let lastHitIdx: Record<string, number> = {};
+    66→  1145→  for (const g of GAMES) lastHitIdx[g.name] = -1;
+    67→  1146→  for (let i = 0; i < n; i++) {
+    68→  1147→    const name = hist[i].name;
+    69→  1148→    if (lastHitIdx[name] >= 0) {
+    70→  1149→      gapHistories[name].push(i - lastHitIdx[name]);
+    71→  1150→    }
+    72→  1151→    lastHitIdx[name] = i;
+    73→  1152→  }
+    74→  1153→  for (const g of GAMES) {
+    75→  1154→    gaps[g.name] = lastHitIdx[g.name] >= 0 ? n - 1 - lastHitIdx[g.name] : n;
+    76→  1155→  }
+    77→  1156→
+    78→  1157→  // Adaptive weighting between long-term and recent
+    79→  1158→  const adaptW = dashboard.adaptiveWeight;
+    80→  1159→  const longW = 1 - adaptW;
+    81→  1160→
+    82→  1161→  // Per-game stability (variance of recent gaps → inverse)
+    83→  1162→  const recentUnique = new Set(recentHist.map((g) => g.name)).size;
+    84→  1163→  const stability = recentUnique >= 4 ? "STABLE" : recentUnique >= 2 ? "VOLATILE" : "STREAK";
+    85→  1164→
+    86→  1165→  // ===== REPEAT-PATTERN ANALYSIS (data-based, NOT blind carryover) =====
+    87→  1166→  // Analyze the historical tendency of each outcome to REPEAT in the next
+    88→  1167→  // round. This is NOT "last hit → predict same again". Instead, we measure:
+    89→  1168→  //   P(next = X | current = X)  from ALL historical consecutive pairs.
+    90→  1169→  // If the last actual result was X, and X has a historically HIGH repeat
+    91→  1170→  // rate, then X gets a MILD evidence boost (capped). If X has a LOW repeat
+    92→  1171→  // rate, no penalty — we just don't boost. This is pure statistical
+    93→  1172→  // evidence, not a "last hit shortcut".
+    94→  1173→  //
+    95→  1174→  // We use BOTH the user-verified round history AND the live casino spins
+    96→  1175→  // (mapped to game names) for a larger, more reliable sample.
+    97→  1176→  const lastActualName = n > 0 ? hist[n - 1].name : null;
+    98→  1177→  const lastLiveSpinName = liveN > 0
+    99→  1178→    ? (SPIN_TO_GAME_NAME[liveSpins[0].sector] ?? null)
+   100→  1179→    : null;
+   101→  1180→  // Prefer the most recent data point (live spins are newer than user rounds).
+   102→  1181→  const lastResultName = lastLiveSpinName ?? lastActualName;
+   103→  1182→
+   104→  1183→  // Build a combined consecutive-pair sequence from both sources.
+   105→  1184→  // Live spins are newest-first; reverse to oldest-first for pair analysis.
+   106→  1185→  const liveGameSeq = liveSpins
+   107→  1186→    .map((s) => SPIN_TO_GAME_NAME[s.sector] ?? null)
+   108→  1187→    .filter((x): x is string => x !== null)
+   109→  1188→    .reverse(); // oldest-first
+   110→  1189→  const userGameSeq = hist.map((h) => h.name);
+   111→  1190→  const combinedSeq = [...userGameSeq, ...liveGameSeq];
+   112→  1191→
+   113→  1192→  // Count repeat pairs: P(next = X | current = X)
+   114→  1193→  const repeatStats: Record<string, { currentCount: number; repeatCount: number; rate: number }> = {};
+   115→  1194→  for (const g of GAMES) repeatStats[g.name] = { currentCount: 0, repeatCount: 0, rate: 0 };
+   116→  1195→  for (let i = 0; i < combinedSeq.length - 1; i++) {
+   117→  1196→    const cur = combinedSeq[i];
+   118→  1197→    const next = combinedSeq[i + 1];
+   119→  1198→    if (repeatStats[cur]) {
+   120→  1199→      repeatStats[cur].currentCount++;
+   121→  1200→      if (next === cur) repeatStats[cur].repeatCount++;
+   122→  1201→    }
+   123→  1202→  }
+   124→  1203→  for (const g of GAMES) {
+   125→  1204→    const rs = repeatStats[g.name];
+   126→  1205→    rs.rate = rs.currentCount >= 3 ? rs.repeatCount / rs.currentCount : 0;
+   127→  1206→  }
+   128→  1207→  // Overall average repeat rate (for comparison baseline).
+   129→  1208→  const totalRepeatCur = Object.values(repeatStats).reduce((s, r) => s + r.currentCount, 0);
+   130→  1209→  const totalRepeatCount = Object.values(repeatStats).reduce((s, r) => s + r.repeatCount, 0);
+   131→  1210→  const baselineRepeatRate = totalRepeatCur >= 5 ? totalRepeatCount / totalRepeatCur : 0;
+   132→  1211→
+   133→  1212→  // ===== BONUS CLUSTER DETECTION (bonus-aware scoring) =====
+   134→  1213→  // Analyze whether bonus outcomes are: increasing, decreasing, clustering,
+   135→  1214→  // appearing after specific sequences, repeating, or showing unusual recent
+   136→  1215→  // frequency. This is NOT "bonus appeared → predict bonus next". Instead,
+   137→  1216→  // we measure the CURRENT bonus activity level vs the long-term baseline.
+   138→  1217→  // If bonus activity is elevated, bonus outcomes get a mild evidence boost
+   139→  1218→  // (capped). This ensures the engine does NOT have a bonus blind spot.
+   140→  1219→  const isBonusGame = (name: string): boolean => BONUS_NAMES.includes(name);
+   141→  1220→
+   142→  1221→  // Bonus frequency in combined sequence (long-term)
+   143→  1222→  const combinedBonusCount = combinedSeq.filter(isBonusGame).length;
+   144→  1223→  const combinedBonusRate = combinedSeq.length > 0 ? combinedBonusCount / combinedSeq.length : 0;
+   145→  1224→  // Bonus frequency in recent 10 of combined sequence (short-term)
+   146→  1225→  const recentCombined = combinedSeq.slice(-10);
+   147→  1226→  const recentBonusCount = recentCombined.filter(isBonusGame).length;
+   148→  1227→  const recentBonusRate = recentCombined.length > 0 ? recentBonusCount / recentCombined.length : 0;
+   149→  1228→  // Bonus activity trend: recent vs long-term
+   150→  1229→  const bonusTrend = recentBonusRate - combinedBonusRate; // positive = increasing
+   151→  1230→  // Bonus clustering: count bonus "bursts" (2+ bonuses within 3 spins)
+   152→  1231→  let bonusBursts = 0;
+   153→  1232→  for (let i = 0; i < combinedSeq.length - 2; i++) {
+   154→  1233→    const window = combinedSeq.slice(i, i + 3);
+   155→  1234→    const bonusInWindow = window.filter(isBonusGame).length;
+   156→  1235→    if (bonusInWindow >= 2) bonusBursts++;
+   157→  1236→  }
+   158→  1237→  // Is a bonus currently "active" (appeared in last 3 spins)?
+   159→  1238→  const last3 = combinedSeq.slice(-3);
+   160→  1239→  const bonusInLast3 = last3.filter(isBonusGame).length;
+   161→  1240→  const bonusActive = bonusInLast3 > 0;
+   162→  1241→  // Per-bonus-game recent frequency (last 10 combined)
+   163→  1242→  const bonusRecentFreq: Record<string, number> = {};
+   164→  1243→  for (const b of BONUS_NAMES) bonusRecentFreq[b] = 0;
+   165→  1244→  for (const name of recentCombined) {
+   166→  1245→    if (isBonusGame(name)) bonusRecentFreq[name] = (bonusRecentFreq[name] ?? 0) + 1;
+   167→  1246→  }
+   168→  1247→
+   169→  1248→  const scores: CandidateScore[] = [];
+   170→  1249→
+   171→  1250→  for (let i = 0; i < GAMES.length; i++) {
+   172→  1251→    const g = GAMES[i];
+   173→  1252→    const theo = THEORETICAL[g.name] ?? 0.1;
+   174→  1253→    // LONG-TERM PRIOR: prefer REAL casino spin frequency when available (20+
+   175→  1254→    // real spins), else theoretical probability, else tiny user history.
+   176→  1255→    const livePrior = livePriorFor(g.name);
+   177→  1256→    const userLongFreq = n > 0 ? (freqAll.get(g.name) ?? 0) / n : 0;
+   178→  1257→    // Blend user-verified long-term with live-prior when both exist.
+   179→  1258→    // Live prior dominates (real casino data) but user history adds weight.
+   180→  1259→    const longFreq = useLivePrior
+   181→  1260→      ? livePrior * 0.7 + userLongFreq * 0.3
+   182→  1261→      : userLongFreq;
+   183→  1262→    // RECENT frequency: prefer live recent (last 10 real spins) when available;
+   184→  1263→    // it's far more responsive than the tiny user recent slice.
+   185→  1264→    const liveRecFreq = liveRecentN > 0 ? (liveRecentFreq.get(g.name) ?? 0) / liveRecentN : 0;
+   186→  1265→    const userRecFreq = recentHist.length > 0 ? (recentFreq.get(g.name) ?? 0) / recentHist.length : 0;
+   187→  1266→    const recFreq = useLivePrior
+   188→  1267→      ? liveRecFreq * 0.6 + userRecFreq * 0.4
+   189→  1268→      : userRecFreq;
+   190→  1269→    const trend = recFreq - longFreq;
+   191→  1270→    const gap = gaps[g.name];
+   192→  1271→    const gapHistory = gapHistories[g.name];
+   193→  1272→    const avgGap = gapHistory.length > 0
+   194→  1273→      ? gapHistory.reduce((s, x) => s + x, 0) / gapHistory.length
+   195→  1274→      : n / Math.max(freqAll.get(g.name) ?? 1, 1);
+   196→  1275→    const isOverdue = avgGap > 0 && gap > avgGap * 1.5;
+   197→  1276→    const isHot = longFreq > theo * 1.3 && (n >= 5 || liveN >= 20);
+   198→  1277→    const isCold = longFreq < theo * 0.5 && (n >= 5 || liveN >= 20);
+   199→  1278→
+   200→  1279→    // Signal-wise historical performance (when this game was predicted)
+   201→  1280→    const sw = dashboard.signalWiseHitRate[g.name];
+   202→  1281→    const sampleSize = sw.predicted;
+   203→  1282→    const signalHitRate = sw.rate;
+   204→  1283→    const wilsonLower = sw.wilsonLower; // sample-size-aware confidence
+   205→  1284→
+   206→  1285→    // Volatility: variance of gap history
+   207→  1286→    let volatility = 0;
+   208→  1287→    if (gapHistory.length >= 2) {
+   209→  1288→      const mean = gapHistory.reduce((s, x) => s + x, 0) / gapHistory.length;
+   210→  1289→      volatility = gapHistory.reduce((s, x) => s + (x - mean) ** 2, 0) / gapHistory.length;
+   211→  1290→    }
+   212→  1291→
+   213→  1292→    const signals: string[] = [];
+   214→  1293→
+   215→  1294→    // ===== SAMPLE-SIZE STABILIZATION (Bayesian / Laplace shrinkage) =====
+   216→  1295→    // CRITICAL: Small-sample observations must NOT create extreme deviations.
+   217→  1296→    //
+   218→  1297→    // k=30 (increased from 20): rare outcomes need MORE evidence before their
+   219→  1298→    // deviation can significantly affect the score. At k=30:
+   220→  1299→    //   N=30, CRAZY TIME count=1, prior=1.85%:
+   221→  1300→    //     smoothed = (1 + 30*0.0185) / 60 = 1.09% → dev=-41% (was +48% at k=20)
+   222→  1301→    //   N=30, "1" count=12, prior=38.89%:
+   223→  1302→    //     smoothed = (12 + 30*0.389) / 60 = 39.45% → dev=+1.4% (barely changed)
+   224→  1303→    //
+   225→  1304→    // This ensures rare outcomes need substantially more observations before
+   226→  1305→    // they can displace high-prior common outcomes like "1" (38.89%) or "2" (24.07%).
+   227→  1306→    const SHRINKAGE_K = 30;
+   228→  1307→
+   229→  1308→    // Compute observed count and total N for this outcome.
+   230→  1309→    // Use the larger of (user rounds, live spins) as the sample.
+   231→  1310→    const userCount = freqAll.get(g.name) ?? 0;
+   232→  1311→    const liveCount = liveFreqAll.get(g.name) ?? 0;
+   233→  1312→    // Total sample N = combined user rounds + live spins
+   234→  1313→    const sampleN = n + liveN;
+   235→  1314→    // Combined observed count (user + live, weighted by their respective N)
+   236→  1315→    const combinedCount = userCount + liveCount;
+   237→  1316→
+   238→  1317→    // Laplace-smoothed frequency
+   239→  1318→    const smoothedFreq = sampleN > 0
+   240→  1319→      ? (combinedCount + SHRINKAGE_K * theo) / (sampleN + SHRINKAGE_K)
+   241→  1320→      : theo;
+   242→  1321→
+   243→  1322→    // Raw (unstabilized) deviation — for debug display only
+   244→  1323→    const rawBlendedFreq = (longFreq * longW + recFreq * adaptW);
+   245→  1324→    const rawDeviation = theo > 0 ? (rawBlendedFreq - theo) / theo : 0;
+   246→  1325→
+   247→  1326→    // Stabilized deviation — uses the Laplace-smoothed frequency
+   248→  1327→    const stabilizedDeviation = theo > 0 ? (smoothedFreq - theo) / theo : 0;
+   249→  1328→
+   250→  1329→    // Cap stabilized deviation to prevent extreme swings: [-0.6, +2.0]
+   251→  1330→    const cappedDeviation = Math.max(-0.6, Math.min(2.0, stabilizedDeviation));
+   252→  1331→
+   253→  1332→    // ===== EXPERIMENTAL: RARE-OUTCOME EVIDENCE RELIABILITY LAYER =====
+   254→  1333→    // (ACTIVE only in mode === "experimental"; baseline passes through unchanged)
+   255→  1334→    //
+   256→  1335→    // A small sample of rare-outcome appearances (e.g. PACHINKO 3× in 50
+   257→  1336→    // rounds) can generate a large RELATIVE deviation (+39%) that, via
+   258→  1337→    // evidenceScore = 1 + dev, displaces a substantially higher-prior
+   259→  1338→    // number outcome. This is statistically unsound: the relative
+   260→  1339→    // deviation of a rare outcome has much higher variance per observation
+   261→  1340→    // than a common outcome, so the same count implies far less confidence.
+   262→  1341→    //
+   263→  1342→    // Reliability factor (continuous, generic, NO hard cutoff):
+   264→  1343→    //   reliability = effectiveSampleSize / (effectiveSampleSize + RELIABILITY_K)
+   265→  1344→    //
+   266→  1345→    //   effectiveSampleSize = combinedCount (user rounds + live spins that
+   267→  1346→    //   landed on this outcome — the independent observations supporting
+   268→  1347→    //   THIS outcome's deviation estimate).
+   269→  1348→    //
+   270→  1349→    // Applied ONLY to the POSITIVE portion of the deviation:
+   271→  1350→    //   - Positive dev (outcome appeared MORE than prior) → dampened by
+   272→  1351→    //     reliability. A rare outcome needs many independent observations
+   273→  1352→    //     before its positive evidence can dominate a high-prior outcome.
+   274→  1353→    //   - Negative dev (outcome appeared LESS than prior) → passes through
+   275→  1354→    //     UNCHANGED. We must NOT inflate a rare outcome that hasn't
+   276→  1355→    //     appeared (that would push never-seen rare outcomes INTO Top-4,
+   277→  1356→    //     the opposite of the goal). The prior term already keeps them low.
+   278→  1357→    //
+   279→  1358→    // This is NOT recency chasing: a single recent appearance does not
+   280→  1359→    // move reliability much (count 0→1: r 0→0.09). Genuine repeated
+   281→  1360→    // evidence accumulates count → reliability rises → evidence reaches
+   282→  1361→    // full strength. A rare outcome with 8+ appearances CAN still enter.
+   283→  1362→    const experimentalActive = mode === "experimental";
+   284→  1363→    const effectiveSampleSize = combinedCount; // independent observations
+   285→  1364→    const reliability = experimentalActive
+   286→  1365→      ? effectiveSampleSize / (effectiveSampleSize + RELIABILITY_K)
+   287→  1366→      : 1.0; // baseline: full strength (no reliability discount)
+   288→  1367→    // Dampen positive deviation only; keep negative deviation as-is.
+   289→  1368→    const reliableDeviation = experimentalActive
+   290→  1369→      ? (cappedDeviation > 0
+   291→  1370→          ? cappedDeviation * reliability
+   292→  1371→          : cappedDeviation)
+   293→  1372→      : cappedDeviation; // baseline: identity
+   294→  1373→
+   295→  1374→    // ===== BASE SCORE — BALANCED EVIDENCE + PRIOR =====
+   296→  1375→    // CRITICAL FIX: The previous 85% evidence / 15% prior ratio allowed rare
+   297→  1376→    // outcomes (CRAZY TIME 1.85%) to displace common outcomes ("1" 38.89%)
+   298→  1377→    // after just 1-2 appearances. This caused the model to UNDERPERFORM the
+   299→  1378→    // simple theoretical [1,2,5,10] baseline (53% vs 88%).
+   300→  1379→    //
+   301→  1380→    // NEW RATIO: 50% evidence / 50% prior.
+   302→  1381→    //
+   303→  1382→    // This means:
+   304→  1383→    //   - Common outcomes with NEUTRAL evidence keep ~50% of their prior weight
+   305→  1384→    //   - Rare outcomes need MUCH stronger relative evidence to overcome
+   306→  1385→    //     the prior advantage of common outcomes
+   307→  1386→    //   - A rare outcome appearing 1-2× in 30 spins will NOT displace "1" or "2"
+   308→  1387→    //   - A rare outcome appearing 5+× in 30 spins CAN still enter Top-4
+   309→  1388→    //
+   310→  1389→    // Example with N=30, k=30:
+   311→  1390→    //   "1" (prior 38.89%): smoothed=39.45%, dev=+1.4% → evidence=1.014
+   312→  1391→    //     score = 1.014*0.50 + 0.389*0.50 = 0.702
+   313→  1392→    //   CRAZY TIME (prior 1.85%): smoothed=1.09%, dev=-41% → evidence=0.59
+   314→  1393→    //     score = 0.59*0.50 + 0.0185*0.50 = 0.304
+   315→  1394→    //   → "1" (0.702) >> CRAZY TIME (0.304) — correct!
+   316→  1395→    //
+   317→  1396→    //   CRAZY TIME appearing 3× in 30: smoothed=(3+30*0.0185)/60=5.93%, dev=+221%
+   318→  1397→    //     evidence=3.21, score=3.21*0.50+0.0185*0.50=1.614
+   319→  1398→    //   "1" appearing 12× in 30: score=0.702
+   320→  1399→    //   → CRAZY TIME (1.614) > "1" (0.702) — rare outcome CAN enter when justified ✓
+   321→  1400→    //
+   322→  1401→    // EXPERIMENTAL mode: evidenceScore uses reliableDeviation (positive dev
+   323→  1402→    // dampened by sample-size reliability). Baseline mode: reliableDeviation
+   324→  1403→    // === cappedDeviation (identity), so behavior is BIT-FOR-BIT identical
+   325→  1404→    // to the frozen k=30 baseline. This guarantees a clean A/B comparison.
+   326→  1405→    const evidenceScore = 1 + reliableDeviation;
+   327→  1406→    let score = evidenceScore * 0.50 + theo * 0.50;
+   328→  1407→    if (sampleN === 0) score = theo; // no data at all → pure theoretical
+   329→  1408→
+   330→  1409→    // ===== FACTOR 1: Recent active (mild adaptive signal — NOT a chase) =====
+   331→  1410→    // Appearing more than 80% of theoretical recently → mild evidence the wheel
+   332→  1411→    // is currently favouring it (regime). Capped to prevent hot-number chasing.
+   333→  1412→    // Adaptive weight applied from MISS-feedback calibration.
+   334→  1413→    if (recFreq > livePrior * 0.8 && (n >= 5 || liveN >= 20)) {
+   335→  1414→      const w = sigWeights["recent-active"] ?? 1.0;
+   336→  1415→      score *= 1 + (0.10 - 1) * (1 - w) + 0.10 * w; // = 1.10 * w + (1 - w)
+   337→  1416→      signals.push("recent-active");
+   338→  1417→    }
+   339→  1418→
+   340→  1419→    // ===== FACTOR 2: Trend alignment (adaptive weighting) =====
+   341→  1420→    // Recent vs long-term delta — mild evidence of regime shift. NOT a chase.
+   342→  1421→    // Adaptive weight applied from MISS-feedback calibration.
+   343→  1422→    if (trend > 0.05 && (n >= 10 || liveN >= 20)) {
+   344→  1423→      const w = sigWeights["trending-up"] ?? 1.0;
+   345→  1424→      score *= 1 + Math.min(0.12, trend * 1.5 * adaptW) * w;
+   346→  1425→      signals.push("trending-up");
+   347→  1426→    } else if (trend < -0.05 && (n >= 10 || liveN >= 20)) {
+   348→  1427→      const w = sigWeights["trending-down"] ?? 1.0;
+   349→  1428→      score *= 1 + Math.max(-0.20, trend * 1.5 * adaptW) * w;
+   350→  1429→      signals.push("trending-down");
+   351→  1430→    }
+   352→  1431→
+   353→  1432→    // ===== FACTOR 3: Pattern stability bonus =====
+   354→  1433→    // Stable patterns (4+ unique in recent 10) = more predictable wheel.
+   355→  1434→    // Reliability signal, not a hot/cold bias.
+   356→  1435→    if (stability === "STABLE" && longFreq >= livePrior * 0.8) {
+   357→  1436→      score *= 1.06;
+   358→  1437→      signals.push("pattern-stable");
+   359→  1438→    }
+   360→  1439→
+   361→  1440→    // ===== FACTOR 4: Wilson score confidence (sample-size-aware) =====
+   362→  1441→    // Games with verified good prediction history get a mild boost.
+   363→  1442→    // Wilson lower bound penalizes tiny samples automatically (2/2 ≠ 100%).
+   364→  1443→    if (sampleSize >= 3) {
+   365→  1444→      score *= 1 + wilsonLower * 0.25; // up to +25% for proven signals
+   366→  1445→      signals.push(`verified (${hitLabel(sampleSize, signalHitRate)})`);
+   367→  1446→    }
+   368→  1447→
+   369→  1448→    // ===== FACTOR 5: Volatility penalty (reliability only — NOT overdue boost) =====
+   370→  1449→    // High gap-variance = erratic = LESS reliable → mild penalty.
+   371→  1450→    // This is NOT an overdue boost — gap is used ONLY as a stability signal.
+   372→  1451→    if (volatility > avgGap * avgGap * 1.5 && avgGap > 0) {
+   373→  1452→      score *= 0.92;
+   374→  1453→      signals.push("high-volatility");
+   375→  1454→    }
+   376→  1455→
+   377→  1456→    // ===== FACTOR 6: Repeat-Pattern Analysis (DATA-BASED, NOT blind carryover) =====
+   378→  1457→    // If the last actual result was this game's name, AND this game has a
+   379→  1458→    // historically HIGH repeat rate (P(next=X|cur=X) > baseline), then give
+   380→  1459→    // a MILD evidence boost. This is NOT "last hit → predict same again" —
+   381→  1460→    // it's "this outcome has a statistical tendency to repeat, and it just
+   382→  1461→    // happened, so the evidence for continuation is slightly stronger".
+   383→  1462→    //
+   384→  1463→    // KEY RULES (per user spec):
+   385→  1464→    //   - Previous result gets NO automatic bonus (bonus = 0 by default).
+   386→  1465→    //   - Previous HIT gets NO automatic carryover.
+   387→  1466→    //   - Previous MISS gets NO automatic penalty.
+   388→  1467→    //   - Repeat is ALLOWED but ONLY when statistical evidence supports it.
+   389→  1468→    //   - Same number CAN repeat, but only if its repeat rate is above baseline.
+   390→  1469→    //
+   391→  1470→    // We compare this game's repeat rate against the baseline repeat rate.
+   392→  1471→    // Only if ABOVE baseline (and 3+ observed pairs) do we apply a mild boost.
+   393→  1472→    if (lastResultName === g.name) {
+   394→  1473→      const rs = repeatStats[g.name];
+   395→  1474→      if (rs.currentCount >= 3 && rs.rate > baselineRepeatRate * 1.15) {
+   396→  1475→        // Above baseline by 15%+ → mild evidence boost (capped at +10%).
+   397→  1476→        const excess = (rs.rate - baselineRepeatRate) / Math.max(baselineRepeatRate, 0.01);
+   398→  1477→        score *= 1 + Math.min(0.10, excess * 0.15);
+   399→  1478→        signals.push(`repeat-supported (${Math.round(rs.rate * 100)}%)`);
+   400→  1479→      } else if (rs.currentCount >= 3 && rs.rate < baselineRepeatRate * 0.5) {
+   401→  1480→        // Below baseline by 50%+ → mild evidence dampening (repeat is unlikely).
+   402→  1481→        score *= 0.95;
+   403→  1482→        signals.push(`repeat-unlikely (${Math.round(rs.rate * 100)}%)`);
+   404→  1483→      }
+   405→  1484→      // If repeat rate is near baseline → NO boost, NO penalty. Fresh ranking.
+   406→  1485→    }
+   407→  1486→
+   408→  1487→    // ===== FACTOR 7: PER-OUTCOME BONUS EVIDENCE (no group boost) =====
+   409→  1488→    // CRITICAL: NO group bonus boost. Each bonus is scored INDIVIDUALLY.
+   410→  1489→    // A COIN FLIP cluster affects ONLY COIN FLIP — never transfers to
+   411→  1490→    // CASH HUNT / PACHINKO / CRAZY TIME. This prevents COIN FLIP from
+   412→  1491→    // being over-selected due to generic bonus group boosts.
+   413→  1492→    //
+   414→  1493→    // Per user spec:
+   415→  1494→    //   - NO generic bonus-elevated boost (was applying to ALL bonuses)
+   416→  1495→    //   - NO generic bonus-clustering boost (was applying to ALL bonuses)
+   417→  1496→    //   - Per-outcome recent occurrence = individual evidence
+   418→  1497→    //   - Per-outcome cluster = individual evidence
+   419→  1498→    //   - Each bonus competes on the SAME scoring framework as numbers
+   420→  1499→    if (isBonusGame(g.name)) {
+   421→  1500→      // Per-outcome recent occurrence (last 10) — INDIVIDUAL, not group
+   422→  1501→      const thisBonusRecent = bonusRecentFreq[g.name] ?? 0;
+   423→  1502→      if (combinedSeq.length >= 20 && thisBonusRecent > 0 && recentCombined.length > 0) {
+   424→  1503→        const thisBonusRate = thisBonusRecent / recentCombined.length;
+   425→  1504→        const thisBonusTheo = theo;
+   426→  1505→        // Boost only if THIS specific bonus is appearing more than 1.5× its base
+   427→  1506→        if (thisBonusRate > thisBonusTheo * 1.5) {
+   428→  1507→          score *= 1.08; // capped +8%
+   429→  1508→          signals.push(`${g.name.toLowerCase()}-recent-active`);
+   430→  1509→        }
+   431→  1510→      }
+   432→  1511→      // Per-outcome cluster detection — THIS bonus's own cluster (2+ in last 5)
+   433→  1512→      const last5ForThisBonus = combinedSeq.slice(-5);
+   434→  1513→      const thisBonusInLast5 = last5ForThisBonus.filter((n) => n === g.name).length;
+   435→  1514→      if (combinedSeq.length >= 20 && thisBonusInLast5 >= 2) {
+   436→  1515→        // This specific bonus has its own cluster — mild boost
+   437→  1516→        score *= 1.05; // capped +5%
+   438→  1517→        signals.push(`${g.name.toLowerCase()}-cluster-${thisBonusInLast5}in5`);
+   439→  1518→      }
+   440→  1519→      // NO group bonus-elevated boost
+   441→  1520→      // NO group bonus-clustering boost
+   442→  1521→      // NO group bonus-cluster-3in5 boost
+   443→  1522→    } else {
+   444→  1523→      // For NUMBER outcomes: if bonus risk is high, numbers are slightly
+   445→  1524→      // less reliable (the wheel is in a "bonus phase"). Mild dampening.
+   446→  1525→      // Requires 20+ sample AND recent bonus > 1.5× long-term.
+   447→  1526→      if (combinedSeq.length >= 20 && recentBonusRate > combinedBonusRate * 1.5) {
+   448→  1527→        score *= 0.97;
+   449→  1528→        signals.push("bonus-phase-risk");
+   450→  1529→      }
+   451→  1530→    }
+   452→  1531→
+   453→  1532→    // ===================================================================
+   454→  1533→    // EXPLICITLY REMOVED (single-round last-hit carryover bias):
+   455→  1534→    //   - NO single prev-miss-dampen (one MISS → automatic penalty)
+   456→  1535→    //   - NO prev-HIT continuation (one HIT → automatic bonus)
+   457→  1536→    //   - NO overdue gap-filling boost (isOverdue → boost)
+   458→  1537→    //   - NO hot/cold z-score boost
+   459→  1538→    //
+   460→  1539→    // BUT: PERSISTENCE PENALTY after REPEATED consecutive failures.
+   461→  1540→    // If the same outcome keeps appearing in FAILED predictions (2+ consecutive
+   462→  1541→    // MISSes), apply a graduated dampening so alternatives get a fair evaluation.
+   463→  1542→    // This prevents tunnel vision — the engine must challenge its own targets
+   464→  1543→    // when they repeatedly fail, not keep selecting the same set.
+   465→  1544→    // ===================================================================
+   466→  1545→    if (dashboard.consecutiveMisses >= 2 && prevPredNames.includes(g.name)) {
+   467→  1546→      // Graduated penalty: -3% per consecutive miss (capped at -15%)
+   468→  1547→      const penalty = Math.min(0.15, dashboard.consecutiveMisses * 0.03);
+   469→  1548→      score *= (1 - penalty);
+   470→  1549→      signals.push(`persistence-penalty (-${Math.round(penalty * 100)}%)`);
+   471→  1550→    }
+   472→  1551→    void isOverdue;
+   473→  1552→    void isHot;
+   474→  1553→    void isCold;
+   475→  1554→    void lastHit;
+   476→  1555→
+   477→  1556→    // ===== SIGNAL 9: Anomaly handling (pure relative — no prior multiplication) =====
+   478→  1557→    if (dashboard.anomalyDetected) {
+   479→  1558→      const anomalyDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
+   480→  1559→      const cappedAnomalyDev = Math.max(-0.6, Math.min(2.0, anomalyDeviation));
+   481→  1560→      const anomalyEvidence = 1 + cappedAnomalyDev * 1.5;
+   482→  1561→      score = anomalyEvidence * 0.50 + theo * 0.50;
+   483→  1562→      if (!signals.includes("anomaly-weighted")) signals.push("anomaly-weighted");
+   484→  1563→    }
+   485→  1564→
+   486→  1565→    // ===== SIGNAL 10: Pattern shift handling (pure relative) =====
+   487→  1566→    if (dashboard.patternShiftDetected) {
+   488→  1567→      const shiftDeviation = livePrior > 0 ? (recFreq - livePrior) / livePrior : 0;
+   489→  1568→      const cappedShiftDev = Math.max(-0.6, Math.min(2.0, shiftDeviation));
+   490→  1569→      const shiftEvidence = 1 + cappedShiftDev * 1.3;
+   491→  1570→      score = shiftEvidence * 0.50 + theo * 0.50;
+   492→  1571→      if (!signals.includes("shift-adaptive")) signals.push("shift-adaptive");
+   493→  1572→    }
+   494→  1573→
+   495→  1574→    // ===== Wheel base-probability model breakdown =====
+   496→  1575→    const basePrior = THEORETICAL[g.name] ?? 0.1;
+   497→  1576→    const segmentCount = WHEEL_SEGMENTS[g.name] ?? 1;
+   498→  1577→    const liveObservedRate = longFreq; // observed frequency (blended live + user)
+   499→  1578→    // Model adjustment = ratio of final score to base prior (how much evidence shifted it)
+   500→  1579→    const modelAdjustment = basePrior > 0 ? score / basePrior : 1;
+   501→  1580→
+   502→  1581→    scores.push({
+   503→  1582→      game: g,
+   504→  1583→      rawScore: Math.max(score, 0.001),
+   505→  1584→      normalizedScore: 0, // filled after sorting
+   506→  1585→      signals,
+   507→  1586→      sampleSize,
+   508→  1587→      signalHitRate,
+   509→  1588→      wilsonLower,
+   510→  1589→      longTermFreq: longFreq,
+   511→  1590→      recentFreq: recFreq,
+   512→  1591→      trend,
+   513→  1592→      currentGap: gap,
+   514→  1593→      avgGap,
+   515→  1594→      isOverdue,
+   516→  1595→      isHot,
+   517→  1596→      isCold,
+   518→  1597→      label: "",
+   519→  1598→      // Wheel model breakdown:
+   520→  1599→      basePrior,
+   521→  1600→      segmentCount,
+   522→  1601→      liveObservedRate,
+   523→  1602→      modelAdjustment,
+   524→  1603→      finalAIScore: Math.max(score, 0.001),
+   525→  1604→      selectionReason: "", // filled after ranking
+   526→  1605→      // Full debug fields:
+   527→  1606→      observedFrequency: longFreq,
+   528→  1607→      blendedFrequency: rawBlendedFreq,
+   529→  1608→      relativeDeviation: rawDeviation,
+   530→  1609→      evidenceScorePreMultiplier: evidenceScore,
+   531→  1610→      sampleN,
+   532→  1611→      observedCount: combinedCount,
+   533→  1612→      smoothedFrequency: smoothedFreq,
+   534→  1613→      rawDeviation,
+   535→  1614→      stabilizedDeviation,
+   536→  1615→      // EXPERIMENTAL reliability layer:
+   537→  1616→      engineMode: mode,
+   538→  1617→      effectiveSampleSize,
+   539→  1618→      reliability,
+   540→  1619→      reliableDeviation,
+   541→  1620→    });
+   542→  1621→  }
+   543→  1622→
+   544→  1623→  // Normalize scores (so they sum to 1)
+   545→  1624→  const totalRaw = scores.reduce((s, c) => s + c.rawScore, 0);
+   546→  1625→  for (const c of scores) c.normalizedScore = totalRaw > 0 ? c.rawScore / totalRaw : 0;
+   547→  1626→
+   548→  1627→  // Sort by raw score (descending) — this is the EVIDENCE ranking (for display).
+   549→  1628→  scores.sort((a, b) => b.rawScore - a.rawScore);
+   550→  1629→
+   551→  1630→  // ===== Generate specific selection reasons (not generic) =====
+   552→  1631→  for (let i = 0; i < scores.length; i++) {
+   553→  1632→    const c = scores[i];
+   554→  1633→    const parts: string[] = [];
+   555→  1634→    const devPct = ((c.modelAdjustment - 1) * 100);
+   556→  1635→    if (Math.abs(devPct) > 2) {
+   557→  1636→      parts.push(`${devPct > 0 ? "+" : ""}${devPct.toFixed(1)}% vs prior`);
+   558→  1637→    }
+   559→  1638→    if (c.signals.length > 0) {
+   560→  1639→      parts.push(c.signals.slice(0, 3).join("+"));
+   561→  1640→    }
+   562→  1641→    if (c.recentFreq > c.longTermFreq + 0.02) {
+   563→  1642→      parts.push(`recent ${Math.round(c.recentFreq * 100)}% > long ${Math.round(c.longTermFreq * 100)}%`);
+   564→  1643→    }
+   565→  1644→    if (parts.length === 0) {
+   566→  1645→      parts.push(`base prior ${Math.round(c.basePrior * 100)}% (neutral)`);
+   567→  1646→    }
+   568→  1647→    c.selectionReason = parts.join(" · ");
+   569→  1648→  }
+   570→  1649→
+   571→  1650→  // Assign evidence ranks + labels (1..8).
+   572→  1651→  const rankLabels = [
+   573→  1652→    "strongest evidence",
+   574→  1653→    "second strongest",
+   575→  1654→    "third strongest",
+   576→  1655→    "fourth strongest",
+   577→  1656→    "fifth — alternate",
+   578→  1657→    "sixth — weak",
+   579→  1658→    "seventh — weak",
+   580→  1659→    "weakest evidence",
+   581→
+   582→[showing lines 1080-1659 of 2251; use offset=1660 with limit to continue reading]
