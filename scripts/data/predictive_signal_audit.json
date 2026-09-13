@@ -1,0 +1,122 @@
+{
+  "meta": {
+    "dataset": "200 frozen rounds",
+    "analysisDate": "2026-09-13T19:38:57.759846",
+    "readOnly": true
+  },
+  "signal1_first_order": {
+    "theo_ll": 1.6214196121072695,
+    "emp_ll": 1.6496200956446134,
+    "trans_ll": 1.7147041000518777,
+    "delta_vs_theo": 0.0932844879446082
+  },
+  "signal2_second_order": {
+    "trans2_ll": 1.713765936867861,
+    "delta_vs_theo": 0.09234632476059157
+  },
+  "signal3_bonus_clustering": {
+    "mean_bonus_gap": 6.6,
+    "gaps": [
+      2,
+      2,
+      14,
+      3,
+      9,
+      4,
+      5,
+      4,
+      1,
+      2,
+      8,
+      11,
+      5,
+      12,
+      8,
+      1,
+      4,
+      9,
+      1,
+      2,
+      7,
+      6,
+      3,
+      7,
+      18,
+      9,
+      26,
+      4,
+      7,
+      4
+    ],
+    "binary_accuracy": 0.5628140703517588,
+    "bonus_recall": 0.45161290322580644,
+    "bonus_total": 31
+  },
+  "signal4_regime": {
+    "n_high_tvd": 142,
+    "n_low_tvd": 38,
+    "avg_ll_high_tvd": 1.6440092814513534,
+    "avg_ll_low_tvd": 1.569243266305951
+  },
+  "signal5_timing": {
+    "median_dt_s": 42.82800006866455,
+    "fast_n": 99,
+    "slow_n": 100,
+    "fast_bonus_rate": 0.0,
+    "slow_bonus_rate": 0.31,
+    "chi2_bonus_vs_speed": 36.35303571428572,
+    "significant": true
+  },
+  "signal6_metadata": {
+    "has_sequence": false,
+    "num_ids_parsed": 200,
+    "diff_sample": [
+      173151606543949267473,
+      464204360323844599810,
+      168495861990859500001,
+      292135085546925902085,
+      181612692112901567103
+    ],
+    "note": "Spin IDs are opaque; even if sequential, they carry no outcome-predictive content."
+  },
+  "bonus_predictability": {
+    "bonus_base_rate": 0.155,
+    "bonus_rate_ci": [
+      0.11139568514638545,
+      0.211608058937256
+    ],
+    "p_bonus_after_bonus": 0.1,
+    "p_bonus_after_bonus_ci": [
+      0.03459925995971615,
+      0.25621441315266624
+    ],
+    "p_bonus_after_number": 0.16568047337278108,
+    "p_bonus_after_number_ci": [
+      0.11718666814065776,
+      0.22903553762462098
+    ],
+    "n_after_bonus": 30,
+    "n_after_number": 169,
+    "p_bonus_after_number_streak3": 1.0,
+    "p_bonus_after_number_streak3_ci": [
+      0.8453561767357979,
+      0.9999999999999999
+    ],
+    "n_number_streak3": 21,
+    "p_cf_given_cf_recent_10": 0.064,
+    "n_cf_recent_10": 125,
+    "cf_base_rate": 0.085
+  },
+  "walk_forward": {
+    "theo_ll": 1.6214196121072695,
+    "emp_ll": 1.6496200956446134,
+    "trans_ll": 1.7147041000518777,
+    "c17_ll": 1.6214196121072695
+  },
+  "split_half_cv": {
+    "test_ll": 1.7486815317892828,
+    "theo_test_ll": 1.6045911422934072,
+    "delta": 0.1440903894958756
+  },
+  "verdict": "Signal may exist \u2014 investigate further"
+}
