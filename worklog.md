@@ -8254,3 +8254,27 @@ Stage Summary:
 - Verification: 41/41 tests pass; tsc 12 total (ALL pre-existing in firebase/export-csv/RevoStats/examples/skills — 0 in decisionEngine/RevoGame/tests); lint 0 errors in src/+tests/ (4 pre-existing errors in diagnostic scripts/*.js, untouched per "don't modify unrelated files"); dev server compiles clean; agent-browser QA: page renders, C7 button runs (freshRounds + McNemar + disclaimer), flag toggle + reload no crash, no console errors.
 - Did NOT restart monitoring/cron. Did NOT claim the model is better. Did NOT tune parameters to the 178-round history. Did NOT run fresh-round validation. STOP after implementation + tests + commit per directive.
 - Next step required before any live validation: explicit user approval to run the C7 frozen walk-forward harness on 100+ genuinely NEW paired live rounds with the model FROZEN, and/or explicit approval to enable Shadow A/B.
+
+---
+Task ID: FROZEN-VALIDATION
+Agent: Z.ai Code (main)
+Task: Start frozen fresh-round Shadow A/B validation — collect 200 genuinely NEW paired live rounds, baseline (ALL_FLAGS_OFF) vs experimental (C1-C7 ALL ON), frozen flags, no tuning.
+
+Work Log:
+- Pre-flight verified: git clean (HEAD 5798379, engine byte-identical to 09f7863), 41 tests pass, Shadow A/B OFF (revo_experimentalFlag=null), no cron running (cron list total=0).
+- Inspected live feed: /api/crazy-time returns spins with unique `id` + `data.result.outcome.wheelResult.wheelSector`; cadence ~44s/spin. Mapped sectors via SPIN_TO_GAME_NAME.
+- Built collector (scripts/frozen_validation/collector.ts): polls feed every 20s, cold-starts by marking existing 30 spins as seen (only NEW spins count), runs BOTH engines per round (buildInitial with ALL_FLAGS_OFF vs ALL_FLAGS_ON), writes JSONL row per round with all 13 required fields, auto-stops at 200.
+- Built analyzer (scripts/frozen_validation/analyzer.ts): calls runFrozenWalkForward(actualNames, ALL_FLAGS_ON, []), produces 13-point report with McNemar, per-outcome efficiency, bonus inclusion/exclusion rates, duplicate/leakage checks.
+- Background process detachment failed (nohup/setsid/disown all killed by Bash tool on return; no screen/tmux available). Switched to foreground-chunk approach: 575s per Bash call (under 600s tool limit), state file enables seamless resume. Ran 17 chunks over ~2.7 hours.
+- Collected 200 genuinely NEW paired rounds (cold-start excluded all pre-existing spins). Collector auto-stopped at target 200 with status "stopped_target".
+- Ran analyzer. Results verified: 0 duplicate spinIds, 0 leakage violations, history monotonic (0→199), all predictions computed before settle.
+
+Stage Summary:
+- 200 clean paired rounds. Zero duplicates. Zero leakage. Model FROZEN (no tuning during validation).
+- Baseline (ALL_FLAGS_OFF): 134/200 = 67.00% (matches the 178-round diagnostic baseline of 66.29% — consistent).
+- Experimental (C1-C7 ALL ON): 165/200 = 82.50% (+15.50 pp vs baseline).
+- Theoretical [1,2,5,10]: 169/200 = 84.50% (experimental is -2.00 pp below theoretical).
+- McNemar: χ²=18.367, p<0.0001, SIGNIFICANT. 40 MISS→HIT flips, 9 HIT→MISS flips.
+- Experimental NEVER includes PACHINKO/CASH HUNT/CRAZY TIME (C4 overreaction penalty drops them). Includes COIN FLIP 137× (68.5%, data-driven — reliability rose above gate). Baseline wastes 61+48+34=143 slots on PACHINKO/CASH HUNT/CRAZY TIME with near-0% hit efficiency.
+- Experimental is 2 pp BELOW theoretical [1,2,5,10] — the COIN FLIP inclusion (trading 10) cost slightly more 10-hits than it gained COIN-FLIP-hits on this sample. The theoretical baseline remains the champion.
+- STOP per directive. No optimization cycle. No 100% claim. No superiority claim over theoretical.

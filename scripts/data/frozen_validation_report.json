@@ -1,0 +1,264 @@
+{
+  "meta": {
+    "modelVersion": "revo-engine-v2-C1C7",
+    "baselineFlags": {
+      "c1_calibratedChannel": false,
+      "c2_genericReliability": false,
+      "c3_uncertaintyShrinkage": false,
+      "c4_realOptimizer": false,
+      "c5_deScopeHarmful": false,
+      "c6_rcaInstrumentation": false,
+      "c7_frozenWalkForward": false
+    },
+    "experimentalFlags": {
+      "c1_calibratedChannel": true,
+      "c2_genericReliability": true,
+      "c3_uncertaintyShrinkage": true,
+      "c4_realOptimizer": true,
+      "c5_deScopeHarmful": true,
+      "c6_rcaInstrumentation": true,
+      "c7_frozenWalkForward": true
+    },
+    "collectedAt": "2026-09-13T06:20:53.025Z",
+    "pairedRounds": 200,
+    "jsonlRows": 200
+  },
+  "1_baseline_hit_total_pct": {
+    "hits": 134,
+    "total": 200,
+    "pct": 0.67
+  },
+  "2_experimental_hit_total_pct": {
+    "hits": 165,
+    "total": 200,
+    "pct": 0.825
+  },
+  "3_theoretical_12510_hit_total_pct": {
+    "hits": 169,
+    "total": 200,
+    "pct": 0.845
+  },
+  "4_experimental_delta_vs_baseline_pp": 0.15499999999999992,
+  "5_mcnemar": {
+    "r": 9,
+    "s": 40,
+    "statistic": 18.367346938775512,
+    "pValue": 0.000011585908650600347,
+    "significant": true,
+    "note": "McNemar χ²(1)=18.367, p=0.0000 (significant). Retrospective paired comparison only — NOT a fresh-validation claim."
+  },
+  "6_m2h_h2m": {
+    "m2h_missToHit": 40,
+    "h2m_hitToMiss": 9
+  },
+  "7_per_outcome_inclusion_vs_hit_efficiency": {
+    "baseline": [
+      {
+        "name": "1",
+        "inclusions": 177,
+        "actuals": 81,
+        "coveredActuals": 71,
+        "hitEfficiency": 0.4011299435028249
+      },
+      {
+        "name": "2",
+        "inclusions": 159,
+        "actuals": 52,
+        "coveredActuals": 38,
+        "hitEfficiency": 0.2389937106918239
+      },
+      {
+        "name": "5",
+        "inclusions": 80,
+        "actuals": 21,
+        "coveredActuals": 8,
+        "hitEfficiency": 0.1
+      },
+      {
+        "name": "10",
+        "inclusions": 109,
+        "actuals": 15,
+        "coveredActuals": 6,
+        "hitEfficiency": 0.05504587155963303
+      },
+      {
+        "name": "PACHINKO",
+        "inclusions": 61,
+        "actuals": 6,
+        "coveredActuals": 1,
+        "hitEfficiency": 0.01639344262295082
+      },
+      {
+        "name": "COIN FLIP",
+        "inclusions": 128,
+        "actuals": 17,
+        "coveredActuals": 10,
+        "hitEfficiency": 0.078125
+      },
+      {
+        "name": "CASH HUNT",
+        "inclusions": 48,
+        "actuals": 6,
+        "coveredActuals": 0,
+        "hitEfficiency": 0
+      },
+      {
+        "name": "CRAZY TIME",
+        "inclusions": 34,
+        "actuals": 2,
+        "coveredActuals": 0,
+        "hitEfficiency": 0
+      }
+    ],
+    "experimental": [
+      {
+        "name": "1",
+        "inclusions": 199,
+        "actuals": 81,
+        "coveredActuals": 80,
+        "hitEfficiency": 0.4020100502512563
+      },
+      {
+        "name": "2",
+        "inclusions": 199,
+        "actuals": 52,
+        "coveredActuals": 52,
+        "hitEfficiency": 0.2613065326633166
+      },
+      {
+        "name": "5",
+        "inclusions": 197,
+        "actuals": 21,
+        "coveredActuals": 20,
+        "hitEfficiency": 0.10152284263959391
+      },
+      {
+        "name": "10",
+        "inclusions": 64,
+        "actuals": 15,
+        "coveredActuals": 4,
+        "hitEfficiency": 0.0625
+      },
+      {
+        "name": "PACHINKO",
+        "inclusions": 0,
+        "actuals": 6,
+        "coveredActuals": 0,
+        "hitEfficiency": 0
+      },
+      {
+        "name": "COIN FLIP",
+        "inclusions": 137,
+        "actuals": 17,
+        "coveredActuals": 9,
+        "hitEfficiency": 0.06569343065693431
+      },
+      {
+        "name": "CASH HUNT",
+        "inclusions": 0,
+        "actuals": 6,
+        "coveredActuals": 0,
+        "hitEfficiency": 0
+      },
+      {
+        "name": "CRAZY TIME",
+        "inclusions": 0,
+        "actuals": 2,
+        "coveredActuals": 0,
+        "hitEfficiency": 0
+      }
+    ]
+  },
+  "8_bonus_inclusion_rate": {
+    "baseline": 0.33875,
+    "experimental": 0.17125
+  },
+  "9_number_exclusion_rate": {
+    "baseline": {
+      "1": 0.115,
+      "2": 0.205,
+      "5": 0.6,
+      "10": 0.455
+    },
+    "experimental": {
+      "1": 0.005,
+      "2": 0.005,
+      "5": 0.015,
+      "10": 0.68
+    }
+  },
+  "10_per_bonus_inclusion_and_hit_rates": {
+    "baseline": {
+      "PACHINKO": {
+        "inclusions": 61,
+        "actuals": 6,
+        "covered": 1,
+        "inclusionRate": 0.305,
+        "hitRate": 0.01639344262295082
+      },
+      "COIN FLIP": {
+        "inclusions": 128,
+        "actuals": 17,
+        "covered": 10,
+        "inclusionRate": 0.64,
+        "hitRate": 0.078125
+      },
+      "CASH HUNT": {
+        "inclusions": 48,
+        "actuals": 6,
+        "covered": 0,
+        "inclusionRate": 0.24,
+        "hitRate": 0
+      },
+      "CRAZY TIME": {
+        "inclusions": 34,
+        "actuals": 2,
+        "covered": 0,
+        "inclusionRate": 0.17,
+        "hitRate": 0
+      }
+    },
+    "experimental": {
+      "PACHINKO": {
+        "inclusions": 0,
+        "actuals": 6,
+        "covered": 0,
+        "inclusionRate": 0,
+        "hitRate": 0
+      },
+      "COIN FLIP": {
+        "inclusions": 137,
+        "actuals": 17,
+        "covered": 9,
+        "inclusionRate": 0.685,
+        "hitRate": 0.06569343065693431
+      },
+      "CASH HUNT": {
+        "inclusions": 0,
+        "actuals": 6,
+        "covered": 0,
+        "inclusionRate": 0,
+        "hitRate": 0
+      },
+      "CRAZY TIME": {
+        "inclusions": 0,
+        "actuals": 2,
+        "covered": 0,
+        "inclusionRate": 0,
+        "hitRate": 0
+      }
+    }
+  },
+  "11_duplicate_leakage_evidence": {
+    "duplicateSettlements": 0,
+    "duplicateRoundIds": [],
+    "leakageViolations": 0,
+    "allPredictionsComputedBeforeSettle": true
+  },
+  "12_exact_clean_paired_rounds": 200,
+  "13_rounds_excluded_and_why": {
+    "excluded": 0,
+    "reason": "none"
+  },
+  "disclaimer": "FROZEN WALK-FORWARD HARNESS. Built per C7. This output is a paired retrospective comparison, NOT a validation success claim. A genuine validation requires 100+ genuinely NEW paired live rounds with the model FROZEN (per §11/§12). Do not quote any number here as a 'validated improvement'."
+}
