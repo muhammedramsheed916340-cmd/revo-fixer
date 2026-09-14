@@ -39,6 +39,8 @@ export const ALL_FLAGS_ON: FeatureFlags = {
   c5_deScopeHarmful: true,
   c6_rcaInstrumentation: true,
   c7_frozenWalkForward: true,
+  c8_credibleLowerBound: true,
+  c9_recencyExcludeLast: true,
 };
 
 /** A representative 30-round history where CRAZY TIME (1.85% prior) appears

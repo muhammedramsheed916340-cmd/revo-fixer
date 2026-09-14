@@ -184,13 +184,13 @@ export const EXPERIMENTAL_CONFIG = {
 } as const;
 
 // ============================================================
-// C1–C7 EXPERIMENTAL FEATURE FLAGS
+// C1–C8 EXPERIMENTAL FEATURE FLAGS
 // ============================================================
 // All default OFF. When ALL flags are OFF, the engine produces
 // BIT-FOR-BIT IDENTICAL output to the pre-C1-C7 baseline (provable
 // by the flag-OFF equivalence test: scores, selection order, and the
 // exact Top-4 set are unchanged). Each flag activates ONE
-// architectural change (C1–C7) independently so they can be A/B
+// architectural change (C1–C8) independently so they can be A/B
 // tested in isolation. None are auto-enabled in the live path —
 // they must be explicitly turned on (and Shadow A/B stays OFF until
 // implementation tests pass).
@@ -202,6 +202,8 @@ export const EXPERIMENTAL_CONFIG = {
 //   C5  de-scope harmful features        (kill raw-recent overwrites; reliability-gate persistence)
 //   C6  RCA instrumentation              (per-locked-Top-4 record for post-MISS reconstruction)
 //   C7  frozen walk-forward validation   (build path ONLY; no live effect; no success claim)
+//   C8  Bayesian credible lower-bound    (coverage uses pLB instead of posterior; generic)
+//   C9  recency-exclude-last             (signal recency window excludes just-arrived actual)
 export interface FeatureFlags {
   c1_calibratedChannel: boolean;
   c2_genericReliability: boolean;
@@ -210,6 +212,8 @@ export interface FeatureFlags {
   c5_deScopeHarmful: boolean;
   c6_rcaInstrumentation: boolean;
   c7_frozenWalkForward: boolean;
+  c8_credibleLowerBound: boolean;
+  c9_recencyExcludeLast: boolean;
 }
 
 /** All flags OFF — the guaranteed bit-for-bit baseline. */
@@ -221,10 +225,12 @@ export const ALL_FLAGS_OFF: FeatureFlags = {
   c5_deScopeHarmful: false,
   c6_rcaInstrumentation: false,
   c7_frozenWalkForward: false,
+  c8_credibleLowerBound: false,
+  c9_recencyExcludeLast: false,
 };
 
 /** Engine model version stamp (for C6 RCA records + validation provenance). */
-export const MODEL_VERSION = "revo-engine-v2-C1C7";
+export const MODEL_VERSION = "revo-engine-v2-C1C9";
 
 // ============================================================
 // C6 — LOCKED RCA RECORD (per-locked-Top-4 instrumentation)
@@ -247,6 +253,8 @@ export interface LockedOutcomeEntry {
   reliability?: number;           // C2: 0..1 sample-size reliability
   uncertainty?: number;           // C3: 0..1 (1 = fully prior-driven, 0 = data-driven)
   selectionScore?: number;        // C1: the score actually used for selection
+  effectiveSampleSize?: number;   // C2/C8: independent observations for this outcome (nEff)
+  lowerBoundProbability?: number; // C8: 95% credible lower bound on posterior (pLB)
   reason: string;                 // why this outcome was selected or excluded
 }
 export interface LockedRcaRecord {
@@ -583,6 +591,64 @@ function calibrateProbabilities(
 function shrinkTowardPrior(dataEstimate: number, prior: number, uncertainty: number): number {
   const u = Math.max(0, Math.min(1, uncertainty));
   return dataEstimate * (1 - u) + prior * u;
+}
+
+// ============================================================
+// C8 — BAYESIAN CREDIBLE LOWER-BOUND (CLB)
+// ============================================================
+// PRINCIPLE: Replace the posterior point estimate in the C4 coverage term
+// with its 95% credible LOWER bound. This is the standard "safe probability"
+// from Bayesian decision theory — penalizes outcomes with high point
+// estimates but low effective sample sizes (uncertainty drags the lower
+// bound down). GENERIC: applies identically to all 8 outcomes (numbers and
+// bonuses); no per-outcome threshold or hardcoded handling.
+//
+//   pLB_i = max(0, p_i - z * sqrt(p_i * (1 - p_i) / nEff_i))
+//
+// where:
+//   p_i      = calibrated Bayesian posterior (C1)
+//   nEff_i   = effective sample size (independent observations for outcome i)
+//              derived from C2 reliability: reliability = nEff / (nEff + K)
+//              → nEff = K * reliability / (1 - reliability)   (0 when reliability 0)
+//   z        = 1.96 (95% two-sided credible level — the standard, NOT tuned
+//              to any historical sample; per the C8 design directive §3).
+//
+// Behavior:
+//   - nEff = 0        → pLB = 0 (no data → no safe probability)
+//   - nEff small      → pLB ≪ posterior (wide CI → strong shrinkage)
+//   - nEff → ∞        → pLB → posterior (CI narrows → no shrinkage)
+//   - p near 0 or 1   → smaller SE → pLB closer to p (variance stabilizes)
+//
+// IMPORTANT: C8 does NOT overwrite the posterior, rawScore, or selectionScore.
+// It ONLY changes the probability used in the C4 optimizer's COVERAGE term
+// (and the diversity term, which is computed from the same probabilities).
+// All other C1–C7 fields remain unchanged. When c8_credibleLowerBound is OFF,
+// the optimizer uses the posterior directly (bit-for-bit C1–C7 behavior).
+export const C8_Z = 1.96; // 95% credible lower bound (NOT tuned — standard)
+
+/** Compute the 95% credible lower bound on a posterior probability given
+ *  the effective sample size. Returns 0 when nEff <= 0. Generic — identical
+ *  treatment for all outcomes. */
+export function credibleLowerBound(
+  posterior: number,
+  effectiveSampleSize: number,
+  z: number = C8_Z,
+): number {
+  if (!Number.isFinite(posterior) || !Number.isFinite(effectiveSampleSize)) return 0;
+  const p = Math.max(0, Math.min(1, posterior));
+  const n = Math.max(0, effectiveSampleSize);
+  if (n <= 0) return 0;
+  const se = Math.sqrt((p * (1 - p)) / n);
+  return Math.max(0, p - z * se);
+}
+
+/** Derive the effective sample size (nEff) from C2 reliability.
+ *  reliability = nEff / (nEff + K)  →  nEff = K * r / (1 - r).
+ *  Returns 0 when reliability <= 0; returns a large number when reliability → 1. */
+export function effectiveSampleSizeFromReliability(reliability: number, K: number = RELIABILITY_K): number {
+  if (!Number.isFinite(reliability) || reliability <= 0) return 0;
+  if (reliability >= 1) return 1e9;
+  return K * reliability / (1 - reliability);
 }
 
 /** Chi-square-based anomaly detection: actual distribution vs theoretical.
@@ -1285,10 +1351,25 @@ function scoreCandidates(
   }
 
   // Per-game frequency in recent 10 USER-VERIFIED rounds (short-term)
+  // C9: when c9_recencyExcludeLast is ON, the SIGNAL recency window excludes
+  // the just-arrived actual (the last element of hist). This prevents the
+  // self-referential boost where the just-arrived result inflates its own
+  // recent-frequency signal (recent-active, trending, shift-adaptive).
+  // The Bayesian count (freqAll / smoothedFreq below) is UNCHANGED — it still
+  // includes the just-arrived actual, which is correct for the posterior.
+  // When C9 OFF: signalRecentHist === recentHist (bit-for-bit baseline).
   const recentHist = hist.slice(-10);
   const recentFreq = new Map<string, number>();
   for (const g of GAMES) recentFreq.set(g.name, 0);
   for (const h of recentHist) recentFreq.set(h.name, (recentFreq.get(h.name) ?? 0) + 1);
+
+  // C9: signal recency window = last 10 EXCLUDING the most recent (just-arrived) actual.
+  // hist.slice(-11, -1) takes elements [n-11 .. n-2], i.e. the 10 BEFORE the last.
+  // When hist has ≤ 1 element, this is empty (no signal recency) — correct.
+  const signalRecentHist = flags.c9_recencyExcludeLast ? hist.slice(-11, -1) : recentHist;
+  const signalRecentFreq = new Map<string, number>();
+  for (const g of GAMES) signalRecentFreq.set(g.name, 0);
+  for (const h of signalRecentHist) signalRecentFreq.set(h.name, (signalRecentFreq.get(h.name) ?? 0) + 1);
 
   // Gap analysis per game
   const gaps: Record<string, number> = {};
@@ -1414,11 +1495,22 @@ function scoreCandidates(
       : userLongFreq;
     // RECENT frequency: prefer live recent (last 10 real spins) when available;
     // it's far more responsive than the tiny user recent slice.
+    // C9: when c9_recencyExcludeLast is ON, the USER-VERIFIED recent slice
+    // uses signalRecentFreq (which excludes the just-arrived actual) instead of
+    // recentFreq. The live-recent slice is unchanged (it's a separate feed, not
+    // the just-arrived user actual). This prevents the self-referential boost.
     const liveRecFreq = liveRecentN > 0 ? (liveRecentFreq.get(g.name) ?? 0) / liveRecentN : 0;
     const userRecFreq = recentHist.length > 0 ? (recentFreq.get(g.name) ?? 0) / recentHist.length : 0;
+    // C9: signal-user-recFreq excludes the just-arrived actual.
+    const signalUserRecFreq = signalRecentHist.length > 0
+      ? (signalRecentFreq.get(g.name) ?? 0) / signalRecentHist.length
+      : userRecFreq; // fallback when signalRecentHist is empty (≤1 round)
+    // recFreq drives the SIGNALS (recent-active, trending, shift-adaptive).
+    // When C9 ON, use signalUserRecFreq (excludes just-arrived actual).
+    // When C9 OFF, signalUserRecFreq === userRecFreq (bit-for-bit baseline).
     const recFreq = useLivePrior
-      ? liveRecFreq * 0.6 + userRecFreq * 0.4
-      : userRecFreq;
+      ? liveRecFreq * 0.6 + (flags.c9_recencyExcludeLast ? signalUserRecFreq : userRecFreq) * 0.4
+      : (flags.c9_recencyExcludeLast ? signalUserRecFreq : userRecFreq);
     const trend = recFreq - longFreq;
     const gap = gaps[g.name];
     const gapHistory = gapHistories[g.name];
@@ -1969,10 +2061,26 @@ function selectTopByEvidence(
 
   // Helper: the probability to use for COVERAGE in the objective.
   // C1 ON → true Bayesian posterior; OFF → legacy score share (bit-for-bit).
-  const probFor = (c: typeof calibrated[number]): number =>
-    (flags.c1_calibratedChannel && typeof c.calibratedProbabilityPosterior === "number")
-      ? c.calibratedProbabilityPosterior
-      : c.calibratedProbability;
+  // C8 ON (requires C1) → 95% credible LOWER BOUND of the posterior
+  //   (pLB = max(0, posterior − z·√(p(1−p)/nEff))). This is the "safe
+  //   probability" from Bayesian decision theory — penalizes outcomes with
+  //   high point estimates but low effective sample sizes. GENERIC: identical
+  //   treatment for all 8 outcomes; no per-outcome threshold. When C8 OFF,
+  //   the posterior (or legacy share) is used directly (bit-for-bit C1–C7).
+  //   C8 requires C1 (needs a real posterior); if C1 is OFF, C8 is a no-op.
+  const probFor = (c: typeof calibrated[number]): number => {
+    if (flags.c1_calibratedChannel && typeof c.calibratedProbabilityPosterior === "number") {
+      const posterior = c.calibratedProbabilityPosterior;
+      if (flags.c8_credibleLowerBound) {
+        // C8 ON: use the 95% credible lower bound (safe probability).
+        const rel = typeof c.reliability === "number" ? c.reliability : 1.0;
+        const nEff = effectiveSampleSizeFromReliability(rel);
+        return credibleLowerBound(posterior, nEff);
+      }
+      return posterior;
+    }
+    return c.calibratedProbability;
+  };
   // Helper: uncertainty (C3). 0 when C3 OFF → no uncertainty penalty.
   const uncertFor = (c: typeof calibrated[number]): number =>
     (flags.c3_uncertaintyShrinkage && typeof c.uncertainty === "number") ? c.uncertainty : 0;
@@ -2374,6 +2482,13 @@ export function runEngine(
     const allOutcomes: LockedOutcomeEntry[] = rankedAll.map((c, i) => {
       const selected = selectedSet.has(c.game.name);
       const selScore = typeof c.selectionScore === "number" ? c.selectionScore : c.rawScore;
+      // C8: effective sample size + 95% credible lower bound on the posterior.
+      const rel = typeof c.reliability === "number" ? c.reliability : 1.0;
+      const nEff = effectiveSampleSizeFromReliability(rel);
+      const posterior = c.calibratedProbabilityPosterior;
+      const lowerBound = (flags.c8_credibleLowerBound && typeof posterior === "number")
+        ? credibleLowerBound(posterior, nEff)
+        : undefined;
       const reason = selected
         ? `Selected rank ${i + 1} (selScore=${selScore.toFixed(4)}${c.signals.length ? "; signals: " + c.signals.slice(0, 4).join("+") : ""}).`
         : `Excluded rank ${i + 1} (selScore=${selScore.toFixed(4)}) — displaced by a stronger 4-combination per the optimizer objective.`;
@@ -2389,6 +2504,8 @@ export function runEngine(
         reliability: c.reliability,
         uncertainty: c.uncertainty,
         selectionScore: c.selectionScore,
+        effectiveSampleSize: nEff,
+        lowerBoundProbability: lowerBound,
         reason,
       };
     });

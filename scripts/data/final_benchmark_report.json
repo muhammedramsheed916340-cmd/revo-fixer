@@ -1,0 +1,391 @@
+{
+  "meta": {
+    "modelVersion": "revo-engine-v2-C1C9",
+    "armA": "C1-C9",
+    "armB": "[1,2,5,10]",
+    "rounds": 500,
+    "date": "2026-09-14T07:11:29.758Z"
+  },
+  "1_a_hits": {
+    "hits": 402,
+    "total": 500,
+    "pct": 0.804
+  },
+  "2_b_hits": {
+    "hits": 408,
+    "total": 500,
+    "pct": 0.816
+  },
+  "3_a_delta_vs_b_pp": -0.012,
+  "4_mcnemar": {
+    "r": 14,
+    "s": 20,
+    "chi2": 0.7352941176470589,
+    "pValue": 0.1680626565582791,
+    "significant": false
+  },
+  "5_a_only_hits": 14,
+  "6_b_only_hits": 20,
+  "7_bonus_actual_rate": 0.184,
+  "8_dynamic_bonus_inclusion_rate": 0.342,
+  "9_dynamic_only_misses": {
+    "bHit_aMiss": 20,
+    "aHit_bMiss": 14
+  },
+  "10_cold_start": {
+    "count": 1,
+    "aHitsNormal": 402,
+    "bHitsNormal": 407,
+    "normalTotal": 499
+  },
+  "11_ci_95": {
+    "lo": -0.034857331427793584,
+    "hi": 0.01085733142779358
+  },
+  "12_integrity": {
+    "uniqueIds": 500,
+    "duplicates": 0,
+    "sequential": true,
+    "leakage": 0
+  },
+  "decision": "NO-GO",
+  "aOnlyHitRounds": [
+    {
+      "roundId": 65,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 67,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 69,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 75,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 82,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 83,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "COIN FLIP",
+        "10"
+      ]
+    },
+    {
+      "roundId": 113,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 135,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 146,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "COIN FLIP",
+        "10"
+      ]
+    },
+    {
+      "roundId": 171,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 172,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 433,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "5",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 443,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "5",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 497,
+      "actual": "COIN FLIP",
+      "armA": [
+        "1",
+        "2",
+        "5",
+        "COIN FLIP"
+      ]
+    }
+  ],
+  "bOnlyHitRounds": [
+    {
+      "roundId": 1,
+      "actual": "1",
+      "armA": []
+    },
+    {
+      "roundId": 63,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 71,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 74,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 102,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 132,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 150,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "COIN FLIP",
+        "10"
+      ]
+    },
+    {
+      "roundId": 157,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 162,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 170,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 173,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "COIN FLIP",
+        "10"
+      ]
+    },
+    {
+      "roundId": 175,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "COIN FLIP",
+        "10"
+      ]
+    },
+    {
+      "roundId": 181,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 182,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 189,
+      "actual": "5",
+      "armA": [
+        "1",
+        "2",
+        "10",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 244,
+      "actual": "10",
+      "armA": [
+        "1",
+        "2",
+        "5",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 431,
+      "actual": "10",
+      "armA": [
+        "1",
+        "2",
+        "5",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 444,
+      "actual": "10",
+      "armA": [
+        "1",
+        "2",
+        "5",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 448,
+      "actual": "10",
+      "armA": [
+        "1",
+        "2",
+        "5",
+        "COIN FLIP"
+      ]
+    },
+    {
+      "roundId": 500,
+      "actual": "10",
+      "armA": [
+        "1",
+        "2",
+        "5",
+        "COIN FLIP"
+      ]
+    }
+  ]
+}

@@ -420,6 +420,8 @@ function readCFlags(): FeatureFlags {
       c5_deScopeHarmful: !!parsed.c5_deScopeHarmful,
       c6_rcaInstrumentation: !!parsed.c6_rcaInstrumentation,
       c7_frozenWalkForward: !!parsed.c7_frozenWalkForward,
+      c8_credibleLowerBound: !!parsed.c8_credibleLowerBound,
+      c9_recencyExcludeLast: !!parsed.c9_recencyExcludeLast,
     };
     return cachedCFlags;
   } catch {
@@ -455,7 +457,7 @@ function subscribeCFlags(cb: () => void): () => void {
   };
 }
 
-// Display metadata for the 7 C-flags (order = C1..C7). Pure data, no closures.
+// Display metadata for the 9 C-flags (order = C1..C9). Pure data, no closures.
 const FLAG_META: Array<{ key: keyof FeatureFlags; desc: string }> = [
   { key: "c1_calibratedChannel", desc: "True Bayesian posterior probability channel" },
   { key: "c2_genericReliability", desc: "Generic sample-size reliability (decoupled from mode)" },
@@ -464,6 +466,8 @@ const FLAG_META: Array<{ key: keyof FeatureFlags; desc: string }> = [
   { key: "c5_deScopeHarmful", desc: "De-scope raw-recent overwrites + reliability-gate persistence" },
   { key: "c6_rcaInstrumentation", desc: "Per-locked-Top-4 RCA record for post-MISS reconstruction" },
   { key: "c7_frozenWalkForward", desc: "Frozen walk-forward validation harness (build path)" },
+  { key: "c8_credibleLowerBound", desc: "Bayesian 95% credible lower-bound coverage (generic, z=1.96)" },
+  { key: "c9_recencyExcludeLast", desc: "Signal recency window excludes just-arrived actual (anti-chase)" },
 ];
 
 // Subscribers for the shadow ledger.
