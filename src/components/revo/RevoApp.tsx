@@ -15,6 +15,7 @@ import { RevoRevenue } from "./RevoRevenue";
 import { RevoConverter } from "./RevoConverter";
 import { RevoFaq } from "./RevoFaq";
 import { RevoAdminGate } from "./RevoAdminGate";
+import { RevoVideoSensor } from "./RevoVideoSensor";
 import { RevoComparison } from "./RevoComparison";
 import { RevoDeposit } from "./RevoDeposit";
 import { RevoScrollTop, RevoDivider } from "./RevoScrollTop";
@@ -186,8 +187,6 @@ export function RevoApp() {
             onExplore={handleExplore}
           />
 
-          <RevoTicker />
-
           <RevoReveal>
             <RevoGame />
           </RevoReveal>
@@ -197,74 +196,11 @@ export function RevoApp() {
           </RevoReveal>
 
           <RevoReveal>
-            <RevoPackages
-              packages={packages}
-              settings={settings}
-              onBuy={handleBuy}
-            />
+            <RevoVideoSensor />
           </RevoReveal>
-
-          <RevoReveal>
-            <RevoRecommender
-              packages={packages}
-              settings={settings}
-              onPick={handlePickPackage}
-            />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoComparison packages={packages} onBuy={handlePickPackage} />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoRevenue />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoConverter settings={settings} />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoStats stats={stats} settings={settings} />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoTestimonials />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoDeposit
-              settings={settings}
-              packages={packages}
-              methods={methods}
-              onPickPackage={handlePickPackage}
-            />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoPayments methods={methods} loading={loadingPayments} />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoActivity
-              data={activity}
-              notifications={notifications}
-              loading={loadingActivity}
-            />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoFaq settings={settings} />
-          </RevoReveal>
-
-          <RevoDivider icon="fa-user-shield" color="#a78bfa" />
 
           <RevoReveal>
             <RevoAdminGate />
-          </RevoReveal>
-
-          <RevoReveal>
-            <RevoTerms settings={settings} />
           </RevoReveal>
         </main>
 
