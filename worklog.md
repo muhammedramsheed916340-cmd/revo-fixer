@@ -8625,3 +8625,104 @@ Task: Fix the Live Video Sensor — calibration stuck on CALIBRATING, tracking I
   - Angle unwrapping + direction stability
   - Auto-diagnostic with auto-extend
   - Diagnostic report with PASS/FAIL gates
+
+---
+Task ID: fusion-engine-v1
+Agent: Z.ai Code (main)
+Task: Build and validate the fusion engine: live history + live video physics → calibrated fusion → 70-combination optimizer → exactly 4 dynamic outcomes.
+
+## Architecture Built
+
+### 1. fusionEngine.ts (~1000 lines)
+Complete fusion pipeline:
+- **PhysicsModel**: Constant-deceleration stopping prediction (Δθ = -v²/2a)
+  - 54-sector Gaussian probability (σ = angularUncertainty, wrapped)
+  - 8-outcome mapping (sum sectors per outcome)
+  - Validation: only predict when confidence > 0.15 AND |velocity| > 5°/s
+- **HistoryProbability**: Independent distribution from C1-C9 engine
+  - Uses engine.predictions + candidateScores, blended 50/50
+  - Fallback: theoretical prior blended with recent empirical frequency
+  - NaN-safe normalization
+- **Calibrated Fusion**: P_fused = w_h * P_history + w_v * P_video
+  - Effective video weight = w_v * physicsConfidence (low conf → less weight)
+  - Weight is learned, not hardcoded
+- **70-Combination Optimizer**: Evaluates all C(8,4)=70 combos
+  - Selects highest P(actual ∈ Top4)
+  - No fixed composition, no forced bonus, no random selection
+- **LockRecord**: No-leakage guarantee (all inputs ≤ lockTimestamp)
+  - Stores predictionId, spinId, lockTimestamp, lastHistoryTimestamp, lastVideoFrameTimestamp
+  - Stores all 8 probabilities, Top-4, confidence levels
+- **MissForensics**: Per-miss RCA
+  - Angular error (predicted stop vs actual sector)
+  - #4 vs #5 margin
+  - Classification: EXPLAINED / UNEXPLAINED / BONUS_UNPREDICTABLE
+- **Weight Learning**: Chronological 70/30 train/val split
+  - Log-loss minimization (proper scoring rule)
+  - Weight clamped to [0, 0.5] (video can't exceed 50% until proven)
+- **Experiment Harness**: A/B/C/D comparison
+  - A = theoretical [1,2,5,10]
+  - B = C1-C9 history-only
+  - C = Video-only
+  - D = Fusion (history + video)
+  - Lock at T-5 (5s before result, no leakage)
+  - McNemar paired test (D vs B)
+
+### 2. RevoFusionExperiment.tsx (~450 lines)
+Full UI component:
+- Fusion weight slider (0% to 50% video)
+- "Run A/B/C/D Experiment" button
+- "Lock Prediction Now" button (no-leakage)
+- Live lock display (Top-4 cards with probabilities, metadata)
+- A/B/C/D comparison table (HIT, hit-rate, log-loss, Brier, bonus recall, false bonus)
+- McNemar test panel
+- Leakage audit
+- Miss forensics (top 20 misses with classification)
+- Production integration gate (5 criteria)
+
+## Live Experiment Results (30 rounds)
+
+| Arm | Top-4 HIT | Hit Rate | Log-Loss | Brier |
+|-----|-----------|----------|----------|-------|
+| A: [1,2,5,10] ★ | 24/30 | 80.0% | 1.630 | 0.575 |
+| B: C1-C9 | 18/30 | 60.0% | 8.540 | 0.735 |
+| C: Video-only | 24/30 | 80.0% | 1.630 | 0.575 |
+| D: Fusion | 18/30 | 60.0% | 8.540 | 0.735 |
+
+- **Leakage Audit: PASS** (all inputs filtered to before lock time)
+- **McNemar: 0 discordant pairs** (D=B since video weight=0, no video history)
+- **Live Lock verified**: Top-4 = [1, 10, PACHINKO, CASH HUNT] (DYNAMIC, not hardcoded)
+
+## Key Findings
+
+1. **Theoretical [1,2,5,10] remains the champion** at 80% on this 30-round sample
+2. **C1-C9 history engine underperforms** (60%) — consistent with prior 500-round validation
+3. **Video-only has no history** to predict from (physicsHistory empty in this run)
+4. **Fusion = History** when video weight = 0 (as expected)
+5. **No leakage** — the lock-timing system works correctly
+
+## Production Integration Gate (5 criteria)
+
+| Criterion | Status |
+|-----------|--------|
+| Zero leakage | ✅ PASS |
+| Out-of-sample (chronological split) | ✅ PASS |
+| Fusion outperforms history-only | ❌ FAIL (D = B, no improvement) |
+| Statistically significant (McNemar p<0.05) | ❌ FAIL (0 discordant) |
+| Fusion > 83.3% theoretical | ❌ FAIL (D = 60%) |
+
+**Recommendation: Do NOT integrate fusion into production.** It does not meet the integration criteria.
+
+## What's Needed for Fusion to Pass
+1. **Collect video physics history** — the experiment currently has no physics snapshots to predict from. Need to collect physics data during actual spins and store it chronologically.
+2. **Learn the deceleration model** — currently using instantaneous acceleration (noisy). Need to learn the average deceleration from completed spins.
+3. **Validate the stopping model** — need to compare predicted stopping angle vs actual stopping angle across many spins.
+4. **Run 100+ fresh spins** with video history to see if video physics genuinely adds predictive value.
+
+## Files Changed
+- `src/components/revo/fusionEngine.ts` (NEW, ~1000 lines)
+- `src/components/revo/RevoFusionExperiment.tsx` (NEW, ~450 lines)
+- `src/components/revo/RevoApp.tsx` (added Fusion section after Video Sensor)
+- `src/components/revo/RevoNavbar.tsx` (added "Fusion" nav button)
+
+## Commit
+Pushed as `9be32fd` to GitHub.
