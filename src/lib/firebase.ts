@@ -41,6 +41,31 @@ async function fbGet<T>(
 }
 
 /**
+ * REST write to Firebase RTDB. Uses PATCH (merge) so we never clobber sibling
+ * keys. Requires the DB rules to permit public write (the original APK relies
+ * on this). Returns true on success.
+ */
+async function fbPatch(
+  path: string,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  const url = new URL(`${DB_URL}/${path}.json`);
+  const res = await fetch(url.toString(), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `Firebase write ${res.status} on ${path}: ${text.slice(0, 120)}`,
+    );
+  }
+  return true;
+}
+
+/**
  * Tiny in-memory TTL cache so heavy nodes (e.g. packagePayments with base64
  * screenshots) are fetched from Firebase at most once per TTL window, no matter
  * how many clients hit the API.
@@ -657,6 +682,115 @@ export function getOnlineUsers(windowMs = 15 * 60 * 1000): Promise<{
       totalKeys: Object.keys(map).length,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// KEY GENERATION (admin-only — writes to the live RTDB)
+// ---------------------------------------------------------------------------
+
+/** Cryptographically-secure random base32 string of `len` chars. */
+function randomToken(len: number, alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"): string {
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  let out = "";
+  for (let i = 0; i < len; i++) out += alphabet[arr[i] % alphabet.length];
+  return out;
+}
+
+/** Format a 16-char token as XXXX-XXXX-XXXX-XXXX (license / admin key shape). */
+function formatDash(token: string): string {
+  return token.match(/.{1,4}/g)?.slice(0, 4).join("-") ?? token;
+}
+
+/** 10-digit numeric signal code. */
+function randomSignalCode(): string {
+  const arr = new Uint32Array(10);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (n) => String(n % 10)).join("");
+}
+
+/** Generate a license key (stored under securityCodes/{key}). */
+export async function generateLicenseKey(opts: {
+  hours: number;
+  name: string;
+  finalPrice: number;
+  originalPrice?: number;
+}): Promise<{ key: string }> {
+  const token = formatDash(randomToken(16));
+  const now = Date.now();
+  const validity = now + opts.hours * 3600_000;
+  const discountPercent =
+    opts.originalPrice && opts.originalPrice > opts.finalPrice
+      ? Math.round(
+          ((opts.originalPrice - opts.finalPrice) / opts.originalPrice) * 100,
+        )
+      : 0;
+  await fbPatch(`securityCodes/${encodeURIComponent(token)}`, {
+    status: "active",
+    name: opts.name,
+    hours: opts.hours,
+    package: {
+      name: opts.name,
+      price: opts.finalPrice,
+      hours: opts.hours,
+    },
+    originalPrice: opts.originalPrice ?? opts.finalPrice,
+    finalPrice: opts.finalPrice,
+    discountPercent,
+    deviceLogins: 0,
+    totalDevices: 0,
+    createdAt: now,
+    validity,
+  });
+  // Invalidate the cached security overview so the panel sees the new key.
+  memCache.delete("securityOverview");
+  memCache.delete("stats");
+  memCache.delete("onlineUsers");
+  return { key: token };
+}
+
+/** Generate a signal/activation code (stored under activation_codes/{code}). */
+export async function generateActivationCode(opts: {
+  usedFor?: string;
+  createdBy?: string;
+}): Promise<{ code: string }> {
+  const code = randomSignalCode();
+  const now = Date.now();
+  await fbPatch(`activation_codes/${code}`, {
+    originalCode: code,
+    active: true,
+    used: false,
+    usedFor: opts.usedFor ?? "Crazy Time Revo Signal",
+    createdBy: opts.createdBy ?? "admin-panel",
+    createdAt: now,
+  });
+  memCache.delete("activationCodes");
+  memCache.delete("stats");
+  return { code };
+}
+
+/** Generate an admin key (stored under adminKeys/{underscored}). */
+export async function generateAdminKey(opts: {
+  label?: string;
+  maxLogins?: number;
+  createdBy?: string;
+}): Promise<{ key: string }> {
+  const token = formatDash(randomToken(16));
+  const underscored = token.replace(/-/g, "_");
+  const now = Date.now();
+  await fbPatch(`adminKeys/${underscored}`, {
+    originalKey: token,
+    status: "active",
+    loginCount: 0,
+    maxLogins: opts.maxLogins ?? 50,
+    label: opts.label ?? "Admin",
+    createdBy: opts.createdBy ?? "admin-panel",
+    createdAt: now,
+    lastLogin: 0,
+  });
+  memCache.delete("adminKeys");
+  memCache.delete("stats");
+  return { key: token };
 }
 
 

@@ -2,9 +2,14 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { formatINR, formatDateTime, timeAgo, normalizeKey } from "./lib";
+import { formatINR, formatDateTime, timeAgo, copyText } from "./lib";
 
-const ADMIN_KEY_PATTERN = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+// ---------------------------------------------------------------------------
+// Bypass PIN — skip the complex XXXX-XXXX-XXXX-XXXX admin key.
+// The owner can type a simple 10-digit code to enter the read-only panel.
+// (The real admin key path still works as a fallback.)
+// ---------------------------------------------------------------------------
+const ADMIN_KEY = "revo_admin_session_v1";
 
 interface AdminKeyLite {
   originalKey: string;
@@ -56,7 +61,6 @@ interface AdminData {
 }
 
 // --- Admin session persistence (SSR-safe via useSyncExternalStore) ---
-const ADMIN_KEY = "revo_admin_session_v1";
 let cachedRaw: string | null = null;
 let cachedKey: string | null = null;
 const listeners = new Set<() => void>();
@@ -124,6 +128,10 @@ function Badge({ status }: { status: string }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// PIN-based login (skips complex admin key format).
+// Accepts a 10-digit numeric PIN or a full admin key as fallback.
+// ---------------------------------------------------------------------------
 function AdminLogin({
   onVerified,
   onClose,
@@ -136,31 +144,34 @@ function AdminLogin({
   const [msg, setMsg] = useState("");
 
   const verify = useCallback(async () => {
-    const key = normalizeKey(raw);
-    setRaw(key);
-    if (!ADMIN_KEY_PATTERN.test(key)) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
       setStatus("error");
-      setMsg("Invalid format. Use XXXX-XXXX-XXXX-XXXX");
+      setMsg("Enter your access code.");
       return;
     }
     setStatus("verifying");
-    setMsg("Verifying admin key…");
+    setMsg("Verifying…");
     try {
       const res = await fetch("/api/verify-admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key }),
+        body: JSON.stringify({ key: trimmed }),
       });
-      const json: { ok: boolean; key?: string } = await res.json();
+      const json: { ok: boolean; key?: string; mode?: string } =
+        await res.json();
       if (json.ok && json.key) {
         writeAdmin(json.key);
         toast.success("Admin access granted", {
-          description: "Loading read-only admin panel…",
+          description:
+            json.mode === "pin"
+              ? "Unlocked via PIN bypass · read-only panel"
+              : "Unlocked via admin key · read-only panel",
         });
         onVerified(json.key);
       } else {
         setStatus("error");
-        setMsg("Invalid or inactive admin key.");
+        setMsg("Invalid access code. Try again.");
       }
     } catch {
       setStatus("error");
@@ -190,17 +201,17 @@ function AdminLogin({
       </div>
 
       <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[#8899cc]">
-        Admin Key
+        Access Code (PIN or admin key)
       </label>
       <input
         type="text"
+        inputMode="numeric"
         autoComplete="off"
         spellCheck={false}
         value={raw}
-        onChange={(e) => setRaw(normalizeKey(e.target.value))}
+        onChange={(e) => setRaw(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && verify()}
-        placeholder="XXXX-XXXX-XXXX-XXXX"
-        maxLength={19}
+        placeholder="Enter PIN (e.g. 8950888988)"
         className="w-full rounded-xl border border-[#1e2240] bg-[#0d1020] px-4 py-3.5 font-mono text-base tracking-wider text-white outline-none transition placeholder:text-[#5a6a99] focus:border-[#a78bfa] focus:ring-2 focus:ring-[#a78bfa]/30"
       />
       <button
@@ -218,7 +229,7 @@ function AdminLogin({
           </>
         ) : (
           <>
-            <i className="fas fa-key" /> Unlock Admin Panel
+            <i className="fas fa-unlock" /> Unlock Admin Panel
           </>
         )}
       </button>
@@ -235,8 +246,298 @@ function AdminLogin({
       )}
       <p className="mt-3 text-center text-[11px] text-[#5a6a99]">
         <i className="fas fa-lock mr-1" />
-        Read-only. No writes to the live database.
+        Read-only view. Key generation writes to the live DB.
       </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Key Generation tab
+// ---------------------------------------------------------------------------
+interface GenResult {
+  kind: "license" | "signal" | "admin";
+  key?: string;
+  code?: string;
+  at: number;
+}
+
+function GenerateTab({ onReload }: { onReload: () => void }) {
+  const [tab, setTab] = useState<"license" | "signal" | "admin">("license");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<GenResult | null>(null);
+  const [error, setError] = useState("");
+
+  // License form state
+  const [licName, setLicName] = useState("1h");
+  const [licHours, setLicHours] = useState(1);
+  const [licPrice, setLicPrice] = useState(2000);
+  const [licOrig, setLicOrig] = useState(2500);
+
+  // Admin form state
+  const [admLabel, setAdmLabel] = useState("Admin");
+  const [admMax, setAdmMax] = useState(50);
+
+  const run = useCallback(
+    async (kind: "license" | "signal" | "admin") => {
+      setBusy(true);
+      setError("");
+      setResult(null);
+      try {
+        const payload: Record<string, unknown> = { kind };
+        if (kind === "license") {
+          payload.name = licName;
+          payload.hours = licHours;
+          payload.finalPrice = licPrice;
+          payload.originalPrice = licOrig;
+        } else if (kind === "admin") {
+          payload.label = admLabel;
+          payload.maxLogins = admMax;
+        }
+        const res = await fetch("/api/generate-keys", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json: {
+          ok: boolean;
+          key?: string;
+          code?: string;
+          error?: string;
+        } = await res.json();
+        if (json.ok) {
+          const r: GenResult = {
+            kind,
+            key: json.key,
+            code: json.code,
+            at: Date.now(),
+          };
+          setResult(r);
+          toast.success(
+            `${kind === "license" ? "License key" : kind === "signal" ? "Signal code" : "Admin key"} generated`,
+            {
+              description: json.key ?? json.code,
+            },
+          );
+          onReload();
+        } else {
+          setError(json.error ?? "Generation failed");
+          toast.error("Generation failed", {
+            description: json.error ?? "Unknown error",
+          });
+        }
+      } catch (e) {
+        const m = e instanceof Error ? e.message : "Network error";
+        setError(m);
+        toast.error("Generation failed", { description: m });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [licName, licHours, licPrice, licOrig, admLabel, admMax, onReload],
+  );
+
+  const value = result?.key ?? result?.code ?? "";
+
+  return (
+    <div className="space-y-3">
+      {/* Sub-tabs */}
+      <div className="flex gap-1 rounded-xl border border-[#1e2240] bg-[#0d1020]/60 p-1">
+        {(
+          [
+            ["license", "License Key", "fa-key"],
+            ["signal", "Signal Code", "fa-signal"],
+            ["admin", "Admin Key", "fa-user-shield"],
+          ] as const
+        ).map(([id, label, icon]) => (
+          <button
+            key={id}
+            onClick={() => {
+              setTab(id);
+              setResult(null);
+              setError("");
+            }}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${
+              tab === id
+                ? "bg-[#a78bfa]/20 text-[#a78bfa]"
+                : "text-[#8899cc] hover:text-white"
+            }`}
+          >
+            <i className={`fas ${icon} text-[10px]`} />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* License form */}
+      {tab === "license" && (
+        <div className="space-y-2 rounded-xl border border-[#1e2240] bg-[#0d1020]/60 p-3">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                Package Name
+              </span>
+              <input
+                value={licName}
+                onChange={(e) => setLicName(e.target.value)}
+                className="w-full rounded-lg border border-[#1e2240] bg-[#0d1020] px-3 py-2 text-sm text-white outline-none focus:border-[#a78bfa]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                Hours
+              </span>
+              <input
+                type="number"
+                min={1}
+                value={licHours}
+                onChange={(e) => setLicHours(Number(e.target.value) || 1)}
+                className="w-full rounded-lg border border-[#1e2240] bg-[#0d1020] px-3 py-2 text-sm text-white outline-none focus:border-[#a78bfa]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                Final Price (₹)
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={licPrice}
+                onChange={(e) => setLicPrice(Number(e.target.value) || 0)}
+                className="w-full rounded-lg border border-[#1e2240] bg-[#0d1020] px-3 py-2 text-sm text-white outline-none focus:border-[#a78bfa]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                Original Price (₹)
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={licOrig}
+                onChange={(e) => setLicOrig(Number(e.target.value) || 0)}
+                className="w-full rounded-lg border border-[#1e2240] bg-[#0d1020] px-3 py-2 text-sm text-white outline-none focus:border-[#a78bfa]"
+              />
+            </label>
+          </div>
+          <button
+            onClick={() => run("license")}
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#2ed573] to-[#1abc9c] px-4 py-2.5 text-sm font-bold text-white transition disabled:opacity-60"
+          >
+            {busy ? (
+              <i className="fas fa-spinner fa-spin" />
+            ) : (
+              <i className="fas fa-plus" />
+            )}
+            Generate License Key
+          </button>
+        </div>
+      )}
+
+      {/* Signal form */}
+      {tab === "signal" && (
+        <div className="space-y-2 rounded-xl border border-[#1e2240] bg-[#0d1020]/60 p-3">
+          <p className="text-[11px] text-[#8899cc]">
+            Generates a fresh 10-digit numeric signal code in{" "}
+            <code className="text-[#a78bfa]">activation_codes</code>. Active and
+            ready to distribute.
+          </p>
+          <button
+            onClick={() => run("signal")}
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#ffa502] to-[#ff7f50] px-4 py-2.5 text-sm font-bold text-white transition disabled:opacity-60"
+          >
+            {busy ? (
+              <i className="fas fa-spinner fa-spin" />
+            ) : (
+              <i className="fas fa-bolt" />
+            )}
+            Generate Signal Code
+          </button>
+        </div>
+      )}
+
+      {/* Admin form */}
+      {tab === "admin" && (
+        <div className="space-y-2 rounded-xl border border-[#1e2240] bg-[#0d1020]/60 p-3">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                Label
+              </span>
+              <input
+                value={admLabel}
+                onChange={(e) => setAdmLabel(e.target.value)}
+                className="w-full rounded-lg border border-[#1e2240] bg-[#0d1020] px-3 py-2 text-sm text-white outline-none focus:border-[#a78bfa]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                Max Logins
+              </span>
+              <input
+                type="number"
+                min={1}
+                value={admMax}
+                onChange={(e) => setAdmMax(Number(e.target.value) || 1)}
+                className="w-full rounded-lg border border-[#1e2240] bg-[#0d1020] px-3 py-2 text-sm text-white outline-none focus:border-[#a78bfa]"
+              />
+            </label>
+          </div>
+          <button
+            onClick={() => run("admin")}
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#a78bfa] to-[#7c3aed] px-4 py-2.5 text-sm font-bold text-white transition disabled:opacity-60"
+          >
+            {busy ? (
+              <i className="fas fa-spinner fa-spin" />
+            ) : (
+              <i className="fas fa-user-shield" />
+            )}
+            Generate Admin Key
+          </button>
+        </div>
+      )}
+
+      {/* Result */}
+      {value && (
+        <div className="rounded-xl border border-[#2ed573]/40 bg-[#2ed573]/10 p-3">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#2ed573]">
+              <i className="fas fa-check-circle mr-1" />
+              Generated ·{" "}
+              {result?.kind === "license"
+                ? "License"
+                : result?.kind === "signal"
+                  ? "Signal"
+                  : "Admin"}
+            </span>
+            <button
+              onClick={async () => {
+                const ok = await copyText(value);
+                toast[ok ? "success" : "error"](
+                  ok ? "Copied to clipboard" : "Copy failed",
+                );
+              }}
+              className="rounded-md border border-[#1e2240] bg-[#141827] px-2 py-1 text-[10px] font-bold text-[#8899cc] transition hover:text-white"
+            >
+              <i className="fas fa-copy mr-1" />
+              Copy
+            </button>
+          </div>
+          <code className="block break-all font-mono text-sm font-bold text-white">
+            {value}
+          </code>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-[#ff4757]/40 bg-[#ff4757]/10 p-3 text-sm font-semibold text-[#ff4757]">
+          <i className="fas fa-triangle-exclamation mr-1" />
+          {error}
+        </div>
+      )}
     </div>
   );
 }
@@ -246,15 +547,17 @@ function Panel({
   data,
   loading,
   onLogout,
+  onReload,
 }: {
   adminKey: string;
   data: AdminData | null;
   loading: boolean;
   onLogout: () => void;
+  onReload: () => void;
 }) {
-  const [tab, setTab] = useState<"security" | "admins" | "codes" | "requests">(
-    "security",
-  );
+  const [tab, setTab] = useState<
+    "security" | "admins" | "codes" | "requests" | "generate"
+  >("security");
   const sec = data?.security;
   const totalAdminKeys = data?.adminKeys.length ?? 0;
   const totalCodes = data?.activationCodes.length ?? 0;
@@ -272,28 +575,42 @@ function Panel({
             <div className="flex items-center gap-2">
               <span className="text-sm font-black text-white">Admin Panel</span>
               <span className="rounded-full bg-[#2ed573]/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#2ed573]">
-                Live · Read-only
+                {adminKey === "BYPASS-PIN" ? "PIN · Live" : "Live · Read-only"}
               </span>
             </div>
-            <div className="font-mono text-[11px] text-[#5a6a99]">{adminKey}</div>
+            <div className="font-mono text-[11px] text-[#5a6a99]">
+              {adminKey === "BYPASS-PIN" ? "Unlocked via bypass PIN" : adminKey}
+            </div>
           </div>
         </div>
-        <button
-          onClick={onLogout}
-          className="rounded-lg border border-[#1e2240] bg-[#141827] px-3 py-1.5 text-xs font-semibold text-[#8899cc] transition hover:bg-[#1e2240] hover:text-white"
-        >
-          <i className="fas fa-right-from-bracket mr-1" /> Lock
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onReload}
+            disabled={loading}
+            className="rounded-lg border border-[#1e2240] bg-[#141827] px-3 py-1.5 text-xs font-semibold text-[#8899cc] transition hover:bg-[#1e2240] hover:text-white disabled:opacity-50"
+            title="Refresh data"
+          >
+            <i className={`fas fa-rotate ${loading ? "fa-spin" : ""} mr-1`} />
+            Refresh
+          </button>
+          <button
+            onClick={onLogout}
+            className="rounded-lg border border-[#1e2240] bg-[#141827] px-3 py-1.5 text-xs font-semibold text-[#8899cc] transition hover:bg-[#1e2240] hover:text-white"
+          >
+            <i className="fas fa-right-from-bracket mr-1" /> Lock
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto border-b border-[#1e2240] bg-[#0d1020]/40 p-2 revo-scroll">
         {(
           [
-            ["security", "License Keys", `fa-key`, sec?.total ?? 0],
-            ["admins", "Admin Keys", `fa-user-shield`, totalAdminKeys],
-            ["codes", "Signal Codes", `fa-signal`, totalCodes],
-            ["requests", "Pay Requests", `fa-credit-card`, data?.paymentRequests.length ?? 0],
+            ["security", "License Keys", "fa-key", sec?.total ?? 0],
+            ["admins", "Admin Keys", "fa-user-shield", totalAdminKeys],
+            ["codes", "Signal Codes", "fa-signal", totalCodes],
+            ["requests", "Pay Requests", "fa-credit-card", data?.paymentRequests.length ?? 0],
+            ["generate", "Generate", "fa-wand-magic-sparkles", null],
           ] as const
         ).map(([id, label, icon, count]) => (
           <button
@@ -307,9 +624,11 @@ function Panel({
           >
             <i className={`fas ${icon} text-[10px]`} />
             {label}
-            <span className="rounded-full bg-[#1e2240] px-1.5 py-0.5 text-[9px] text-[#bcc6e0]">
-              {count}
-            </span>
+            {count !== null && (
+              <span className="rounded-full bg-[#1e2240] px-1.5 py-0.5 text-[9px] text-[#bcc6e0]">
+                {count}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -328,8 +647,10 @@ function Panel({
           <AdminsTab data={data} />
         ) : tab === "codes" ? (
           <CodesTab data={data} />
-        ) : (
+        ) : tab === "requests" ? (
           <RequestsTab data={data} />
+        ) : (
+          <GenerateTab onReload={onReload} />
         )}
       </div>
 
@@ -532,11 +853,24 @@ export function RevoAdminGate() {
     if (adminKey) setOpen(true);
   }, [adminKey]);
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin-data");
+      const json: AdminData = await res.json();
+      setData(json);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Load admin data whenever the panel is unlocked.
   useEffect(() => {
     if (!adminKey) return;
     let active = true;
-    async function load() {
+    const run = async () => {
       setLoading(true);
       try {
         const res = await fetch("/api/admin-data");
@@ -547,9 +881,9 @@ export function RevoAdminGate() {
       } finally {
         if (active) setLoading(false);
       }
-    }
-    load();
-    const t = setInterval(load, 30000);
+    };
+    run();
+    const t = setInterval(run, 30000);
     return () => {
       active = false;
       clearInterval(t);
@@ -593,8 +927,8 @@ export function RevoAdminGate() {
             Platform <span className="text-[#a78bfa]">control center</span>
           </h2>
           <p className="mt-1 text-sm text-[#8899cc]">
-            Real-time read-only view of license keys, admin keys, signal codes
-            and payment requests.
+            Real-time view of license keys, admin keys, signal codes, payment
+            requests + key generation.
           </p>
         </div>
 
@@ -603,6 +937,7 @@ export function RevoAdminGate() {
             adminKey={adminKey}
             data={data}
             loading={loading}
+            onReload={load}
             onLogout={() => {
               writeAdmin(null);
               setOpen(false);

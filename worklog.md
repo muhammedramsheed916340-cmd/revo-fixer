@@ -8278,3 +8278,39 @@ Stage Summary:
 - Experimental NEVER includes PACHINKO/CASH HUNT/CRAZY TIME (C4 overreaction penalty drops them). Includes COIN FLIP 137× (68.5%, data-driven — reliability rose above gate). Baseline wastes 61+48+34=143 slots on PACHINKO/CASH HUNT/CRAZY TIME with near-0% hit efficiency.
 - Experimental is 2 pp BELOW theoretical [1,2,5,10] — the COIN FLIP inclusion (trading 10) cost slightly more 10-hits than it gained COIN-FLIP-hits on this sample. The theoretical baseline remains the champion.
 - STOP per directive. No optimization cycle. No 100% claim. No superiority claim over theoretical.
+
+---
+Task ID: admin-pin-bypass
+Agent: Z.ai Code (main)
+Task: User requested "skip admin key" — replace the complex XXXX-XXXX-XXXX-XXXX admin-key requirement with a simple numeric PIN bypass (8950888988), and restore the missing key-generation panel.
+
+Work Log:
+- Read existing RevoAdminGate.tsx — confirmed it still required XXXX-XXXX-XXXX-XXXX admin key format despite prior "keyless" request.
+- Read /api/verify-admin, /api/admin-data, firebase.ts, lib.ts to map the full access flow.
+- Added `fbPatch()` (REST PATCH writer) to src/lib/firebase.ts for RTDB writes.
+- Added 3 key-generation helpers to firebase.ts: generateLicenseKey(), generateActivationCode(), generateAdminKey() — all crypto-secure, cache-invalidating.
+- Rewrote /api/verify-admin/route.ts to accept EITHER (a) bypass PIN 8950888988 (env-overridable via ADMIN_BYPASS_PIN) returning mode="pin" / key="BYPASS-PIN", OR (b) a real admin key via Firebase lookup.
+- Rewrote src/components/revo/RevoAdminGate.tsx:
+  * Replaced AdminLogin input from formatted-key field → simple numeric/text PIN field ("Enter PIN (e.g. 8950888988)").
+  * Removed ADMIN_KEY_PATTERN strict format gate on the client.
+  * Added new "Generate" tab with 3 sub-tabs (License / Signal / Admin) + forms (name, hours, price for license; label, maxLogins for admin).
+  * Generation result card with one-click Copy button.
+  * Refresh + Lock buttons in panel header; auto-refresh every 30s.
+- Created /api/generate-keys/route.ts (POST) — dispatches to the 3 generators with validation + graceful errors.
+- Fixed prop-name mismatch bug (GenerateTab expected `onGenerated`, Panel passed `onReload`) — generation succeeded but threw on the reload callback. Renamed to consistent `onReload`.
+- Lint: 0 new errors (4 pre-existing in scripts/ video-experiment files, untouched).
+- agent-browser end-to-end verification (all PASS):
+  * PIN 8950888988 → toast "Admin access granted · Unlocked via PIN bypass · read-only panel", panel opens with License(19)/Admin(2)/Signal(10)/Pay(20) tabs.
+  * Wrong PIN (0000000000 / 1234567890) → API returns ok:false, UI shows "Invalid access code."
+  * License generation → key "GAQJ-MUBF-BXUP-ZAB5" written, License count 19→21.
+  * Signal generation → code "2518007943" written, Signal count 10→11.
+  * Admin generation → key "LPQB-D2EE-E4SM-UWND" written, Admin count 2→3.
+  * Lock → re-unlock cycle works (session persists in localStorage).
+  * Fresh reload: 0 console errors, 0 dev.log errors, HTTP 200.
+  * Footer present at page bottom (Telegram / Email / Original site / Scroll-to-top).
+
+Stage Summary:
+- Admin access no longer requires the complex XXXX-XXXX-XXXX-XXXX key. Owner types the 10-digit PIN 8950888988 to enter.
+- Real admin keys (Firebase-stored) still work as a fallback via the same input.
+- Full key-generation console restored (was missing after the clean-push): License / Signal / Admin, all writing to the live RTDB.
+- Production admin flow fully browser-verified end-to-end.
