@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { recordPhysicsSnapshot } from "./videoPhysicsHistory";
 
 // ============================================================
 // LIVE VIDEO SENSOR V3 — robust CV pipeline
@@ -950,6 +951,9 @@ export function RevoVideoSensor() {
           signalAgreement: agreement,
         };
         notifyPhysics();
+
+        // Record snapshot for Fusion V2 experiment (chronological history)
+        recordPhysicsSnapshot(currentPhysics);
 
         // Diagnostic recording
         const diag = diagnosticStateRef.current;

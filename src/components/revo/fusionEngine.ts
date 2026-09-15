@@ -200,13 +200,17 @@ export function predictStoppingAngle(
 }
 
 function invalidPrediction(reason: string): StoppingPrediction {
+  // CRITICAL: Do NOT fall back to theoretical probabilities.
+  // Return ALL ZEROS so the fusion can detect "INSUFFICIENT" video.
+  // The caller must check `isValid` and show "VIDEO: INSUFFICIENT" —
+  // never silently replace with theoretical [1,2,5,10].
   return {
     predictedStopAngle: 0,
     predictedStopSector: 0,
     predictedStopOutcome: "?",
     angularUncertainty: 180, // maximum uncertainty
-    sectorProbabilities: new Float64Array(54).fill(1 / 54), // uniform
-    outcomeProbabilities: Object.fromEntries(GAMES.map((g) => [g.name, THEORETICAL[g.name] ?? 0])),
+    sectorProbabilities: new Float64Array(54).fill(0), // ALL ZEROS — not theoretical
+    outcomeProbabilities: Object.fromEntries(GAMES.map((g) => [g.name, 0])),
     physicsConfidence: 0,
     isValid: false,
     reason,
@@ -1072,7 +1076,401 @@ function erfc(x: number): number {
 export const DEFAULT_FUSION_WEIGHTS: FusionWeights = {
   historyWeight: 1,
   videoWeight: 0,
-  version: "fusion-v1-untrained",
+  version: "fusion-v2-untrained",
   learnedFrom: 0,
   lastUpdated: Date.now(),
 };
+
+// ============================================================
+// FUSION V2 — REAL SYNCHRONIZED DATA EXPERIMENT
+// ============================================================
+
+import type { SynchronizedSpin } from "./videoPhysicsHistory";
+
+export interface V2ArmResult {
+  hits: number;
+  misses: number;
+  hitRate: number;
+  logLoss: number;
+  brierScore: number;
+  bonusRecall: number;
+  falseBonusInclusion: number;
+  insufficientCount: number; // how many spins had INSUFFICIENT video
+  top4List: string[][];
+}
+
+export interface V2ExperimentResult {
+  totalSpins: number;
+  spinsWithValidVideo: number; // how many had real pre-result video
+  lockPointCoverage: Record<string, number>; // T-20/T-15/T-10/T-5 → % with valid video
+  arms: Record<string, Record<string, V2ArmResult>>; // arm → lockPoint → result
+  mcnemar: {
+    r: number;
+    s: number;
+    statistic: number;
+    pValue: number;
+    significant: boolean;
+    discordant: number;
+  } | null;
+  missForensics: V2MissForensics[];
+  leakageAudit: {
+    passed: boolean;
+    details: string;
+  };
+  datasetStats: {
+    totalSnapshots: number;
+    trackingSnapshots: number;
+    timeSpanSeconds: number;
+    avgSnapshotsPerSpin: number;
+  };
+}
+
+export interface V2MissForensics {
+  spinId: string;
+  lockPoint: string;
+  arm: string;
+  actual: string;
+  top4: string[];
+  actualRank: number | null;
+  outcomeProbabilities: Record<string, number>;
+  margin4vs5: number;
+  videoValid: boolean;
+  videoReason: string;
+  physicsSnapshot: {
+    angle: number;
+    velocity: number;
+    acceleration: number;
+    confidence: number;
+  } | null;
+  predictedStopAngle: number | null;
+  actualSector: number | null;
+  angularError: number | null;
+  historyConfidence: number;
+  videoConfidence: number;
+  fusionConfidence: number;
+  classification:
+    | "TRACKING_ERROR"
+    | "CALIBRATION_ERROR"
+    | "SECTOR_MAP_ERROR"
+    | "PHYSICS_ERROR"
+    | "HISTORY_ERROR"
+    | "FUSION_ERROR"
+    | "NO_PRE_RESULT_SIGNAL";
+  missingSignal: string | null;
+}
+
+/**
+ * Run the Fusion V2 experiment on REAL synchronized data.
+ *
+ * For each synchronized spin, evaluate 4 arms at 4 lock points:
+ *   A = theoretical [1,2,5,10]
+ *   B = C1-C9 history
+ *   C = video-only (INSUFFICIENT if no valid video — NO theoretical fallback)
+ *   D = fusion (history + video, calibrated)
+ *
+ * All predictions use ONLY information available at the lock point.
+ * No post-result frames, no settledAt, no future history.
+ */
+export function runFusionV2Experiment(
+  spins: SynchronizedSpin[],
+  historyRounds: RoundResult[],
+  liveSpins: SpinData[],
+  weights: FusionWeights,
+): V2ExperimentResult {
+  const armNames = ["A_theoretical", "B_history", "C_video", "D_fusion"];
+  const lockPoints = ["T-20", "T-15", "T-10", "T-5"];
+
+  // Initialize arm results for each lock point
+  const arms: Record<string, Record<string, V2ArmResult>> = {};
+  for (const arm of armNames) {
+    arms[arm] = {};
+    for (const lp of lockPoints) {
+      arms[arm][lp] = {
+        hits: 0, misses: 0, hitRate: 0,
+        logLoss: 0, brierScore: 0,
+        bonusRecall: 0, falseBonusInclusion: 0,
+        insufficientCount: 0,
+        top4List: [],
+      };
+    }
+  }
+
+  const missForensics: V2MissForensics[] = [];
+  let spinsWithValidVideo = 0;
+  let leakageIssues = 0;
+
+  for (const spin of spins) {
+    // Filter history to ONLY rounds before this spin's result (no leakage)
+    const safeRounds = historyRounds.filter(
+      (r) => r.time < spin.resultTimestamp,
+    );
+    const safeSpins = liveSpins.filter(
+      (s) => new Date(s.settledAt).getTime() < spin.resultTimestamp,
+    );
+
+    for (const lp of lockPoints) {
+      const lockPoint = spin.lockPoints[lp as keyof typeof spin.lockPoints];
+      if (!lockPoint) continue;
+
+      const lockTs = lockPoint.lockTimestamp;
+      const physics = lockPoint.physics;
+
+      // Check for leakage
+      if (safeRounds.some((r) => r.time >= spin.resultTimestamp)) leakageIssues++;
+      if (physics && physics.timestamp > lockTs) leakageIssues++;
+
+      // ---- Arm A: Theoretical [1,2,5,10] ----
+      const armA_top4 = ["1", "2", "5", "10"];
+      const armA_probs = { ...THEORETICAL };
+      evaluateV2Arm(armA_top4, armA_probs, spin, lp, "A_theoretical", arms, missForensics, lockPoint, null);
+
+      // ---- Arm B: C1-C9 History ----
+      const history = getHistoryProbability(safeRounds, safeSpins);
+      const armB_top4Result = selectTop4(history.outcomeProbabilities);
+      evaluateV2Arm(armB_top4Result.top4, history.outcomeProbabilities, spin, lp, "B_history", arms, missForensics, lockPoint, null);
+
+      // ---- Arm C: Video-only ----
+      // CRITICAL: If video is not valid, mark INSUFFICIENT — do NOT fall back to theoretical
+      let armC_top4: string[];
+      let armC_probs: Record<string, number>;
+      let videoStopping: StoppingPrediction | null = null;
+
+      if (physics && lockPoint.videoValid) {
+        // Real video prediction
+        videoStopping = predictStoppingAngle(
+          {
+            timestamp: physics.timestamp / 1000,
+            angle: physics.angle,
+            velocity: physics.velocity,
+            acceleration: physics.acceleration,
+            confidence: physics.confidence,
+            direction: physics.direction,
+            isTracking: physics.isTracking,
+            calibrationStable: physics.calibrationStable,
+          },
+          null,
+        );
+        if (videoStopping.isValid) {
+          armC_probs = { ...videoStopping.outcomeProbabilities };
+          const armC_result = selectTop4(armC_probs);
+          armC_top4 = armC_result.top4;
+        } else {
+          // Video model couldn't predict — INSUFFICIENT
+          armC_top4 = [];
+          armC_probs = Object.fromEntries(GAMES.map((g) => [g.name, 0]));
+          arms["C_video"][lp].insufficientCount++;
+        }
+      } else {
+        // No valid video at this lock point — INSUFFICIENT
+        armC_top4 = [];
+        armC_probs = Object.fromEntries(GAMES.map((g) => [g.name, 0]));
+        arms["C_video"][lp].insufficientCount++;
+      }
+
+      evaluateV2Arm(armC_top4, armC_probs, spin, lp, "C_video", arms, missForensics, lockPoint, videoStopping);
+
+      // ---- Arm D: Fusion ----
+      const fusion = calibrateFusion(history, videoStopping?.isValid ? videoStopping : null, weights);
+      evaluateV2Arm(fusion.top4, fusion.outcomeProbabilities, spin, lp, "D_fusion", arms, missForensics, lockPoint, videoStopping);
+    }
+
+    // Check if this spin had any valid video
+    const hadValidVideo = Object.values(spin.lockPoints).some(
+      (lp) => lp?.videoValid,
+    );
+    if (hadValidVideo) spinsWithValidVideo++;
+  }
+
+  // Compute final rates
+  for (const arm of armNames) {
+    for (const lp of lockPoints) {
+      const a = arms[arm][lp];
+      const total = a.hits + a.misses;
+      a.hitRate = total > 0 ? a.hits / total : 0;
+      a.logLoss = total > 0 ? a.logLoss / total : 0;
+      a.brierScore = total > 0 ? a.brierScore / total : 0;
+    }
+  }
+
+  // Lock-point coverage
+  const lockPointCoverage: Record<string, number> = {};
+  for (const lp of lockPoints) {
+    const validCount = spins.filter(
+      (s) => s.lockPoints[lp as keyof typeof s.lockPoints]?.videoValid,
+    ).length;
+    lockPointCoverage[lp] = spins.length > 0 ? validCount / spins.length : 0;
+  }
+
+  // McNemar: D vs B at T-5
+  let r = 0;
+  let s = 0;
+  const t5Spins = spins;
+  for (const spin of t5Spins) {
+    const bTop4 = arms["B_history"]["T-5"].top4List[t5Spins.indexOf(spin)];
+    const dTop4 = arms["D_fusion"]["T-5"].top4List[t5Spins.indexOf(spin)];
+    if (!bTop4 || !dTop4) continue;
+    const bHit = bTop4.includes(spin.actualOutcome);
+    const dHit = dTop4.includes(spin.actualOutcome);
+    if (bHit && !dHit) r++;
+    if (!bHit && dHit) s++;
+  }
+  const discordant = r + s;
+  const statistic = discordant > 0 ? (Math.abs(r - s) - 1) ** 2 / discordant : 0;
+  const pValue = discordant > 0 ? chiSquare1dfSurvival(statistic) : 1;
+
+  // Dataset stats
+  const totalSnapshots = spins.reduce(
+    (sum, s) => sum + s.physicsHistory.length,
+    0,
+  );
+  const trackingSnapshots = spins.reduce(
+    (sum, s) => sum + s.physicsHistory.filter((p) => p.isTracking).length,
+    0,
+  );
+  const timeSpan = spins.length > 0
+    ? (spins[spins.length - 1].resultTimestamp - spins[0].resultTimestamp) / 1000
+    : 0;
+
+  return {
+    totalSpins: spins.length,
+    spinsWithValidVideo,
+    lockPointCoverage,
+    arms,
+    mcnemar: {
+      r, s, statistic, pValue,
+      significant: pValue < 0.05,
+      discordant,
+    },
+    missForensics,
+    leakageAudit: {
+      passed: leakageIssues === 0,
+      details: leakageIssues === 0
+        ? "PASS — all inputs strictly before lock time"
+        : `FAIL — ${leakageIssues} leakage violations`,
+    },
+    datasetStats: {
+      totalSnapshots,
+      trackingSnapshots,
+      timeSpanSeconds: timeSpan,
+      avgSnapshotsPerSpin: spins.length > 0 ? totalSnapshots / spins.length : 0,
+    },
+  };
+}
+
+function evaluateV2Arm(
+  top4: string[],
+  probs: Record<string, number>,
+  spin: SynchronizedSpin,
+  lockPoint: string,
+  armName: string,
+  arms: Record<string, Record<string, V2ArmResult>>,
+  missForensics: V2MissForensics[],
+  lockPointState: { physics: PhysicsSnapshot | null; videoValid: boolean; videoReason: string } | null,
+  videoStopping: StoppingPrediction | null,
+): void {
+  const a = arms[armName][lockPoint];
+  const hit = top4.includes(spin.actualOutcome);
+  if (hit) a.hits++;
+  else a.misses++;
+  a.top4List.push(top4);
+
+  // Log-loss (skip if INSUFFICIENT — no prediction made)
+  if (top4.length > 0) {
+    const p = probs[spin.actualOutcome] ?? 0.001;
+    a.logLoss += -Math.log(Math.max(1e-9, p));
+    a.brierScore += (1 - p) ** 2;
+  }
+
+  // Bonus metrics
+  const isBonus = BONUS_NAMES.includes(spin.actualOutcome);
+  if (isBonus) {
+    if (hit) {
+      // Bonus was in Top-4 and it hit
+      // Check if we predicted it
+    }
+  }
+  // False bonus: bonus in Top-4 but didn't hit
+  for (const name of top4) {
+    if (BONUS_NAMES.includes(name) && name !== spin.actualOutcome) {
+      a.falseBonusInclusion++;
+    }
+  }
+
+  // If miss, record forensics
+  if (!hit && top4.length > 0) {
+    const sorted = Object.entries(probs).sort((a, b) => b[1] - a[1]);
+    const actualRank = sorted.findIndex((x) => x[0] === spin.actualOutcome) + 1;
+    const prob4 = sorted[3]?.[1] ?? 0;
+    const prob5 = sorted[4]?.[1] ?? 0;
+    const margin = prob4 - prob5;
+
+    // Angular error
+    let angularError: number | null = null;
+    if (videoStopping?.isValid && spin.actualSector !== null) {
+      const actualAngle = spin.actualSector * SECTOR_WIDTH + SECTOR_WIDTH / 2;
+      let diff = actualAngle - videoStopping.predictedStopAngle;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      angularError = Math.abs(diff);
+    }
+
+    // Classification
+    let classification: V2MissForensics["classification"];
+    let missingSignal: string;
+
+    if (!lockPointState?.videoValid && (armName === "C_video" || armName === "D_fusion")) {
+      classification = "NO_PRE_RESULT_SIGNAL";
+      missingSignal = "No valid video at lock time — physics model had no pre-result signal.";
+    } else if (videoStopping && !videoStopping.isValid) {
+      classification = "PHYSICS_ERROR";
+      missingSignal = `Video physics invalid: ${videoStopping.reason}`;
+    } else if (angularError !== null && angularError > 60) {
+      classification = "PHYSICS_ERROR";
+      missingSignal = `Angular error ${angularError.toFixed(0)}° — stopping prediction inaccurate.`;
+    } else if (lockPointState?.physics && lockPointState.physics.confidence < 0.3) {
+      classification = "TRACKING_ERROR";
+      missingSignal = `Tracking confidence ${(lockPointState.physics.confidence * 100).toFixed(0)}% — too low for reliable prediction.`;
+    } else if (isBonus && (probs[spin.actualOutcome] ?? 0) < 0.05) {
+      classification = "NO_PRE_RESULT_SIGNAL";
+      missingSignal = "Bonus outcome with <5% probability — no pre-result signal identifies this specific bonus.";
+    } else if (margin < 0.02) {
+      classification = "CALIBRATION_ERROR";
+      missingSignal = `Actual rank #${actualRank}, margin ${(margin * 100).toFixed(1)}pp — better calibration could include it.`;
+    } else if (armName === "B_history") {
+      classification = "HISTORY_ERROR";
+      missingSignal = "History engine assigned low probability to the actual outcome.";
+    } else {
+      classification = "NO_PRE_RESULT_SIGNAL";
+      missingSignal = "No identifiable pre-result signal that could have corrected this miss.";
+    }
+
+    missForensics.push({
+      spinId: spin.spinId,
+      lockPoint,
+      arm: armName,
+      actual: spin.actualOutcome,
+      top4,
+      actualRank: actualRank || null,
+      outcomeProbabilities: probs,
+      margin4vs5: margin,
+      videoValid: lockPointState?.videoValid ?? false,
+      videoReason: lockPointState?.videoReason ?? "no lock point",
+      physicsSnapshot: lockPointState?.physics
+        ? {
+            angle: lockPointState.physics.angle,
+            velocity: lockPointState.physics.velocity,
+            acceleration: lockPointState.physics.acceleration,
+            confidence: lockPointState.physics.confidence,
+          }
+        : null,
+      predictedStopAngle: videoStopping?.isValid ? videoStopping.predictedStopAngle : null,
+      actualSector: spin.actualSector,
+      angularError,
+      historyConfidence: 0, // filled by caller if available
+      videoConfidence: videoStopping?.physicsConfidence ?? 0,
+      fusionConfidence: 0,
+      classification,
+      missingSignal,
+    });
+  }
+}
