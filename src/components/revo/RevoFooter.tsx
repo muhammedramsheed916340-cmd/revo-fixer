@@ -19,6 +19,14 @@ export function RevoFooter({
       id="support"
       className="relative z-10 mt-auto scroll-mt-20 border-t border-[#1e2240] bg-[#0a0b14]/80 backdrop-blur-xl"
     >
+      {/* Gradient divider at top for visual separation */}
+      <div
+        className="h-px w-full"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, #448AFF40, #a78bfa40, #448AFF40, transparent)",
+        }}
+      />
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
@@ -30,7 +38,7 @@ export function RevoFooter({
                 <i className="fas fa-crown" />
               </span>
               <div>
-                <div className="text-lg font-extrabold text-white">
+                <div className="text-xl font-black tracking-tight text-white">
                   REVO<span className="text-[#448AFF]"> FIXER</span>
                 </div>
                 <div className="text-[10px] uppercase tracking-[0.2em] text-[#5a6a99]">
@@ -80,6 +88,8 @@ export function RevoFooter({
                 { id: "home", label: "Home" },
                 { id: "game", label: "Live Game" },
                 { id: "live-results", label: "Live Results" },
+                { id: "streak-tracker", label: "Streaks" },
+                { id: "prediction-timeline", label: "Backtest" },
                 { id: "packages", label: "Packages" },
                 { id: "recommender", label: "Picker" },
                 { id: "compare", label: "Compare" },
@@ -97,8 +107,9 @@ export function RevoFooter({
                 <li key={l.id}>
                   <button
                     onClick={() => onGo(l.id)}
-                    className="text-[#bcc6e0] transition hover:text-[#448AFF]"
+                    className="group flex items-center gap-1 text-[#bcc6e0] transition-all hover:translate-x-0.5 hover:text-[#448AFF]"
                   >
+                    <i className="fas fa-chevron-right text-[8px] text-transparent transition-colors group-hover:text-[#448AFF]/60" />
                     {l.label}
                   </button>
                 </li>
@@ -110,36 +121,36 @@ export function RevoFooter({
             <div className="mb-3 text-xs font-bold uppercase tracking-wider text-[#5a6a99]">
               App status
             </div>
-            <ul className="space-y-2 text-sm">
-              <li className="flex items-center justify-between gap-3 text-[#bcc6e0]">
-                Version
-                <span className="font-bold text-white">
+            <ul className="space-y-2.5 text-sm">
+              <li className="flex items-center justify-between gap-3 border-b border-[#1e2240]/40 pb-1.5 text-[#8899cc]">
+                <span className="text-[12px]">Version</span>
+                <span className="text-right font-bold text-white">
                   v{settings?.appVersion ?? "2.0.0"}
                 </span>
               </li>
-              <li className="flex items-center justify-between gap-3 text-[#bcc6e0]">
-                Maintenance
+              <li className="flex items-center justify-between gap-3 border-b border-[#1e2240]/40 pb-1.5 text-[#8899cc]">
+                <span className="text-[12px]">Maintenance</span>
                 <span
-                  className={`font-bold ${
+                  className={`text-right font-bold ${
                     settings?.maintenanceMode ? "text-[#ffa502]" : "text-[#2ed573]"
                   }`}
                 >
                   {settings?.maintenanceMode ? "On" : "Off"}
                 </span>
               </li>
-              <li className="flex items-center justify-between gap-3 text-[#bcc6e0]">
-                Force update
+              <li className="flex items-center justify-between gap-3 border-b border-[#1e2240]/40 pb-1.5 text-[#8899cc]">
+                <span className="text-[12px]">Force update</span>
                 <span
-                  className={`font-bold ${
+                  className={`text-right font-bold ${
                     settings?.forceUpdate ? "text-[#ff4757]" : "text-[#2ed573]"
                   }`}
                 >
                   {settings?.forceUpdate ? "Required" : "Not needed"}
                 </span>
               </li>
-              <li className="flex items-center justify-between gap-3 text-[#bcc6e0]">
-                USDT rate
-                <span className="font-bold text-white">
+              <li className="flex items-center justify-between gap-3 text-[#8899cc]">
+                <span className="text-[12px]">USDT rate</span>
+                <span className="text-right font-bold text-white">
                   ₹{(settings?.paymentSettings?.usdtRate ?? 94.14).toFixed(2)}
                 </span>
               </li>

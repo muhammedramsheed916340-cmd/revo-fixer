@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, useMemo } from "react";
+import { useSyncExternalStore, useMemo, useState, useRef, useCallback } from "react";
 import {
   getLiveSpins,
   getLiveSpinsVersion,
@@ -59,22 +59,32 @@ export function RevoStreakTracker() {
   useLiveSpinsVersion(); // re-render when the spin store changes
   const spins = getLiveSpins();
 
+  // Persisted window size for the rolling hit-rate (10 / 20 / 30).
+  const [windowSize, setWindowSize] = useState<number>(() => {
+    if (typeof window === "undefined") return 20;
+    const saved = parseInt(localStorage.getItem("revo_streak_window") ?? "20", 10);
+    return [10, 20, 30].includes(saved) ? saved : 20;
+  });
+  const updateWindowSize = useCallback((w: number) => {
+    setWindowSize(w);
+    try { localStorage.setItem("revo_streak_window", String(w)); } catch { /* ignore */ }
+  }, []);
+
   // Slice the most recent 30 (store is newest-first).
   const recent = useMemo(() => spins.slice(0, 30), [spins]);
 
-  // Rolling hit-rate of Top-4 over the last 20 spins.
+  // Rolling hit-rate of Top-4 over the user-selected window size.
   const rollingData = useMemo(() => {
-    const window = 20;
     const reversed = [...spins].reverse(); // oldest → newest
     const points: { idx: number; rate: number }[] = [];
     for (let i = 0; i < reversed.length; i++) {
-      const start = Math.max(0, i - window + 1);
+      const start = Math.max(0, i - windowSize + 1);
       const slice = reversed.slice(start, i + 1);
       const hits = slice.filter((s) => TOP4.includes(s.sector)).length;
       points.push({ idx: i, rate: slice.length ? hits / slice.length : 0 });
     }
     return points.slice(-40); // last 40 windows
-  }, [spins]);
+  }, [spins, windowSize]);
 
   // Per-sector observed frequency (last 50 spins).
   const sectorFreq = useMemo(() => {
@@ -247,6 +257,23 @@ export function RevoStreakTracker() {
                 <i className="fas fa-wave-square text-[#2ed573]" /> Rolling Top-4
                 Hit-Rate
               </span>
+              {/* Window size selector */}
+              <div className="flex items-center gap-1 rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-0.5">
+                {([10, 20, 30] as const).map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => updateWindowSize(w)}
+                    className={`rounded-md px-2 py-0.5 text-[9px] font-bold transition ${
+                      windowSize === w
+                        ? "bg-[#2ed573]/20 text-[#2ed573]"
+                        : "text-[#8899cc] hover:text-white"
+                    }`}
+                    title={`Rolling window: last ${w} spins`}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="p-4">
               {rollingData.length < 2 ? (
@@ -261,7 +288,7 @@ export function RevoStreakTracker() {
               )}
               <div className="mt-2 flex items-center justify-between text-[10px]">
                 <span className="text-[#8899cc]">
-                  Last {rollingData.length} windows (n=20)
+                  Last {rollingData.length} windows (n={windowSize})
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-[#2ed573]" />
@@ -418,6 +445,7 @@ function KpiTile({
 /**
  * Lightweight inline SVG sparkline — no chart library dependency.
  * Draws the rolling hit-rate as a smooth area + line, with a dashed baseline.
+ * Interactive: hover to see the exact hit-rate at each data point.
  */
 function RollingSparkline({
   points,
@@ -430,9 +458,10 @@ function RollingSparkline({
   const H = 100;
   const pad = 6;
   const n = points.length;
-  if (n < 2) return null;
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [hovered, setHovered] = useState<number | null>(null);
 
-  const x = (i: number) => pad + (i / (n - 1)) * (W - pad * 2);
+  const x = (i: number) => pad + (i / Math.max(1, n - 1)) * (W - pad * 2);
   // Y: 0% at bottom, 100% at top — but clamp the view to [0.5, 1.0] so
   // variation is visible (Top-4 hit-rate rarely drops below 50%).
   const yMin = 0.5;
@@ -441,6 +470,20 @@ function RollingSparkline({
     const clamped = Math.max(yMin, Math.min(yMax, v));
     return H - pad - ((clamped - yMin) / (yMax - yMin)) * (H - pad * 2);
   };
+
+  const handleMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      const svg = svgRef.current;
+      if (!svg || n < 2) return;
+      const rect = svg.getBoundingClientRect();
+      const relX = (e.clientX - rect.left) / rect.width; // 0..1
+      const idx = Math.round(relX * (n - 1));
+      setHovered(Math.max(0, Math.min(n - 1, idx)));
+    },
+    [n],
+  );
+
+  if (n < 2) return null;
 
   const linePath = points
     .map((p, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p).toFixed(1)}`)
@@ -453,52 +496,97 @@ function RollingSparkline({
 
   const baselineY = y(baseline);
 
+  const hoveredPoint = hovered !== null ? points[hovered] : null;
+  const hoveredX = hovered !== null ? x(hovered) : 0;
+  const hoveredY = hovered !== null ? y(points[hovered]) : 0;
+
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="h-32 w-full"
-      preserveAspectRatio="none"
-      role="img"
-      aria-label="Rolling Top-4 hit-rate sparkline"
-    >
-      <defs>
-        <linearGradient id="sparkArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#2ed573" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#2ed573" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      {/* baseline */}
-      <line
-        x1={pad}
-        y1={baselineY}
-        x2={W - pad}
-        y2={baselineY}
-        stroke="#448AFF"
-        strokeWidth="1"
-        strokeDasharray="3 3"
-        opacity="0.5"
-      />
-      {/* area */}
-      <path d={areaPath} fill="url(#sparkArea)" />
-      {/* line */}
-      <path
-        d={linePath}
-        fill="none"
-        stroke="#2ed573"
-        strokeWidth="2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      {/* last point */}
-      <circle
-        cx={x(n - 1)}
-        cy={y(points[n - 1])}
-        r="3"
-        fill="#2ed573"
-        stroke="#0d1020"
-        strokeWidth="1.5"
-      />
-    </svg>
+    <div className="relative">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        className="h-32 w-full cursor-crosshair"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Rolling Top-4 hit-rate sparkline"
+        onMouseMove={handleMove}
+        onMouseLeave={() => setHovered(null)}
+      >
+        <defs>
+          <linearGradient id="sparkArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#2ed573" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#2ed573" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {/* baseline */}
+        <line
+          x1={pad}
+          y1={baselineY}
+          x2={W - pad}
+          y2={baselineY}
+          stroke="#448AFF"
+          strokeWidth="1"
+          strokeDasharray="3 3"
+          opacity="0.5"
+        />
+        {/* area */}
+        <path d={areaPath} fill="url(#sparkArea)" />
+        {/* line */}
+        <path
+          d={linePath}
+          fill="none"
+          stroke="#2ed573"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {/* last point */}
+        <circle
+          cx={x(n - 1)}
+          cy={y(points[n - 1])}
+          r="3"
+          fill="#2ed573"
+          stroke="#0d1020"
+          strokeWidth="1.5"
+        />
+        {/* Hover indicator */}
+        {hovered !== null && (
+          <>
+            <line
+              x1={hoveredX}
+              y1={pad}
+              x2={hoveredX}
+              y2={H - pad}
+              stroke="#ffffff"
+              strokeWidth="0.5"
+              opacity="0.4"
+            />
+            <circle
+              cx={hoveredX}
+              cy={hoveredY}
+              r="4"
+              fill="#2ed573"
+              stroke="#0d1020"
+              strokeWidth="2"
+            />
+          </>
+        )}
+      </svg>
+      {/* Tooltip */}
+      {hovered !== null && hoveredPoint !== null && (
+        <div
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-[#2ed573]/40 bg-[#0d1020] px-2 py-1 text-[10px] font-bold shadow-lg"
+          style={{
+            left: `${(hoveredX / W) * 100}%`,
+            top: `${(hoveredY / H) * 100}%`,
+            marginTop: "-8px",
+          }}
+        >
+          <span className="text-[#2ed573]">{(hoveredPoint * 100).toFixed(1)}%</span>
+          <span className="ml-1 text-[#5a6a99]">· spin #{hovered + 1}</span>
+        </div>
+      )}
+    </div>
   );
 }
 

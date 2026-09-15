@@ -8419,3 +8419,118 @@ Created entirely new component (~400 lines) with 3 visualisations powered by the
 3. **Persist Streak Tracker preferences** (window size, last N) to localStorage so the user's view is restored on reload.
 4. **Video Sensor V2 live test** — complete the engineering-gate PASS/FAIL verification on Vercel deployment.
 5. **Add a "Prediction vs Actual" timeline** showing the last 10 predictions side-by-side with what actually hit — closes the loop on the prediction engine's accuracy.
+
+---
+Task ID: cron-review-prediction-timeline-and-enhancements
+Agent: Z.ai Code (main) — triggered by 15-min webDevReview cron
+Task: Assess project status, perform QA via agent-browser, then improve styling + add new features.
+
+## Current Project Status Assessment
+- **Server health:** HTTP 200, ~60-80ms response time. Dev server stable.
+- **Functionality:** All APIs working (app-settings, packages, stats, crazy-time live feed, admin PIN bypass 8950888988, key generation). Zero runtime errors in dev.log.
+- **Existing sections (prior round):** Hero (polished), Live Game, Live Results (zebra-striped), Streak Tracker (Performance Cockpit with KPIs + streak bar + sparkline + hot/cold radar), Video Sensor V2, Admin Gate (PIN bypass + key generation).
+- **No blocking bugs found** — this round focused on new feature + enhancements + footer polish per mandatory requirements.
+
+## QA Performed (agent-browser + VLM)
+1. Desktop (1280×900) full-page screenshot → VLM analysis of footer + streak tracker
+2. Mobile (375×812) viewport screenshot → 0 console errors
+3. Console error monitoring across all interactions (0 errors)
+4. API health checks (admin PIN: `{"ok":true,"mode":"pin"}`)
+
+**QA findings identified:**
+- Footer: needed hover effects on nav links, right-aligned status values, bolder brand name, gradient divider
+- Streak Tracker sparkline: lacked hover tooltips for exact values
+- Streak Tracker: window size was hardcoded to 20 (no user control)
+- Need a "Prediction vs Actual" timeline to close the loop on prediction accuracy (prior round recommendation)
+
+## Completed Modifications
+
+### 1. NEW FEATURE: RevoPredictionTimeline.tsx (~440 lines)
+Created entirely new component that runs a walk-forward backtest on the last 12 live spins, showing what the engine predicted vs what actually hit:
+
+**Architecture:**
+- Imports `runFrozenWalkForward` + `ALL_FLAGS_OFF` from decisionEngine.ts
+- Reads live spins from liveSpinStore (no new API calls)
+- Maps live spin sectors → engine game names (e.g., "CoinFlip" → "COIN FLIP")
+- Runs `runFrozenWalkForward(actualNames, ALL_FLAGS_OFF, spins)` — frozen flags, no data leakage
+- Memoized on `[spinCount, latestSettledAt]` — only re-computes when a genuinely new spin arrives
+
+**Visualisations:**
+- **4 KPI tiles:** Engine Hit-Rate, Theoretical [1,2,5,10] benchmark, Delta vs Theory (pp), Current Streak (×HIT/×MISS with hot/cold indicator)
+- **Round-by-round timeline:** Horizontal scrollable cards, each showing:
+  - Round # + HIT/MISS badge (green/red)
+  - 4 predicted outcome badges (color-coded, with the matching prediction highlighted on HIT — thicker border + glow + ✓ check icon)
+  - Actual result card (image + name + star icon for bonus rounds)
+  - Latest round has white ring + glow
+- **Legend:** HIT/MISS color key + bonus round explanation + "retrospective · frozen flags · no leakage" disclaimer
+- **Info banner:** Explains the walk-forward methodology + "retrospective diagnostic, not a fresh validation claim"
+
+**Live verification:** 91.7% engine hit-rate (11/12 rounds), 6× HIT streak → later 2× MISS streak (data genuinely live). Engine produced DYNAMIC predictions (included PACHINKO in Top-4, not just [1,2,5,10]).
+
+### 2. ENHANCE: RevoStreakTracker.tsx — Interactive Sparkline + Window Selector
+
+**a) Interactive sparkline hover tooltips:**
+- Added `useRef<SVGSVGElement>` + `useState<number | null>` for hovered index
+- `onMouseMove` handler converts mouse pixel position → viewBox coordinates → nearest point index
+- Hover shows: vertical white guide line + enlarged circle marker + HTML tooltip with exact hit-rate % + spin number
+- `cursor-crosshair` CSS for discoverability
+- Fixed React hooks order (useCallback before early return)
+
+**b) Window size selector with localStorage persistence:**
+- Added 3-button toggle (10 / 20 / 30) in the sparkline card header
+- Selected size persisted to `localStorage["revo_streak_window"]`
+- `useState` initializer reads from localStorage (SSR-safe with `typeof window` check)
+- `useCallback` updater writes to localStorage
+- Rolling data `useMemo` now depends on `windowSize` — re-computes when user changes the window
+- Label updates dynamically: "Last N windows (n=W)"
+
+### 3. STYLING: Footer Polish (RevoFooter.tsx)
+
+**a) Gradient divider:** Added 1px gradient line at the top of the footer (`linear-gradient(90deg, transparent, #448AFF40, #a78bfa40, #448AFF40, transparent)`) for visual separation from main content.
+
+**b) Nav link hover effects:** Each nav link now has:
+- `hover:translate-x-0.5` (slides right on hover)
+- `hover:text-[#448AFF]` (color shift)
+- Animated chevron icon (`fa-chevron-right`) that appears on hover (transparent → blue)
+
+**c) Brand name boldness:** `text-lg font-extrabold` → `text-xl font-black tracking-tight` for stronger brand presence.
+
+**d) APP STATUS right-alignment + dividers:**
+- Each status row now has `border-b border-[#1e2240]/40 pb-1.5` (subtle divider between rows)
+- Values use `text-right` for clean vertical alignment
+- Labels use `text-[12px]` for consistent sizing
+- Text color upgraded from `#bcc6e0` to `#8899cc` for better contrast
+
+**e) New nav items:** Added "Streaks" and "Backtest" to the footer Navigate list.
+
+**VLM confirmed:** "Gradient divider ✓. Hover effects ✓. Right-aligned status ✓. Brand boldness ✓."
+
+### 4. Wiring
+- Added `RevoPredictionTimeline` to RevoApp.tsx between StreakTracker and VideoSensor (wrapped in RevoReveal)
+- Added "Backtest" nav button (fa-bullseye icon) to RevoNavbar.tsx after "Streaks"
+
+## Verification Results
+- **Lint:** 0 new errors (4 pre-existing in scripts/ untouched). Fixed 1 rules-of-hooks error during development.
+- **Console errors:** 0 (desktop + mobile, fresh reload, all sections interacted)
+- **dev.log:** clean, all 200 responses
+- **VLM Prediction Timeline:** "High-quality dark-mode cyberpunk aesthetic. Card design well-structured. No rendering artifacts. Data density adds significant value."
+- **VLM Footer:** "Gradient divider ✓. Hover effects ✓. Right-aligned status ✓. Brand boldness ✓."
+- **Admin PIN:** still works (`{"ok":true,"key":"BYPASS-PIN","mode":"pin"}`)
+- **Mobile responsive:** 0 console errors on 375×812 viewport
+- **Prediction Timeline live data:** 91.7% hit-rate, dynamic predictions (PACHINKO in Top-4), hit/miss badges rendering correctly
+- **Streak Tracker window selector:** 10/20/30 buttons functional, localStorage persistence working
+- **Sparkline hover:** Interactive tooltip showing exact % + spin number
+
+## Unresolved Issues / Risks
+1. **Pre-existing lint errors** in `scripts/` (require-imports) — not production code, low priority.
+2. **RevoGame.tsx is 4023 lines** — still too large to safely refactor in a single round. The QA-flagged "INSUFFICIENT DATA looks broken" and "card layout inconsistency" issues remain. Recommend a dedicated refactoring round.
+3. **Video Sensor V2** still needs the deployed live test (engineering gate verification) — requires Vercel deployment access.
+4. **Prediction Timeline performance** — `runFrozenWalkForward` runs both baseline + experimental arms (2N engine calls for N=12 rounds = 24 calls). Currently fast enough (<1s) but could be optimized by writing a single-arm walk-forward if the window is increased beyond 15.
+5. **Sparkline tooltip positioning** — uses percentage-based positioning which works well on desktop but may need adjustment on very narrow mobile screens.
+
+## Priority Recommendations for Next Phase
+1. **Refactor RevoGame.tsx** — split the 4023-line monolith into smaller sub-components (prediction cards, debug panel, validation controls).
+2. **Add a "Prediction History" persistence layer** — store each real-time prediction in localStorage so the Prediction Timeline can show what was ACTUALLY displayed (not just the retrospective backtest).
+3. **Add a "Bonus Round Alert"** — when the hot/cold radar shows a bonus sector running hot, show an informational alert (NOT a bet signal — just descriptive).
+4. **Video Sensor V2 live test** — complete the engineering-gate PASS/FAIL verification on Vercel deployment.
+5. **Add export/share functionality** — let users export their backtest results or streak data as an image/CSV for sharing.
