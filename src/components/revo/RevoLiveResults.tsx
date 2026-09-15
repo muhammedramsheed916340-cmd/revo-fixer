@@ -170,8 +170,8 @@ export function RevoLiveResults() {
                   </tr>
                 </thead>
                 <tbody>
-                  {analysis.segments.map((s) => (
-                    <tr key={s.segment} className="border-b border-[#1e2240]/40 hover:bg-white/[0.02]">
+                  {analysis.segments.map((s, idx) => (
+                    <tr key={s.segment} className={`border-b border-[#1e2240]/40 hover:bg-white/[0.04] ${idx % 2 === 1 ? "bg-white/[0.015]" : ""}`}>
                       <td className="px-2 py-2 text-left">
                         <div className="flex items-center gap-2">
                           <img src={GAME_CARD_IMAGES[s.imageKey]} alt={s.displayName} className="h-8 w-8 object-contain" />
@@ -180,7 +180,7 @@ export function RevoLiveResults() {
                       </td>
                       <td className="px-2 py-2 text-white">{s.count}</td>
                       <td className="px-2 py-2 text-[#448AFF]">{(s.actualFreq * 100).toFixed(1)}%</td>
-                      <td className="px-2 py-2 text-[#5a6a99]">{(s.theoreticalProb * 100).toFixed(1)}%</td>
+                      <td className="px-2 py-2 text-[#8899cc]">{(s.theoreticalProb * 100).toFixed(1)}%</td>
                       <td className="px-2 py-2">
                         <span className={s.zScore > 0 ? "text-[#ff4757]" : "text-[#00d4ff]"}>
                           {s.zScore > 0 ? "+" : ""}{s.zScore.toFixed(2)}
@@ -188,9 +188,9 @@ export function RevoLiveResults() {
                       </td>
                       <td className="px-2 py-2 text-white">
                         {s.currentGap}
-                        {s.isOverdue && <span className="ml-1 text-[#ffa502]">⚠️</span>}
+                        {s.isOverdue && <span className="ml-1 text-[#ffa502]" title="Gap exceeds average — INFO only">⚠️</span>}
                       </td>
-                      <td className="px-2 py-2 text-[#5a6a99]">{s.maxDrought}</td>
+                      <td className="px-2 py-2 text-[#8899cc]">{s.maxDrought}</td>
                       <td className="px-2 py-2 text-[#2ed573]">{(s.bayesianProb * 100).toFixed(1)}%</td>
                       <td className="px-2 py-2">
                         {s.isHot && <span className="rounded-full bg-[#ff4757]/15 px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#ff4757]" title="Descriptive only — NOT a bet signal">🔥 INFO: Hot</span>}

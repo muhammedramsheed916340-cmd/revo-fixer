@@ -8314,3 +8314,108 @@ Stage Summary:
 - Real admin keys (Firebase-stored) still work as a fallback via the same input.
 - Full key-generation console restored (was missing after the clean-push): License / Signal / Admin, all writing to the live RTDB.
 - Production admin flow fully browser-verified end-to-end.
+
+---
+Task ID: cron-review-styling-and-streak-tracker
+Agent: Z.ai Code (main) — triggered by 15-min webDevReview cron
+Task: Assess project status, perform QA via agent-browser, then improve styling + add new features.
+
+## Current Project Status Assessment
+- **Server health:** HTTP 200, ~50ms response time. Dev server stable.
+- **Functionality:** All APIs working (app-settings, packages, stats, crazy-time live feed, admin PIN bypass, key generation). Zero runtime errors in dev.log.
+- **Admin flow:** PIN bypass (8950888988) + key generation console fully operational (verified via curl + agent-browser in prior round).
+- **Existing sections:** Hero, Live Game (prediction), Live Results (stats tables), Video Sensor (V2), Admin Gate.
+- **No blocking bugs found** — this round focused on styling polish + new feature addition per mandatory requirements.
+
+## QA Performed (agent-browser + VLM)
+1. Desktop (1280×900) full-page screenshot → VLM analysis
+2. Mobile (375×812) viewport screenshot → VLM analysis
+3. Per-section screenshots (Hero, Game, Live Results, Admin) → VLM analysis
+4. Console error monitoring (0 errors)
+5. API health checks (admin PIN, key generation)
+
+**QA findings identified:**
+- Hero: low-contrast subtext (#8899cc on dark bg), "Support" button blended in, stat icons too small
+- Live Results: muted text (#5a6a99) too dark, no zebra striping on segment table
+- Mobile: touch targets slightly small, stray rendering artifact noted by VLM
+- No JS/runtime errors anywhere
+
+## Completed Modifications
+
+### 1. Hero Polish (RevoHero.tsx)
+- **Contrast fix (accessibility):** subtext `#8899cc` → `#bcc6e0`, trust badge sub `#5a6a99` → `#8899cc`
+- **Live badge upgrade:** plain border → glowing purple badge (`#a78bfa` border + glow shadow + bolder text `#c4b5fd`)
+- **"Support" button:** was nearly invisible (dark grey on dark bg) → now vibrant Telegram-blue outline button (`border-2 border-[#29b6f6]/40`, `text-[#29b6f6]`, `bg-[#29b6f6]/10`) with hover scale + fill
+- **Stat icons:** container `h-9 w-9` → `h-11 w-11`, icon `text-sm` → `text-base`, added colored box-shadow glow, added hover scale-110
+- **Stat cards:** added `sub` field ("Live rate", "INR minimum", "Latest build", "Always on"), hover background highlight, bolder labels
+- **Trust badges:** added `group-hover:scale-110` icon animation, `hover:ring-1 hover:ring-white/10`, brighter sub-text
+- **CTA buttons:** all 3 now have `hover:scale-[1.02] active:scale-[0.98]` micro-interactions
+- VLM confirmed: "Text contrast significantly improved. CTA buttons visually distinct. Stat icons clear and well-proportioned."
+
+### 2. NEW FEATURE: RevoStreakTracker.tsx (Performance Cockpit)
+Created entirely new component (~400 lines) with 3 visualisations powered by the existing liveSpinStore (no new API calls):
+
+**a) 4 KPI Tiles:**
+- Rolling Top-4 Hit-Rate (live % vs 83.3% theoretical baseline)
+- Last Result (outcome name + time ago, colored by segment)
+- Current Streak (consecutive repeat count + outcome)
+- Spins Tracked (total live rounds)
+
+**b) Recent Outcomes Streak Bar (last 30):**
+- 30 colored cells, each colored by outcome (8 distinct colors)
+- Bonus rounds (CoinFlip/Pachinko/CashHunt/CrazyTime) show star icon
+- Number rounds show the digit
+- Multiplier badge (×N) on cells with multipliers > 1
+- Latest result has white ring + glow
+- Hover reveals timestamp tooltip
+- Full 8-segment color legend below
+
+**c) Rolling Hit-Rate Sparkline:**
+- Custom inline SVG sparkline (no chart library dependency)
+- Rolling window of 20 spins, last 40 windows shown
+- Green area+line for actual hit-rate
+- Dashed blue baseline at 83.3% (theoretical Top-4)
+- Y-axis clamped to [50%, 100%] for visible variation
+- Animated last-point dot
+
+**d) Hot/Cold Sector Radar (8 mini cards):**
+- Per-sector observed frequency vs theoretical (last 50 spins)
+- Progress bar fills to 50% when observed = theoretical
+- White tick marker at theoretical baseline position
+- Color-coded: 🔥 HOT (≥125%), On par (≥100%), Cool (≥75%), ❄️ COLD (<75%)
+- Shows count + observed% + theoretical%
+- Includes "INFO only — does NOT affect prediction engine" disclaimer
+
+### 3. Wiring
+- Added `RevoStreakTracker` to RevoApp.tsx between LiveResults and VideoSensor (wrapped in RevoReveal)
+- Added "Streaks" nav button (fa-chart-line icon) to RevoNavbar.tsx after "Live Results"
+
+### 4. Live Results Table Polish (RevoLiveResults.tsx)
+- Added zebra striping: odd rows get `bg-white/[0.015]` subtle background
+- Improved contrast: `#5a6a99` → `#8899cc` for theoretical% and max-drought columns
+- Added `title` tooltip on overdue warning emoji: "Gap exceeds average — INFO only"
+- Enhanced hover: `bg-white/[0.02]` → `bg-white/[0.04]` for stronger feedback
+
+## Verification Results
+- **Lint:** 0 new errors (4 pre-existing in scripts/ untouched)
+- **Console errors:** 0 (fresh reload, all sections interacted)
+- **dev.log:** clean, all 200 responses
+- **VLM Hero analysis:** "Text contrast significantly improved. CTA buttons visually distinct. Stat icons clear and well-proportioned. Modern high-end feel."
+- **VLM Streak Tracker analysis:** "Polished, high-contrast aesthetic. No rendering bugs or broken elements. All text legible, borders align perfectly."
+- **Admin PIN:** still works (curl verified `{"ok":true,"mode":"pin"}`)
+- **Key generation:** still works (curl generated signal code `9273856588`)
+- **Mobile responsive:** Streak Tracker grid collapses 4-col → 2-col on mobile, streak bar wraps naturally
+- **Live data integration:** confirmed 30 live spins tracked, 85.0% rolling hit-rate, recent outcomes showing ×5/×2/×10/×400 multipliers
+
+## Unresolved Issues / Risks
+1. **Pre-existing lint errors** in `scripts/gen_diag_report.js` and `scripts/report_part1.js` (require-imports) — these are video-experiment scripts, not production code. Low priority.
+2. **RevoGame.tsx is 4023 lines** — too large to safely edit in this round. The QA-flagged "INSUFFICIENT DATA looks broken" and "card layout inconsistency" issues are in this file but require careful surgery. Recommend a dedicated refactoring round.
+3. **Video Sensor V2** still needs the deployed live test (engineering gate verification) from the prior round — not addressed here as it requires Vercel deployment access.
+4. **Stray "N" artifact** on mobile (VLM-reported) — could not reproduce in DOM inspection; likely a VLM misread of the `revo-pulse` dot or a transient render. Monitor.
+
+## Priority Recommendations for Next Phase
+1. **Refactor RevoGame.tsx** — split the 4023-line monolith into smaller sub-components (prediction cards, debug panel, validation controls) to make it maintainable and fix the card-consistency QA issues safely.
+2. **Add keyboard shortcuts** to the Streak Tracker (e.g., `[`/`]` to scroll through historical windows, `h` to toggle hot/cold view).
+3. **Persist Streak Tracker preferences** (window size, last N) to localStorage so the user's view is restored on reload.
+4. **Video Sensor V2 live test** — complete the engineering-gate PASS/FAIL verification on Vercel deployment.
+5. **Add a "Prediction vs Actual" timeline** showing the last 10 predictions side-by-side with what actually hit — closes the loop on the prediction engine's accuracy.
