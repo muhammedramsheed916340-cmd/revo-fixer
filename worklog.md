@@ -8726,3 +8726,79 @@ Full UI component:
 
 ## Commit
 Pushed as `9be32fd` to GitHub.
+
+---
+Task ID: fusion-v2-real-synchronized-data
+Agent: Z.ai Code (main)
+Task: Build Fusion V2 with REAL synchronized video data. Video-only must NOT fall back to theoretical — show INSUFFICIENT when no valid pre-result video.
+
+## Critical Fix
+**V1 bug:** `invalidPrediction()` returned `THEORETICAL` probabilities when video was insufficient — this silently replaced video-only with [1,2,5,10].
+**V2 fix:** `invalidPrediction()` now returns ALL ZEROS. Video-only arm shows INSUFFICIENT and makes NO prediction when video is invalid.
+
+## New Modules
+
+### 1. videoPhysicsHistory.ts (NEW)
+Chronological physics snapshot collector:
+- **Ring buffer**: 6000 snapshots max (~5 min at 20fps)
+- **recordPhysicsSnapshot()**: hooked into video sensor frame loop
+- **recordSynchronizedSpin()**: pairs live results with pre-result physics
+  - Lock points: T-20, T-15, T-10, T-5 (all strictly before result)
+  - Each lock point stores the latest physics at or before that timestamp
+  - No-leakage guarantee: `getPhysicsAt(ts)` filters to `<= ts`
+- **Stats**: totalSnapshots, trackingSnapshots, validVideoSpins, timeSpan
+
+### 2. fusionEngine.ts V2 additions
+- **runFusionV2Experiment()**: 4 arms × 4 lock points on REAL synchronized data
+- **Video-only (Arm C)**: INSUFFICIENT when no valid video — NO theoretical fallback
+  - `insufficientCount` tracked per lock point
+  - Log-loss/Brier skip INSUFFICIENT predictions (no false prediction)
+- **Miss forensics with classification**:
+  - TRACKING_ERROR (confidence < 30%)
+  - CALIBRATION_ERROR (margin < 2pp)
+  - PHYSICS_ERROR (angular error > 60° or invalid stopping)
+  - HISTORY_ERROR (history engine assigned low probability)
+  - NO_PRE_RESULT_SIGNAL (no identifiable pre-result signal)
+- **Dataset stats**: totalSnapshots, trackingSnapshots, avgSnapshotsPerSpin, timeSpan
+- **Lock-point coverage**: T-20/T-15/T-10/T-5 → % with valid video
+
+### 3. RevoFusionExperiment.tsx V2 UI
+- **Synchronized dataset panel**: live counts (spins, snapshots, tracking, valid video)
+- **Multi-lock-point table**: 4 arms × 4 lock points (T-20/T-15/T-10/T-5)
+- **INSUFFICIENT badge**: shown when video arm couldn't predict
+- **Miss forensics**: classified with color-coded badges
+- **Production gate**: 6 criteria including "real video data" and "video made predictions"
+
+### 4. Hooks
+- **RevoVideoSensor.tsx**: `recordPhysicsSnapshot(currentPhysics)` after each physics update
+- **RevoLiveResults.tsx**: `recordSynchronizedSpin()` when a new live result arrives
+
+## Live Experiment Results (6 spins, 5924 snapshots)
+
+| Arm | T-20 | T-15 | T-10 | T-5 |
+|-----|------|------|------|-----|
+| A: [1,2,5,10] ★ | 100% (6/6) | 100% | 100% | 100% |
+| B: C1-C9 | 83% (5/6) | 83% | 83% | 83% |
+| C: Video-only | 0% (6 INSUF) | 0% (6 INSUF) | 0% (6 INSUF) | 0% (6 INSUF) |
+| D: Fusion | 83% (5/6) | 83% | 83% | 83% |
+
+- **Spins with valid video: 0** (wheel was stopped during all pre-result windows)
+- **Video coverage: 0%** at all lock points
+- **Leakage: PASS**
+- **McNemar: 0 discordant** (D=B since video weight=0)
+
+## Key Findings
+1. **Video-only correctly shows INSUFFICIENT** — does NOT fall back to theoretical
+2. **No data leakage** — all physics filtered to before lock time
+3. **Video model is NOT validated** — 0 spins had valid pre-result video
+4. **Theoretical [1,2,5,10] remains champion** at 100% on this 6-spin sample
+5. **Wheel was stopped** during all pre-result windows (tracking snapshots = 15 out of 5924)
+
+## What's Needed for Real Validation
+1. **Collect data during actual spins** — the wheel only spins ~10s per 60s cycle. Need to collect for 30+ minutes to capture spins with valid pre-result video.
+2. **Validate the 54-sector map** — need to verify the sector-to-outcome mapping from stopped-wheel observations.
+3. **Learn the deceleration model** — currently using instantaneous acceleration (noisy). Need to learn average deceleration from completed spins.
+4. **Run 100+ fresh spins** with video coverage to determine if video physics genuinely adds predictive value.
+
+## Commit
+Pushed as `988f148` to GitHub.
