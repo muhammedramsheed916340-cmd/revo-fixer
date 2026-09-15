@@ -11,6 +11,7 @@ const NAV = [
   { id: "live-results", label: "Live Results", icon: "fa-tower-broadcast" },
   { id: "streak-tracker", label: "Streaks", icon: "fa-chart-line" },
   { id: "prediction-timeline", label: "Backtest", icon: "fa-bullseye" },
+  { id: "fusion-experiment", label: "Fusion", icon: "fa-flask" },
   { id: "packages", label: "Packages", icon: "fa-crown" },
   { id: "recommender", label: "Picker", icon: "fa-wand-magic-sparkles" },
   { id: "compare", label: "Compare", icon: "fa-table-columns" },

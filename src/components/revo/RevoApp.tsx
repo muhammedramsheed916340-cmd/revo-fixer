@@ -18,6 +18,7 @@ import { RevoAdminGate } from "./RevoAdminGate";
 import { RevoVideoSensor } from "./RevoVideoSensor";
 import { RevoStreakTracker } from "./RevoStreakTracker";
 import { RevoPredictionTimeline } from "./RevoPredictionTimeline";
+import { RevoFusionExperiment } from "./RevoFusionExperiment";
 import { RevoComparison } from "./RevoComparison";
 import { RevoDeposit } from "./RevoDeposit";
 import { RevoScrollTop, RevoDivider } from "./RevoScrollTop";
@@ -207,6 +208,10 @@ export function RevoApp() {
 
           <RevoReveal>
             <RevoVideoSensor />
+          </RevoReveal>
+
+          <RevoReveal>
+            <RevoFusionExperiment />
           </RevoReveal>
 
           <RevoReveal>
