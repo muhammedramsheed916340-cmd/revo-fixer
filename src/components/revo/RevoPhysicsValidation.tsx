@@ -15,9 +15,14 @@ import {
   getBufferStats,
   getSpinPhase,
   getExperimentSessionId,
+  getNoiseBaseline,
+  auditSnapshots,
+  diagnoseLockPoints,
   subscribeToBuffer,
   clearAll,
   type PhysicalSpin,
+  type SnapshotAudit,
+  type LockPointDiagnostic,
 } from "./videoPhysicsHistory";
 import { getVideoPhysics } from "./RevoVideoSensor";
 import { GAME_CARD_IMAGES } from "./aiStats";
@@ -162,6 +167,155 @@ export function RevoPhysicsValidation() {
             </div>
           )}
         </div>
+
+        {/* V2.5B-3 DIAGNOSTIC: Snapshot Audit + Lock Point Diagnostic */}
+        {completedSpins.length > 0 && (() => {
+          const latestSpin = completedSpins[completedSpins.length - 1];
+          const audit = auditSnapshots(latestSpin.preResultSnapshots);
+          const noiseBaseline = getNoiseBaseline();
+          const lockDiags = diagnoseLockPoints(latestSpin);
+          return (
+            <div className="revo-card mb-4 p-4">
+              <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-microscope text-[#ffa502]" /> Pre-Stop Telemetry Audit (Spin #{completedSpins.length})
+              </div>
+
+              {/* Noise baseline */}
+              {noiseBaseline && (
+                <div className="mb-3 text-[10px]">
+                  <span className="text-[#5a6a99]">Noise baseline: </span>
+                  <span className="font-bold text-[#a78bfa]">
+                    median={noiseBaseline.median.toFixed(1)} · MAD={noiseBaseline.mad.toFixed(1)} · P95={noiseBaseline.p95.toFixed(1)} · threshold={noiseBaseline.threshold.toFixed(1)}
+                  </span>
+                </div>
+              )}
+              {!noiseBaseline && (
+                <div className="mb-3 text-[10px] text-[#ff4757]">
+                  <i className="fas fa-exclamation-triangle mr-1" />
+                  No noise baseline yet — adaptive profDiff threshold not active
+                </div>
+              )}
+
+              {/* profDiff distribution */}
+              <div className="grid grid-cols-5 gap-2 text-[10px]">
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">pd&gt;10</div>
+                  <div className="font-bold text-white">{audit.profDiffGt10}</div>
+                </div>
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">pd&gt;20</div>
+                  <div className="font-bold text-white">{audit.profDiffGt20}</div>
+                </div>
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">pd&gt;30</div>
+                  <div className="font-bold text-[#2ed573]">{audit.profDiffGt30}</div>
+                </div>
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">pd&gt;40</div>
+                  <div className="font-bold text-[#2ed573]">{audit.profDiffGt40}</div>
+                </div>
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">pd&gt;50</div>
+                  <div className="font-bold text-[#2ed573]">{audit.profDiffGt50}</div>
+                </div>
+              </div>
+
+              {/* velocity + angle distribution */}
+              <div className="mt-2 grid grid-cols-5 gap-2 text-[10px]">
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">v&gt;25</div>
+                  <div className="font-bold text-white">{audit.velocityRawGt25}</div>
+                </div>
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">v&gt;50</div>
+                  <div className="font-bold text-white">{audit.velocityRawGt50}</div>
+                </div>
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">v&gt;100</div>
+                  <div className="font-bold text-white">{audit.velocityRawGt100}</div>
+                </div>
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">angle</div>
+                  <div className="font-bold text-[#00d4ff]">{audit.validAngleFrames}</div>
+                </div>
+                <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                  <div className="text-[#5a6a99]">high conf</div>
+                  <div className="font-bold text-[#2ed573]">{audit.highConfidenceFrames}</div>
+                </div>
+              </div>
+
+              {/* Motion evidence distribution */}
+              <div className="mt-2 text-[10px]">
+                <div className="mb-1 text-[#5a6a99]">Motion evidence (of {audit.totalSnapshots} frames):</div>
+                <div className="grid grid-cols-5 gap-2">
+                  <div className="rounded bg-[#0d1020] p-1 text-center">
+                    <div className="text-[8px] text-[#5a6a99]">velocity</div>
+                    <div className="font-bold text-[#448AFF]">{audit.motionEvidenceDistribution.velocityEvidence}</div>
+                  </div>
+                  <div className="rounded bg-[#0d1020] p-1 text-center">
+                    <div className="text-[8px] text-[#5a6a99]">profile</div>
+                    <div className="font-bold text-[#a78bfa]">{audit.motionEvidenceDistribution.profileEvidence}</div>
+                  </div>
+                  <div className="rounded bg-[#0d1020] p-1 text-center">
+                    <div className="text-[8px] text-[#5a6a99]">angle</div>
+                    <div className="font-bold text-[#ffa502]">{audit.motionEvidenceDistribution.angleEvidence}</div>
+                  </div>
+                  <div className="rounded bg-[#0d1020] p-1 text-center">
+                    <div className="text-[8px] text-[#5a6a99]">phase</div>
+                    <div className="font-bold text-[#2ed573]">{audit.motionEvidenceDistribution.phaseEvidence}</div>
+                  </div>
+                  <div className="rounded bg-[#0d1020] p-1 text-center">
+                    <div className="text-[8px] text-[#5a6a99]">combined</div>
+                    <div className="font-bold text-[#ff6b9d]">{audit.motionEvidenceDistribution.combinedEvidence}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lock-point diagnostic table */}
+              <div className="mt-3">
+                <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+                  Lock-Point Diagnostics
+                </div>
+                <div className="overflow-x-auto revo-scroll">
+                  <table className="w-full text-center text-[9px]">
+                    <thead>
+                      <tr className="border-b border-[#1e2240]">
+                        <th className="px-1 py-1 text-left">LOCK</th>
+                        <th className="px-1 py-1">VALID</th>
+                        <th className="px-1 py-1">TOTAL</th>
+                        <th className="px-1 py-1">ANGLE</th>
+                        <th className="px-1 py-1">VEL</th>
+                        <th className="px-1 py-1">PD</th>
+                        <th className="px-1 py-1">COMB</th>
+                        <th className="px-1 py-1">CONF</th>
+                        <th className="px-1 py-1">REASON</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lockDiags.map((d) => (
+                        <tr key={d.lockPoint} className={`border-b border-[#1e2240]/40 ${d.valid ? "bg-[#2ed573]/5" : ""}`}>
+                          <td className="px-1 py-1 text-left font-bold text-white">{d.lockPoint}</td>
+                          <td className="px-1 py-1">
+                            <span className={d.valid ? "text-[#2ed573]" : "text-[#ff4757]"}>
+                              {d.valid ? "YES" : "NO"}
+                            </span>
+                          </td>
+                          <td className="px-1 py-1 text-[#8899cc]">{d.totalSnapshots}</td>
+                          <td className="px-1 py-1 text-[#00d4ff]">{d.angleValid}</td>
+                          <td className="px-1 py-1 text-[#448AFF]">{d.velocityValid}</td>
+                          <td className="px-1 py-1 text-[#a78bfa]">{d.profDiffValid}</td>
+                          <td className="px-1 py-1 text-[#ff6b9d]">{d.combinedValid}</td>
+                          <td className="px-1 py-1 text-[#8899cc]">{(d.confidence * 100).toFixed(0)}%</td>
+                          <td className="px-1 py-1 text-left text-[#5a6a99] text-[8px]">{d.invalidReason || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Live Physics */}
         {livePhysics && (

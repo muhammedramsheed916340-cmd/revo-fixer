@@ -113,10 +113,10 @@ export function isPhysicallyMoving(snapshot: PhysicsSnapshot, prevSnapshot: Phys
     evidenceCount++;
   }
 
-  // Signal B-Strong: Very high profDiff (> 30) is definitive evidence
-  // During real spins, profDiff reaches 70-80. During stops, it's 5-10.
-  // A profDiff > 30 is 3× the noise floor and counts as strong evidence.
-  if (snapshot.profDiff > 30) {
+  // Signal B-Strong: Very high profDiff (> 20, which is 2× P95 noise) is definitive evidence
+  // During real spins, profDiff reaches 70-80. During stops, P95 is ~10.
+  // A profDiff > 20 is 2× the noise P95 and counts as strong evidence.
+  if (snapshot.profDiff > 20) {
     evidenceCount += 2; // counts as 2 signals (B + B-strong)
   }
 
@@ -164,6 +164,255 @@ export function getNoiseBaseline(): { median: number; mad: number; p95: number; 
     ...noiseBaseline,
     threshold: noiseBaseline.median + PROF_DIFF_K * noiseBaseline.mad,
   };
+}
+
+// ============================================================
+// V2.5B-3 DIAGNOSTIC: Raw snapshot audit
+// ============================================================
+
+export interface SnapshotAudit {
+  totalSnapshots: number;
+  profDiffGt10: number;
+  profDiffGt20: number;
+  profDiffGt30: number;
+  profDiffGt40: number;
+  profDiffGt50: number;
+  velocityRawGt25: number;
+  velocityRawGt50: number;
+  velocityRawGt100: number;
+  validAngleFrames: number;
+  highConfidenceFrames: number;
+  motionEvidenceDistribution: {
+    velocityEvidence: number;
+    profileEvidence: number;
+    angleEvidence: number;
+    phaseEvidence: number;
+    combinedEvidence: number;
+  };
+  noiseBaseline: { median: number; mad: number; p95: number; threshold: number } | null;
+}
+
+/**
+ * Audit the raw telemetry in a spin's preResultSnapshots.
+ * Returns counts of frames passing various thresholds.
+ */
+export function auditSnapshots(snapshots: PhysicsSnapshot[]): SnapshotAudit {
+  let profDiffGt10 = 0, profDiffGt20 = 0, profDiffGt30 = 0, profDiffGt40 = 0, profDiffGt50 = 0;
+  let velocityRawGt25 = 0, velocityRawGt50 = 0, velocityRawGt100 = 0;
+  let validAngleFrames = 0;
+  let highConfidenceFrames = 0;
+  let velocityEvidence = 0, profileEvidence = 0, angleEvidence = 0, phaseEvidence = 0, combinedEvidence = 0;
+
+  for (let i = 0; i < snapshots.length; i++) {
+    const s = snapshots[i];
+    const prev = i > 0 ? snapshots[i - 1] : null;
+
+    if (s.profDiff > 10) profDiffGt10++;
+    if (s.profDiff > 20) profDiffGt20++;
+    if (s.profDiff > 30) profDiffGt30++;
+    if (s.profDiff > 40) profDiffGt40++;
+    if (s.profDiff > 50) profDiffGt50++;
+
+    if (Math.abs(s.velocityRaw) > 25) velocityRawGt25++;
+    if (Math.abs(s.velocityRaw) > 50) velocityRawGt50++;
+    if (Math.abs(s.velocityRaw) > 100) velocityRawGt100++;
+
+    // Valid angle frame: non-zero angle change from previous
+    if (prev) {
+      const angleChange = Math.abs(s.angle - prev.angle);
+      if (angleChange > 0.1) validAngleFrames++;
+      if (angleChange > 2) angleEvidence++;
+    }
+
+    // High confidence
+    if (s.confidence > 0.5) highConfidenceFrames++;
+
+    // Motion evidence signals
+    if (Math.abs(s.velocityRaw) >= 50) velocityEvidence++;
+    if (noiseBaseline && s.profDiff > 0) {
+      const threshold = noiseBaseline.median + PROF_DIFF_K * noiseBaseline.mad;
+      if (s.profDiff > threshold) profileEvidence++;
+    } else if (s.profDiff > 15) {
+      profileEvidence++;
+    }
+    if (s.signalAgreement > 0.3 && Math.abs(s.velocityRaw) > 5) phaseEvidence++;
+    if (isPhysicallyMoving(s, prev)) combinedEvidence++;
+  }
+
+  return {
+    totalSnapshots: snapshots.length,
+    profDiffGt10, profDiffGt20, profDiffGt30, profDiffGt40, profDiffGt50,
+    velocityRawGt25, velocityRawGt50, velocityRawGt100,
+    validAngleFrames,
+    highConfidenceFrames,
+    motionEvidenceDistribution: {
+      velocityEvidence,
+      profileEvidence,
+      angleEvidence,
+      phaseEvidence,
+      combinedEvidence,
+    },
+    noiseBaseline: getNoiseBaseline(),
+  };
+}
+
+/**
+ * Get motion evidence for a single snapshot (transparent breakdown).
+ */
+export function getMotionEvidence(snapshot: PhysicsSnapshot, prevSnapshot: PhysicsSnapshot | null): {
+  velocityEvidence: boolean;
+  profileEvidence: boolean;
+  angleEvidence: boolean;
+  phaseEvidence: boolean;
+  evidenceCount: number;
+  confidence: number;
+} {
+  let count = 0;
+  const velocityEvidence = Math.abs(snapshot.velocityRaw) >= 50;
+  if (velocityEvidence) count++;
+
+  let profileEvidence = false;
+  if (noiseBaseline && snapshot.profDiff > 0) {
+    const threshold = noiseBaseline.median + PROF_DIFF_K * noiseBaseline.mad;
+    profileEvidence = snapshot.profDiff > threshold;
+  } else if (snapshot.profDiff > 15) {
+    profileEvidence = true;
+  }
+  if (profileEvidence) count++;
+
+  // B-Strong
+  if (snapshot.profDiff > 30) count++;
+
+  let angleEvidence = false;
+  if (prevSnapshot) {
+    const dt = (snapshot.timestamp - prevSnapshot.timestamp) / 1000;
+    if (dt > 0 && dt < 0.5) {
+      const angleChange = Math.abs(snapshot.angle - prevSnapshot.angle);
+      angleEvidence = angleChange > 2;
+      if (angleEvidence) count++;
+    }
+  }
+
+  const phaseEvidence = snapshot.signalAgreement > 0.3 && Math.abs(snapshot.velocityRaw) > 5;
+  if (phaseEvidence) count++;
+
+  return {
+    velocityEvidence,
+    profileEvidence,
+    angleEvidence,
+    phaseEvidence,
+    evidenceCount: count,
+    confidence: Math.min(1, count / 4),
+  };
+}
+
+/**
+ * Get per-lock-point diagnostic for a spin.
+ */
+export interface LockPointDiagnostic {
+  lockPoint: string;
+  lockTimestamp: number;
+  valid: boolean;
+  invalidReason: string;
+  totalSnapshots: number;
+  angleValid: number;
+  velocityValid: number;
+  profDiffValid: number;
+  combinedValid: number;
+  confidence: number;
+  secondsBeforeStop: number;
+}
+
+/**
+ * Generate diagnostic table for a spin's lock points.
+ */
+export function diagnoseLockPoints(
+  spin: {
+    physicalSpinStop: number | null;
+    physicalSpinStart: number | null;
+    movementStart: number | null;
+    preResultSnapshots: PhysicsSnapshot[];
+  },
+): LockPointDiagnostic[] {
+  if (!spin.physicalSpinStop || !spin.physicalSpinStart) return [];
+
+  const allLPs = ["S+2", "S+3", "S+5", "S+7", "S+10", "STOP-5", "STOP-3", "STOP-2", "STOP-1"];
+  const spinOffsets: Record<string, number> = {
+    "S+2": 2000, "S+3": 3000, "S+5": 5000, "S+7": 7000, "S+10": 10000,
+  };
+  const stopOffsets: Record<string, number> = {
+    "STOP-5": 5000, "STOP-3": 3000, "STOP-2": 2000, "STOP-1": 1000,
+  };
+
+  const movementStart = spin.movementStart ?? spin.physicalSpinStart;
+  const snapshots = spin.preResultSnapshots;
+  const MIN_MOVING_FRAMES = 2;
+  const MIN_TRACKING_CONFIDENCE = 0.10;
+
+  return allLPs.map((lp) => {
+    let lockTs: number;
+    if (lp.startsWith("S+")) {
+      lockTs = movementStart + spinOffsets[lp];
+    } else {
+      lockTs = spin.physicalSpinStop! - stopOffsets[lp];
+    }
+
+    const isPreStop = lockTs < spin.physicalSpinStop!;
+    const isBeforeSpin = lockTs < movementStart;
+
+    const preLockSnapshots = snapshots.filter((s) => s.timestamp <= lockTs);
+    const combinedValid = countPhysicallyMovingFrames(preLockSnapshots);
+    const latestSnapshot = preLockSnapshots[preLockSnapshots.length - 1];
+    const trackingConfidence = latestSnapshot?.confidence ?? 0;
+
+    // Count angle-valid frames (consecutive angle changes > 0.1°)
+    let angleValid = 0;
+    for (let i = 1; i < preLockSnapshots.length; i++) {
+      const angleChange = Math.abs(preLockSnapshots[i].angle - preLockSnapshots[i - 1].angle);
+      if (angleChange > 0.1) angleValid++;
+    }
+
+    // Count velocity-valid frames
+    const velocityValid = preLockSnapshots.filter((s) => Math.abs(s.velocityRaw) >= 50).length;
+
+    // Count profDiff-valid frames
+    let profDiffValid = 0;
+    if (noiseBaseline) {
+      const threshold = noiseBaseline.median + PROF_DIFF_K * noiseBaseline.mad;
+      profDiffValid = preLockSnapshots.filter((s) => s.profDiff > threshold).length;
+    } else {
+      profDiffValid = preLockSnapshots.filter((s) => s.profDiff > 15).length;
+    }
+
+    let valid = false;
+    let invalidReason = "";
+
+    if (!isPreStop) {
+      invalidReason = "POST_STOP";
+    } else if (isBeforeSpin) {
+      invalidReason = `BEFORE_SPIN (${((movementStart - lockTs) / 1000).toFixed(1)}s before movement)`;
+    } else if (combinedValid < MIN_MOVING_FRAMES) {
+      invalidReason = `INSUFFICIENT (combined=${combinedValid}, need ${MIN_MOVING_FRAMES})`;
+    } else if (trackingConfidence < MIN_TRACKING_CONFIDENCE) {
+      invalidReason = `LOW_CONFIDENCE (${(trackingConfidence * 100).toFixed(0)}%)`;
+    } else {
+      valid = true;
+    }
+
+    return {
+      lockPoint: lp,
+      lockTimestamp: lockTs,
+      valid,
+      invalidReason,
+      totalSnapshots: preLockSnapshots.length,
+      angleValid,
+      velocityValid,
+      profDiffValid,
+      combinedValid,
+      confidence: trackingConfidence,
+      secondsBeforeStop: (spin.physicalSpinStop! - lockTs) / 1000,
+    };
+  });
 }
 
 // Periodically update noise baseline (every 500 snapshots)
