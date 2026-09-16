@@ -59,6 +59,9 @@ export interface PhysicalSpin {
   // Tracking quality during spin
   trackingFrameCount: number;
   totalFrameCount: number;
+  // Pre-result snapshots (saved at completion time for validation)
+  // These are the snapshots from [physicalSpinStop - 60s, physicalSpinStop]
+  preResultSnapshots: PhysicsSnapshot[];
   // API match (filled when API result arrives)
   apiResultTimestamp: number | null;
   apiDelay: number | null; // apiResultTimestamp - physicalSpinStop
@@ -175,6 +178,7 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
         maxVelocity: Math.abs(snapshot.velocityRaw),
         trackingFrameCount: snapshot.isTracking ? 1 : 0,
         totalFrameCount: 1,
+        preResultSnapshots: [],
         apiResultTimestamp: null,
         apiDelay: null,
         actualOutcome: null,
@@ -220,6 +224,13 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
 
         // Complete the spin after 10s of no movement
         if (timeSinceMovement > STOP_TIME_THRESHOLD + 10000) {
+          // Save pre-result snapshots for validation (60s window before stop)
+          // These are frozen at spin completion time — no future data enters
+          const stopTs = currentSpin.physicalSpinStop!;
+          currentSpin.preResultSnapshots = snapshotBuffer
+            .filter((s) => s.timestamp >= stopTs - 60000 && s.timestamp <= stopTs)
+            .slice(-100); // limit for memory
+
           currentSpin.spinPhase = "SETTLED";
           completedSpins.push(currentSpin);
           if (completedSpins.length > 100) completedSpins.shift();
