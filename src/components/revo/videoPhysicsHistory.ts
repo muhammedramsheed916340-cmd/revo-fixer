@@ -25,7 +25,8 @@ export type MovementState = "STOPPED" | "MOVING" | "UNKNOWN";
 export interface PhysicsSnapshot {
   timestamp: number; // ms epoch
   angle: number; // unwrapped, continuous (degrees)
-  velocity: number; // deg/s (filtered)
+  velocity: number; // deg/s (filtered/smoothed)
+  velocityRaw: number; // deg/s (raw, unsmoothed — used for movement detection)
   acceleration: number; // deg/s²
   confidence: number; // 0..1
   direction: 1 | -1;
@@ -137,6 +138,7 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
     timestamp: physics.timestamp * 1000,
     angle: physics.angle,
     velocity: physics.velocity,
+    velocityRaw: physics.velocityRaw,
     acceleration: physics.acceleration,
     confidence: physics.confidence,
     direction: physics.direction,
@@ -170,7 +172,7 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
         physicalSpinStop: null,
         physicalStopConfidence: 0,
         spinPhase: "TRACKING",
-        maxVelocity: Math.abs(snapshot.velocity),
+        maxVelocity: Math.abs(snapshot.velocityRaw),
         trackingFrameCount: snapshot.isTracking ? 1 : 0,
         totalFrameCount: 1,
         apiResultTimestamp: null,
@@ -184,12 +186,12 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
       currentSpin.snapshots.push(snapshot);
       currentSpin.totalFrameCount++;
       if (snapshot.isTracking) currentSpin.trackingFrameCount++;
-      if (Math.abs(snapshot.velocity) > currentSpin.maxVelocity) {
-        currentSpin.maxVelocity = Math.abs(snapshot.velocity);
+      if (Math.abs(snapshot.velocityRaw) > currentSpin.maxVelocity) {
+        currentSpin.maxVelocity = Math.abs(snapshot.velocityRaw);
       }
 
       // Update phase based on velocity profile
-      const absVel = Math.abs(snapshot.velocity);
+      const absVel = Math.abs(snapshot.velocityRaw);
       const recent = currentSpin.snapshots.slice(-10);
       const avgVel = recent.reduce((s, p) => s + Math.abs(p.velocity), 0) / recent.length;
 
@@ -375,7 +377,7 @@ export function reconstructLockPoints(spin: PhysicalSpin): {
         hasMovement = true;
       }
       if (snap.isTracking) trackingCount++;
-      if (Math.abs(snap.velocity) > maxVelocity) maxVelocity = Math.abs(snap.velocity);
+      if (Math.abs(snap.velocityRaw) > maxVelocity) maxVelocity = Math.abs(snap.velocityRaw);
     }
 
     const videoValid = physics !== null && hasMovement;
