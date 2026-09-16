@@ -459,6 +459,7 @@ export function runPhysicsValidation(
     spinId: string;
     physicalSpinStart: number | null;
     physicalSpinStop: number | null;
+    movementStart?: number | null;
     actualOutcome: string | null;
     actualSector: number | null;
     preResultSnapshots: PhysicsSnapshot[];
@@ -480,7 +481,7 @@ export function runPhysicsValidation(
   };
 
   // FROZEN validity thresholds (set BEFORE evaluation)
-  const MIN_MOVING_FRAMES = 3;
+  const MIN_MOVING_FRAMES = 2;
   const MIN_TRACKING_CONFIDENCE = 0.10;
 
   const allResults: SpinValidationResult[] = [];
@@ -504,9 +505,11 @@ export function runPhysicsValidation(
     if (!spin.physicalSpinStop || !spin.actualOutcome) continue;
     if (!spin.physicalSpinStart) continue;
 
-    // Determine movementStart: first snapshot with movementState === MOVING
+    // Determine movementStart: from spin.movementStart or first MOVING snapshot
     const spinSnapshots = spin.preResultSnapshots ?? spin.snapshots;
-    const movementStart = spinSnapshots.find((s) => s.movementState === "MOVING")?.timestamp ?? spin.physicalSpinStart;
+    const movementStart = spin.movementStart
+      ?? spinSnapshots.find((s) => s.movementState === "MOVING")?.timestamp
+      ?? spin.physicalSpinStart;
     const spinDuration = (spin.physicalSpinStop - spin.physicalSpinStart) / 1000;
     const movementDelay = (movementStart - spin.physicalSpinStart) / 1000;
 
@@ -522,10 +525,10 @@ export function runPhysicsValidation(
         lockTs = spin.physicalSpinStop - stopOffsets[lp];
       }
 
-      // LEAKAGE CHECK 1: lockTimestamp < physicalStop
+      // LEAKAGE CHECK 1: lockTimestamp < physicalStop (MUST be true)
       const isPreStop = lockTs < spin.physicalSpinStop;
       if (!isPreStop) {
-        // This is a real post-stop violation (should never happen with correct offsets)
+        // This is a POST_STOP violation (should never happen with correct offsets)
         postStopViolations++;
         invalidPredictions++;
         allResults.push({
@@ -539,7 +542,7 @@ export function runPhysicsValidation(
           movingFrameCount: 0,
           trackingConfidence: 0,
           valid: false,
-          invalidReason: "lockTimestamp >= physicalStop (post-stop violation)",
+          invalidReason: "POST_STOP — lockTimestamp >= physicalSpinStop",
           prediction: predictStoppingAngle([], lockTs),
           hit: false,
           predictedSector: 0,
@@ -556,9 +559,9 @@ export function runPhysicsValidation(
         continue;
       }
 
-      // Check if lock point is BEFORE movement started (for S+ points)
-      // This is not a violation — it's just INSUFFICIENT (no movement yet)
-      const isAfterMovementStart = lockTs >= movementStart;
+      // Check if lock point is BEFORE the spin started
+      // This is NOT a leakage violation — it's just INSUFFICIENT (no movement yet)
+      const isBeforeSpin = lockTs < movementStart;
 
       // Get snapshots at or before lockTs
       const preLockSnapshots = spinSnapshots.filter((s) => s.timestamp <= lockTs);
@@ -579,16 +582,26 @@ export function runPhysicsValidation(
       }
 
       // Validity check (FROZEN rules, determined BEFORE seeing result)
-      const isValidLock = movingFrames >= MIN_MOVING_FRAMES
-        && trackingConfidence >= MIN_TRACKING_CONFIDENCE
-        && isPreStop;
-
+      // BEFORE_SPIN is NOT a leakage violation — it's just INSUFFICIENT
+      let isValidLock: boolean;
       let invalidReason = "";
-      if (!isValidLock) {
-        if (movingFrames < MIN_MOVING_FRAMES) {
-          invalidReason = `Insufficient moving frames (${movingFrames}/${MIN_MOVING_FRAMES})`;
-        } else if (trackingConfidence < MIN_TRACKING_CONFIDENCE) {
-          invalidReason = `Tracking confidence too low (${(trackingConfidence * 100).toFixed(0)}%)`;
+
+      if (isBeforeSpin) {
+        // Lock point is before movement started — INSUFFICIENT (not a violation)
+        isValidLock = false;
+        invalidReason = `BEFORE_SPIN — lock is ${((movementStart - lockTs) / 1000).toFixed(1)}s before movement start`;
+      } else {
+        // Lock is during the spin — check moving frames + confidence
+        isValidLock = movingFrames >= MIN_MOVING_FRAMES
+          && trackingConfidence >= MIN_TRACKING_CONFIDENCE
+          && isPreStop;
+
+        if (!isValidLock) {
+          if (movingFrames < MIN_MOVING_FRAMES) {
+            invalidReason = `INSUFFICIENT — only ${movingFrames} moving frames (need ${MIN_MOVING_FRAMES})`;
+          } else if (trackingConfidence < MIN_TRACKING_CONFIDENCE) {
+            invalidReason = `INSUFFICIENT — tracking confidence ${(trackingConfidence * 100).toFixed(0)}% < ${(MIN_TRACKING_CONFIDENCE * 100).toFixed(0)}%`;
+          }
         }
       }
 

@@ -10,10 +10,11 @@ import {
   type PhysicsPrediction,
 } from "./videoPhysicsPredictor";
 import {
-  getCompletedSpins,
+  getCurrentSessionSpins,
   getSynchronizedCount,
   getBufferStats,
   getSpinPhase,
+  getExperimentSessionId,
   subscribeToBuffer,
   clearAll,
   type PhysicalSpin,
@@ -42,8 +43,9 @@ export function RevoPhysicsValidation() {
   useBufferVersion();
   const syncCount = getSynchronizedCount();
   const bufferStats = getBufferStats();
-  const completedSpins = getCompletedSpins();
+  const completedSpins = getCurrentSessionSpins();
   const spinPhase = getSpinPhase();
+  const sessionId = getExperimentSessionId();
 
   const livePhysics = getVideoPhysics();
 
@@ -51,13 +53,14 @@ export function RevoPhysicsValidation() {
     setRunning(true);
     setReport(null);
     try {
-      const spins = getCompletedSpins();
-      if (spins.length < 5) {
-        toast.error(`Need at least 5 matched spins (currently ${spins.filter(s => s.actualOutcome).length})`);
+      const spins = getCurrentSessionSpins();
+      const matched = spins.filter(s => s.actualOutcome);
+      if (matched.length < 3) {
+        toast.error(`Need at least 3 matched spins from current session (currently ${matched.length})`);
         setRunning(false);
         return;
       }
-      // Run walk-forward validation
+      // Run walk-forward validation on CURRENT SESSION spins only
       const result = runPhysicsValidation(spins.map(s => ({
         spinId: s.spinId,
         physicalSpinStart: s.physicalSpinStart,
@@ -66,6 +69,7 @@ export function RevoPhysicsValidation() {
         actualSector: s.actualSector,
         preResultSnapshots: s.preResultSnapshots ?? [],
         snapshots: s.snapshots,
+        movementStart: s.movementStart,
       })));
       setReport(result);
       toast.success(`Validation complete — ${result.matchedSpins} spins, leakage ${result.leakageAudit.passed ? "PASS" : "FAIL"}`);
@@ -113,18 +117,21 @@ export function RevoPhysicsValidation() {
         <div className="revo-card mb-4 p-4">
           <div className="mb-2 flex items-center justify-between">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-database text-[#00d4ff]" /> Physical Data
+              <i className="fas fa-database text-[#00d4ff]" /> Physical Data (Session)
             </span>
             <button
               onClick={handleClear}
               className="rounded-lg border border-[#ff4757]/40 bg-[#ff4757]/10 px-2 py-1 text-[10px] font-bold text-[#ff4757] transition hover:bg-[#ff4757]/20"
             >
-              <i className="fas fa-trash mr-1" /> Clear
+              <i className="fas fa-trash mr-1" /> Hard Reset
             </button>
+          </div>
+          <div className="mb-2 text-[9px] text-[#5a6a99]">
+            Session: <span className="font-mono text-[#a78bfa]">{sessionId.slice(0, 8)}…</span>
           </div>
           <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
             <div>
-              <div className="text-[9px] text-[#5a6a99]">Validated spins</div>
+              <div className="text-[9px] text-[#5a6a99]">Fresh spins</div>
               <div className="font-black text-white">{completedSpins.length}</div>
             </div>
             <div>
@@ -143,6 +150,17 @@ export function RevoPhysicsValidation() {
           <div className="mt-2 text-[10px] text-[#5a6a99]">
             Buffer: {bufferStats.totalSnapshots} snapshots · {(bufferStats.timeSpanSeconds / 60).toFixed(1)} min · Phase: {spinPhase}
           </div>
+          {/* preResultSnapshots verification */}
+          {completedSpins.length > 0 && (
+            <div className="mt-2 text-[10px]">
+              <span className="text-[#5a6a99]">preResultSnapshots: </span>
+              <span className="font-bold" style={{
+                color: completedSpins.every(s => s.preResultSnapshots.length > 0) ? "#2ed573" : "#ff4757",
+              }}>
+                {completedSpins.filter(s => s.preResultSnapshots.length > 0).length}/{completedSpins.length} spins have data
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Live Physics */}

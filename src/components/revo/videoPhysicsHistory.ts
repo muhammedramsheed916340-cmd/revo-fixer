@@ -50,8 +50,10 @@ export type SpinPhase =
 
 export interface PhysicalSpin {
   spinId: string; // generated when spin starts
+  experimentSessionId: string; // which experiment session this spin belongs to
   physicalSpinStart: number | null; // ms epoch (STOPPED→MOVING transition)
   physicalSpinStop: number | null; // ms epoch (velocity→0 + angle stable)
+  movementStart: number | null; // ms epoch (first MOVING frame)
   physicalStopConfidence: number; // 0..1
   spinPhase: SpinPhase;
   // Velocity profile
@@ -75,10 +77,28 @@ export interface PhysicalSpin {
 let currentSpin: PhysicalSpin | null = null;
 let completedSpins: PhysicalSpin[] = [];
 
+// Experiment session ID — regenerated on every hard reset
+// A spin from an older session MUST NEVER enter the current validation
+let experimentSessionId: string = generateExperimentSessionId();
+
+function generateExperimentSessionId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `exp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
+
+export function getExperimentSessionId(): string {
+  return experimentSessionId;
+}
+
 // Stop detection — simplified for noisy high-speed data
 // Real Crazy Time spins produce 500-2000°/s. Video compression noise
-// produces 20-100°/s. We set the threshold at 100°/s to filter noise.
-const STOP_VELOCITY_THRESHOLD = 100; // deg/s — below this = "not a real spin"
+// produces 20-100°/s. We set the threshold at 50°/s — lower than before
+// because the FFT phase correlation misses some frames during fast rotation,
+// and we need at least 3 moving frames for the physics model.
+const STOP_VELOCITY_THRESHOLD = 50; // deg/s — below this = "not a real spin"
 const STOP_TIME_THRESHOLD = 5000; // ms — no real movement for 5s = physical stop
 let lastMovementTime: number | null = null; // last time we saw MOVING
 let lastAngle: number | null = null;
@@ -171,8 +191,10 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
       // SPIN START detected
       currentSpin = {
         spinId: generateSpinId(),
+        experimentSessionId: experimentSessionId,
         physicalSpinStart: snapshot.timestamp,
         physicalSpinStop: null,
+        movementStart: snapshot.timestamp, // first MOVING frame = movement start
         physicalStopConfidence: 0,
         spinPhase: "TRACKING",
         maxVelocity: Math.abs(snapshot.velocityRaw),
@@ -444,6 +466,14 @@ export function getCompletedSpins(): PhysicalSpin[] {
   return completedSpins;
 }
 
+/**
+ * Get completed spins from the CURRENT experiment session only.
+ * Spins from previous sessions are excluded by experimentSessionId.
+ */
+export function getCurrentSessionSpins(): PhysicalSpin[] {
+  return completedSpins.filter((s) => s.experimentSessionId === experimentSessionId);
+}
+
 export function getCurrentSpin(): PhysicalSpin | null {
   return currentSpin;
 }
@@ -453,7 +483,9 @@ export function getSpinPhase(): SpinPhase {
 }
 
 export function getSynchronizedSpins(): PhysicalSpin[] {
-  return completedSpins.filter((s) => s.actualOutcome !== null);
+  return completedSpins.filter(
+    (s) => s.actualOutcome !== null && s.experimentSessionId === experimentSessionId,
+  );
 }
 
 export function getSynchronizedCount(): number {
@@ -629,6 +661,20 @@ export function getSectorObservations(): SectorObservation[] {
   return sectorObservations;
 }
 
+/**
+ * HARD RESET — true experiment reset.
+ *
+ * When called:
+ *   - Clears completedSpins (ALL spins, no exceptions)
+ *   - Clears synchronized results
+ *   - Clears snapshot buffer
+ *   - Clears sector observations
+ *   - Resets all state-machine variables
+ *   - Generates a NEW experimentSessionId
+ *
+ * A spin from an older session MUST NEVER enter the current validation
+ * because the session ID is different.
+ */
 export function clearAll(): void {
   snapshotBuffer = [];
   completedSpins = [];
@@ -637,6 +683,8 @@ export function clearAll(): void {
   lastMovementTime = null;
   lastAngle = null;
   lastMovementState = "STOPPED";
+  // Generate new session ID — old spins are permanently excluded
+  experimentSessionId = generateExperimentSessionId();
   bufferListeners.forEach((l) => l());
 }
 
