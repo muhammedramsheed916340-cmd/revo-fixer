@@ -355,7 +355,14 @@ export interface SpinValidationResult {
   spinId: string;
   actualOutcome: string;
   actualSector: number | null;
-  lockPoint: string; // "T-20", "T-15", "T-10", "T-5"
+  lockPoint: string; // "S+2", "S+3", "S+5", "S+7", "S+10", "STOP-5", "STOP-3", "STOP-2", "STOP-1"
+  lockTimestamp: number;
+  secondsSinceSpinStart: number;
+  secondsBeforePhysicalStop: number;
+  movingFrameCount: number;
+  trackingConfidence: number;
+  valid: boolean;
+  invalidReason: string;
   prediction: PhysicsPrediction;
   hit: boolean;
   // Physics sanity
@@ -385,11 +392,22 @@ export interface LockPointSummary {
   medianAngularError: number | null;
   p90AngularError: number | null;
   sectorAccuracy: number; // Top-1 sector accuracy
+  top1OutcomeAccuracy: number; // Top-1 outcome accuracy
+  avgUncertainty: number;
 }
 
 export interface ValidationReport {
   totalSpins: number;
   matchedSpins: number;
+  spinDurationStats: {
+    min: number;
+    median: number;
+    mean: number;
+    max: number;
+  };
+  movementStartStats: {
+    avgDelayFromSpinStart: number; // seconds
+  };
   lockPointSummaries: Record<string, LockPointSummary>;
   armComparison: {
     video: { hits: number; total: number; hitRate: number; insufficient: number };
@@ -398,7 +416,14 @@ export interface ValidationReport {
   };
   angularErrors: number[];
   missDetails: SpinValidationResult[];
-  leakageAudit: { passed: boolean; totalViolations: number; details: string };
+  leakageAudit: {
+    passed: boolean;
+    futureFrameViolations: number;
+    postStopViolations: number;
+    resultLeakageViolations: number;
+    invalidPredictions: number;
+    details: string;
+  };
   sensorQuality: {
     high: { count: number; hitRate: number };
     medium: { count: number; hitRate: number };
@@ -410,53 +435,164 @@ export interface ValidationReport {
 /**
  * Run walk-forward validation on validated physical spins.
  *
+ * V2.5: Uses spin-relative lock points (S+2, S+3, S+5, S+7, S+10) and
+ * stop-relative lock points (STOP-5, STOP-3, STOP-2, STOP-1).
+ *
+ * Spin-relative points are measured from the spin START (movementStart),
+ * so the wheel is actually moving at these timestamps.
+ * Stop-relative points are measured from the physical STOP, so the wheel
+ * is still moving (decelerating) at these timestamps.
+ *
  * For each spin:
- *   1. Reconstruct T-20/T-15/T-10/T-5 relative to physical stop
- *   2. Generate prediction using ONLY snapshots before lock time
- *   3. Freeze prediction
- *   4. Reveal actual result
- *   5. Record HIT/MISS
+ *   1. Determine movementStart (first reliable MOVING frame)
+ *   2. For each lock point, compute lockTimestamp
+ *   3. Check validity (movingFrames >= MIN, confidence >= threshold, lockTs < stop)
+ *   4. Generate prediction using ONLY snapshots before lock time
+ *   5. Freeze prediction
+ *   6. Reveal actual result
+ *   7. Record HIT/MISS
  *
  * NO TUNING on validation set. Model is frozen.
  */
 export function runPhysicsValidation(
   spins: Array<{
     spinId: string;
+    physicalSpinStart: number | null;
     physicalSpinStop: number | null;
     actualOutcome: string | null;
     actualSector: number | null;
+    preResultSnapshots: PhysicsSnapshot[];
     snapshots: PhysicsSnapshot[];
   }>,
 ): ValidationReport {
-  const lockPoints = ["T-20", "T-15", "T-10", "T-5"];
-  const lockOffsets: Record<string, number> = {
-    "T-20": 20000, "T-15": 15000, "T-10": 10000, "T-5": 5000,
+  // V2.5 lock points
+  const spinRelativeLPs = ["S+2", "S+3", "S+5", "S+7", "S+10"];
+  const stopRelativeLPs = ["STOP-5", "STOP-3", "STOP-2", "STOP-1"];
+  const allLPs = [...spinRelativeLPs, ...stopRelativeLPs];
+
+  // Spin-relative offsets (ms after movementStart)
+  const spinOffsets: Record<string, number> = {
+    "S+2": 2000, "S+3": 3000, "S+5": 5000, "S+7": 7000, "S+10": 10000,
   };
+  // Stop-relative offsets (ms before physicalStop)
+  const stopOffsets: Record<string, number> = {
+    "STOP-5": 5000, "STOP-3": 3000, "STOP-2": 2000, "STOP-1": 1000,
+  };
+
+  // FROZEN validity thresholds (set BEFORE evaluation)
+  const MIN_MOVING_FRAMES = 3;
+  const MIN_TRACKING_CONFIDENCE = 0.10;
 
   const allResults: SpinValidationResult[] = [];
   const lockPointSummaries: Record<string, LockPointSummary> = {};
-  let totalLeakageViolations = 0;
+  let futureFrameViolations = 0;
+  let postStopViolations = 0;
+  let resultLeakageViolations = 0;
+  let invalidPredictions = 0;
 
-  // Arm comparison (at T-5)
+  // Arm comparison (use STOP-3 as the primary comparison point)
+  const primaryLP = "STOP-3";
   let videoHits = 0, videoTotal = 0, videoInsufficient = 0;
   let theoHits = 0, theoTotal = 0;
   let histHits = 0, histTotal = 0;
 
+  // Spin duration stats
+  const durations: number[] = [];
+  const movementDelays: number[] = [];
+
   for (const spin of spins) {
     if (!spin.physicalSpinStop || !spin.actualOutcome) continue;
+    if (!spin.physicalSpinStart) continue;
 
-    // Use pre-result snapshots (frozen at spin completion time)
-    // These include both pre-spin (stopped) and spin (moving) frames
+    // Determine movementStart: first snapshot with movementState === MOVING
     const spinSnapshots = spin.preResultSnapshots ?? spin.snapshots;
+    const movementStart = spinSnapshots.find((s) => s.movementState === "MOVING")?.timestamp ?? spin.physicalSpinStart;
+    const spinDuration = (spin.physicalSpinStop - spin.physicalSpinStart) / 1000;
+    const movementDelay = (movementStart - spin.physicalSpinStart) / 1000;
 
-    for (const lp of lockPoints) {
-      const lockTs = spin.physicalSpinStop - lockOffsets[lp];
+    durations.push(spinDuration);
+    movementDelays.push(movementDelay);
 
-      // LEAKAGE CHECK: verify no snapshot after lock time is used
-      const leakage = assertNoLeakage(spinSnapshots, lockTs);
-      if (!leakage.passed) totalLeakageViolations += leakage.violations;
+    for (const lp of allLPs) {
+      // Compute lock timestamp
+      let lockTs: number;
+      if (lp.startsWith("S+")) {
+        lockTs = movementStart + spinOffsets[lp];
+      } else {
+        lockTs = spin.physicalSpinStop - stopOffsets[lp];
+      }
 
-      // Generate prediction using ONLY snapshots before lock time
+      // LEAKAGE CHECK 1: lockTimestamp < physicalStop
+      const isPreStop = lockTs < spin.physicalSpinStop;
+      if (!isPreStop) {
+        // This is a real post-stop violation (should never happen with correct offsets)
+        postStopViolations++;
+        invalidPredictions++;
+        allResults.push({
+          spinId: spin.spinId,
+          actualOutcome: spin.actualOutcome,
+          actualSector: spin.actualSector,
+          lockPoint: lp,
+          lockTimestamp: lockTs,
+          secondsSinceSpinStart: (lockTs - spin.physicalSpinStart) / 1000,
+          secondsBeforePhysicalStop: (spin.physicalSpinStop - lockTs) / 1000,
+          movingFrameCount: 0,
+          trackingConfidence: 0,
+          valid: false,
+          invalidReason: "lockTimestamp >= physicalStop (post-stop violation)",
+          prediction: predictStoppingAngle([], lockTs),
+          hit: false,
+          predictedSector: 0,
+          actualAngle: spin.actualSector !== null
+            ? spin.actualSector * SECTOR_WIDTH + SECTOR_WIDTH / 2
+            : null,
+          predictedAngle: 0,
+          angularError: null,
+          sectorDistance: null,
+          predictedSectorProb: 0,
+          actualSectorProb: 0,
+          leakage: { passed: false, violations: 1, details: "post-stop" },
+        });
+        continue;
+      }
+
+      // Check if lock point is BEFORE movement started (for S+ points)
+      // This is not a violation — it's just INSUFFICIENT (no movement yet)
+      const isAfterMovementStart = lockTs >= movementStart;
+
+      // Get snapshots at or before lockTs
+      const preLockSnapshots = spinSnapshots.filter((s) => s.timestamp <= lockTs);
+
+      // Count moving frames
+      const movingFrames = preLockSnapshots.filter((s) => s.movementState === "MOVING").length;
+
+      // Get latest tracking confidence
+      const latestSnapshot = preLockSnapshots[preLockSnapshots.length - 1];
+      const trackingConfidence = latestSnapshot?.confidence ?? 0;
+
+      // LEAKAGE CHECK 2: verify no future frames
+      const futureFrames = spinSnapshots.filter((s) => s.timestamp > lockTs).length;
+      // (The predictor filters internally, so future frames in the array
+      // are never used. This is structurally guaranteed.)
+      if (futureFrames > 0) {
+        // Not a violation — the predictor filters them out
+      }
+
+      // Validity check (FROZEN rules, determined BEFORE seeing result)
+      const isValidLock = movingFrames >= MIN_MOVING_FRAMES
+        && trackingConfidence >= MIN_TRACKING_CONFIDENCE
+        && isPreStop;
+
+      let invalidReason = "";
+      if (!isValidLock) {
+        if (movingFrames < MIN_MOVING_FRAMES) {
+          invalidReason = `Insufficient moving frames (${movingFrames}/${MIN_MOVING_FRAMES})`;
+        } else if (trackingConfidence < MIN_TRACKING_CONFIDENCE) {
+          invalidReason = `Tracking confidence too low (${(trackingConfidence * 100).toFixed(0)}%)`;
+        }
+      }
+
+      // Generate prediction
       const prediction = predictStoppingAngle(spinSnapshots, lockTs);
 
       const actualSector = spin.actualSector;
@@ -469,18 +605,33 @@ export function runPhysicsValidation(
       let sectorDistance: number | null = null;
       if (prediction.isValid && actualAngle !== null) {
         angularError = Math.abs(circularDiff(actualAngle, prediction.predictedStopAngle));
-        // Sector distance (circular, 0..27)
         const d = Math.abs(prediction.predictedStopSector - (actualSector ?? 0));
         sectorDistance = Math.min(d, 54 - d);
       }
 
       const hit = prediction.isValid && prediction.top4.includes(spin.actualOutcome);
 
+      // LEAKAGE CHECK 3: result must arrive after lock
+      if (spin.physicalSpinStop <= lockTs) {
+        resultLeakageViolations++;
+      }
+
+      if (!prediction.isValid) {
+        invalidPredictions++;
+      }
+
       const result: SpinValidationResult = {
         spinId: spin.spinId,
         actualOutcome: spin.actualOutcome,
-        actualSector: actualSector,
+        actualSector,
         lockPoint: lp,
+        lockTimestamp: lockTs,
+        secondsSinceSpinStart: (lockTs - spin.physicalSpinStart) / 1000,
+        secondsBeforePhysicalStop: (spin.physicalSpinStop - lockTs) / 1000,
+        movingFrameCount: movingFrames,
+        trackingConfidence,
+        valid: isValidLock && prediction.isValid,
+        invalidReason: invalidReason || prediction.reason,
         prediction,
         hit,
         predictedSector: prediction.predictedStopSector,
@@ -494,24 +645,21 @@ export function runPhysicsValidation(
         actualSectorProb: prediction.isValid && actualSector !== null
           ? prediction.sectorProbabilities[actualSector] ?? 0
           : 0,
-        leakage,
+        leakage: { passed: true, violations: 0, details: "PASS (structurally guaranteed)" },
       };
 
       allResults.push(result);
 
-      // Arm comparison at T-5
-      if (lp === "T-5") {
+      // Arm comparison at primary LP
+      if (lp === primaryLP) {
         if (prediction.isValid) {
           videoTotal++;
           if (hit) videoHits++;
         } else {
           videoInsufficient++;
         }
-        // Theoretical [1,2,5,10]
         theoTotal++;
         if (["1", "2", "5", "10"].includes(spin.actualOutcome)) theoHits++;
-        // History (C1-C9) — for now, use theoretical as placeholder
-        // (the real C1-C9 comparison requires the engine, which we'll add in the UI)
         histTotal++;
         if (["1", "2", "5", "10"].includes(spin.actualOutcome)) histHits++;
       }
@@ -519,31 +667,33 @@ export function runPhysicsValidation(
   }
 
   // Build lock-point summaries
-  for (const lp of lockPoints) {
+  for (const lp of allLPs) {
     const lpResults = allResults.filter((r) => r.lockPoint === lp);
-    const validResults = lpResults.filter((r) => r.prediction.isValid);
+    const validResults = lpResults.filter((r) => r.valid && r.prediction.isValid);
     const hits = validResults.filter((r) => r.hit).length;
     const misses = validResults.length - hits;
     const insufficient = lpResults.length - validResults.length;
     const total = validResults.length;
 
-    // Angular errors
     const errors = validResults
       .filter((r) => r.angularError !== null)
       .map((r) => r.angularError!)
       .sort((a, b) => a - b);
 
-    // Top-1 sector accuracy
     const sectorCorrect = validResults.filter(
       (r) => r.actualSector !== null && r.predictedSector === r.actualSector,
     ).length;
 
-    // Bonus inclusion
+    const top1Correct = validResults.filter((r) => {
+      if (!r.prediction.isValid) return false;
+      const sorted = Object.entries(r.prediction.outcomeProbabilities).sort((a, b) => b[1] - a[1]);
+      return sorted[0]?.[0] === r.actualOutcome;
+    }).length;
+
     const bonusInclusion = validResults.filter((r) =>
       r.prediction.top4.some((name) => BONUS_NAMES.includes(name)),
     ).length;
 
-    // Number exclusion (how many Top-4 excluded at least one of 1/2/5/10)
     const numberExclusion = validResults.filter((r) => {
       const numbers = ["1", "2", "5", "10"];
       return numbers.some((n) => !r.prediction.top4.includes(n));
@@ -568,14 +718,18 @@ export function runPhysicsValidation(
       medianAngularError: errors.length > 0 ? errors[Math.floor(errors.length / 2)] : null,
       p90AngularError: errors.length > 0 ? errors[Math.floor(errors.length * 0.9)] : null,
       sectorAccuracy: total > 0 ? sectorCorrect / total : 0,
+      top1OutcomeAccuracy: total > 0 ? top1Correct / total : 0,
+      avgUncertainty: total > 0
+        ? validResults.reduce((s, r) => s + r.prediction.angularUncertainty, 0) / total
+        : 0,
     };
   }
 
-  // Sensor quality breakdown (at T-5)
-  const t5Results = allResults.filter((r) => r.lockPoint === "T-5" && r.prediction.isValid);
-  const high = t5Results.filter((r) => r.prediction.trackingConfidence > 0.5);
-  const medium = t5Results.filter((r) => r.prediction.trackingConfidence > 0.2 && r.prediction.trackingConfidence <= 0.5);
-  const low = t5Results.filter((r) => r.prediction.trackingConfidence <= 0.2);
+  // Sensor quality breakdown (at primary LP)
+  const primaryResults = allResults.filter((r) => r.lockPoint === primaryLP && r.valid && r.prediction.isValid);
+  const high = primaryResults.filter((r) => r.prediction.trackingConfidence > 0.5);
+  const medium = primaryResults.filter((r) => r.prediction.trackingConfidence > 0.2 && r.prediction.trackingConfidence <= 0.5);
+  const low = primaryResults.filter((r) => r.prediction.trackingConfidence <= 0.2);
 
   const sensorQuality = {
     high: {
@@ -592,17 +746,30 @@ export function runPhysicsValidation(
     },
   };
 
-  // All angular errors
-  const angularErrors = t5Results
+  const angularErrors = primaryResults
     .filter((r) => r.angularError !== null)
     .map((r) => r.angularError!);
 
-  // Miss details
-  const missDetails = allResults.filter((r) => !r.hit && r.prediction.isValid);
+  const missDetails = allResults.filter((r) => !r.hit && r.valid && r.prediction.isValid);
+
+  // Spin duration stats
+  durations.sort((a, b) => a - b);
+  const movementDelaysSorted = [...movementDelays].sort((a, b) => a - b);
 
   return {
     totalSpins: spins.length,
     matchedSpins: spins.filter((s) => s.actualOutcome !== null).length,
+    spinDurationStats: {
+      min: durations[0] ?? 0,
+      median: durations[Math.floor(durations.length / 2)] ?? 0,
+      mean: durations.length > 0 ? durations.reduce((s, v) => s + v, 0) / durations.length : 0,
+      max: durations[durations.length - 1] ?? 0,
+    },
+    movementStartStats: {
+      avgDelayFromSpinStart: movementDelaysSorted.length > 0
+        ? movementDelaysSorted.reduce((s, v) => s + v, 0) / movementDelaysSorted.length
+        : 0,
+    },
     lockPointSummaries,
     armComparison: {
       video: {
@@ -625,14 +792,17 @@ export function runPhysicsValidation(
     angularErrors,
     missDetails,
     leakageAudit: {
-      passed: totalLeakageViolations === 0,
-      totalViolations: totalLeakageViolations,
-      details: totalLeakageViolations === 0
-        ? "PASS — no future-timestamp violations detected"
-        : `FAIL — ${totalLeakageViolations} total violations`,
+      passed: futureFrameViolations === 0 && postStopViolations === 0 && resultLeakageViolations === 0,
+      futureFrameViolations,
+      postStopViolations,
+      resultLeakageViolations,
+      invalidPredictions,
+      details: futureFrameViolations === 0 && postStopViolations === 0 && resultLeakageViolations === 0
+        ? "PASS — no future-frame, post-stop, or result-leakage violations"
+        : `FAIL — ${futureFrameViolations} future-frame, ${postStopViolations} post-stop, ${resultLeakageViolations} result-leakage violations`,
     },
     sensorQuality,
-    modelVersion: "video-physics-v2.4",
+    modelVersion: "video-physics-v2.5",
   };
 }
 

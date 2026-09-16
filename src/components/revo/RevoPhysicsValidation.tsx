@@ -60,9 +60,11 @@ export function RevoPhysicsValidation() {
       // Run walk-forward validation
       const result = runPhysicsValidation(spins.map(s => ({
         spinId: s.spinId,
+        physicalSpinStart: s.physicalSpinStart,
         physicalSpinStop: s.physicalSpinStop,
         actualOutcome: s.actualOutcome,
         actualSector: s.actualSector,
+        preResultSnapshots: s.preResultSnapshots ?? [],
         snapshots: s.snapshots,
       })));
       setReport(result);
@@ -202,7 +204,7 @@ export function RevoPhysicsValidation() {
 // ============================================================
 
 function ValidationReportView({ report }: { report: ValidationReport }) {
-  const lockPoints = ["T-20", "T-15", "T-10", "T-5"];
+  const allLPs = ["S+2", "S+3", "S+5", "S+7", "S+10", "STOP-5", "STOP-3", "STOP-2", "STOP-1"];
 
   return (
     <div className="space-y-4">
@@ -226,11 +228,13 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
                 <th className="px-2 py-2">Bonus</th>
                 <th className="px-2 py-2">Num Excl</th>
                 <th className="px-2 py-2">Avg Ang Err</th>
+                <th className="px-2 py-2">Top-1</th>
                 <th className="px-2 py-2">Sector Acc</th>
+                <th className="px-2 py-2">σ</th>
               </tr>
             </thead>
             <tbody>
-              {lockPoints.map((lp) => {
+              {allLPs.map((lp) => {
                 const s = report.lockPointSummaries[lp];
                 if (!s) return null;
                 return (
@@ -249,8 +253,14 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
                     <td className="px-2 py-2 text-[#8899cc]">
                       {s.avgAngularError !== null ? `${s.avgAngularError.toFixed(0)}°` : "—"}
                     </td>
+                    <td className="px-2 py-2 text-[#ff6b9d]">
+                      {(s.top1OutcomeAccuracy * 100).toFixed(0)}%
+                    </td>
                     <td className="px-2 py-2 text-[#00d4ff]">
                       {(s.sectorAccuracy * 100).toFixed(0)}%
+                    </td>
+                    <td className="px-2 py-2 text-[#5a6a99]">
+                      {s.avgUncertainty.toFixed(0)}°
                     </td>
                   </tr>
                 );
@@ -263,7 +273,7 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
       {/* Arm comparison */}
       <div className="revo-card p-4">
         <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-          <i className="fas fa-balance-scale text-[#a78bfa]" /> Arm Comparison (T-5)
+          <i className="fas fa-balance-scale text-[#a78bfa]" /> Arm Comparison (STOP-3)
         </div>
         <div className="grid grid-cols-3 gap-3 text-xs">
           <div className="rounded-lg bg-[#0d1020] p-3 text-center">
@@ -310,7 +320,7 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
       {report.angularErrors.length > 0 && (
         <div className="revo-card p-4">
           <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-            <i className="fas fa-ruler text-[#ffa502]" /> Angular Error Distribution (T-5)
+            <i className="fas fa-ruler text-[#ffa502]" /> Angular Error Distribution (STOP-3)
           </div>
           <div className="grid grid-cols-3 gap-3 text-xs">
             <div>
@@ -338,7 +348,7 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
       {/* Sensor quality breakdown */}
       <div className="revo-card p-4">
         <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-          <i className="fas fa-signal text-[#2ed573]" /> Sensor Quality Breakdown (T-5)
+          <i className="fas fa-signal text-[#2ed573]" /> Sensor Quality Breakdown (STOP-3)
         </div>
         <div className="grid grid-cols-3 gap-3 text-xs">
           <div className="rounded-lg bg-[#2ed573]/10 p-3 text-center">
@@ -406,7 +416,7 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
         </div>
         <div className="text-xs text-[#8899cc]">
           <p>
-            <b>Video Top-4 accuracy (T-5):</b>{" "}
+            <b>Video Top-4 accuracy (STOP-3):</b>{" "}
             <span className="font-bold text-white">
               {(report.armComparison.video.hitRate * 100).toFixed(1)}%
             </span>{" "}
