@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { broadcastLiveResult } from "./liveResultsBus";
 import { setLiveSpins } from "./liveSpinStore";
-import { recordSynchronizedSpin } from "./videoPhysicsHistory";
+import { matchApiResultToPhysicalSpin } from "./videoPhysicsHistory";
 import { analyzeSpins, parseSpins, type AnalysisResult, SEGMENT_NAMES, GAME_CARD_IMAGES, DISPLAY_NAMES, THEORETICAL_PROB } from "./aiStats";
 
 function timeAgo(ts: string): string {
@@ -96,8 +96,8 @@ export function RevoLiveResults() {
               appReceivedTime: appReceivedMs,
             });
 
-            // Record synchronized spin for Fusion V2 experiment
-            // Maps the live result to its pre-result video physics history
+            // Match API result to physical spin (V2.2)
+            // Uses video-derived physical stop time, NOT settledAt
             const SECTOR_TO_GAME: Record<string, string> = {
               "1": "1", "2": "2", "5": "5", "10": "10",
               CoinFlip: "COIN FLIP", Pachinko: "PACHINKO",
@@ -106,8 +106,7 @@ export function RevoLiveResults() {
             };
             const actualOutcome = SECTOR_TO_GAME[sector] ?? sector;
             const actualSectorIdx = ["1", "2", "5", "10", "CoinFlip", "Pachinko", "CashHunt", "CrazyTime"].indexOf(sector);
-            recordSynchronizedSpin(
-              settledAt,
+            matchApiResultToPhysicalSpin(
               sourceTimeMs,
               actualOutcome,
               actualSectorIdx >= 0 ? actualSectorIdx : null,

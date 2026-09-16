@@ -1,31 +1,32 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import {
-  runFusionV2Experiment,
   DEFAULT_FUSION_WEIGHTS,
   lockPrediction,
   type FusionWeights,
-  type V2ExperimentResult,
   type LockRecord,
 } from "./fusionEngine";
 import {
   buildInitial,
-  ALL_FLAGS_OFF,
   type RoundResult,
 } from "./decisionEngine";
-import { getLiveSpins, type SpinData } from "./liveSpinStore";
+import { getLiveSpins } from "./liveSpinStore";
 import { getVideoPhysics } from "./RevoVideoSensor";
 import {
-  getSynchronizedSpins,
   getSynchronizedCount,
   getBufferStats,
+  getCompletedSpins,
+  getCurrentSpin,
+  getSpinPhase,
+  getSynchronizationReport,
   subscribeToBuffer,
   clearAll,
+  type PhysicalSpin,
+  type SpinPhase,
 } from "./videoPhysicsHistory";
 import {
-  DISPLAY_NAMES,
   GAME_CARD_IMAGES,
 } from "./aiStats";
 
@@ -42,6 +43,16 @@ const GAME_COLOR: Record<string, string> = {
   "CASH HUNT": "#FFD700", "CRAZY TIME": "#ff6b9d",
 };
 
+const PHASE_COLOR: Record<SpinPhase, string> = {
+  IDLE: "#5a6a99",
+  SPIN_DETECTED: "#2ed573",
+  TRACKING: "#00d4ff",
+  DECELERATION: "#ffa502",
+  PREDICTION_WINDOW: "#ff6b9d",
+  PHYSICAL_STOP: "#ff4757",
+  SETTLED: "#8899cc",
+};
+
 function useBufferVersion(): number {
   return useSyncExternalStore(
     subscribeToBuffer,
@@ -51,76 +62,19 @@ function useBufferVersion(): number {
 }
 
 export function RevoFusionExperiment() {
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<V2ExperimentResult | null>(null);
-  const [weights, setWeights] = useState<FusionWeights>(DEFAULT_FUSION_WEIGHTS);
+  const [weights] = useState<FusionWeights>(DEFAULT_FUSION_WEIGHTS);
   const [liveLock, setLiveLock] = useState<LockRecord | null>(null);
 
-  // Live buffer stats (updates when new snapshots are recorded)
+  // Live buffer stats
   useBufferVersion();
   const syncCount = getSynchronizedCount();
   const bufferStats = getBufferStats();
-
-  // Run the V2 experiment on REAL synchronized data
-  const runExperiment = useCallback(async () => {
-    setRunning(true);
-    setResult(null);
-    try {
-      const syncSpins = getSynchronizedSpins();
-      if (syncSpins.length < 2) {
-        toast.error(
-          `Need at least 2 synchronized spins (currently ${syncSpins.length}). Start the video sensor and wait for live results.`,
-        );
-        setRunning(false);
-        return;
-      }
-
-      const liveSpins = getLiveSpins();
-
-      // Build RoundResult[] from live spins (for history engine)
-      const rounds: RoundResult[] = liveSpins
-        .slice()
-        .reverse()
-        .map((s) => ({
-          prediction: [],
-          actualResult: {
-            name: SECTOR_TO_GAME[s.sector] ?? s.sector,
-            imageKey: s.sector,
-            confidenceRange: [50, 90],
-            isBonus: !["1", "2", "5", "10"].includes(s.sector),
-          },
-          hit: false,
-          time: new Date(s.settledAt).getTime(),
-          confidence: 50,
-          recalibrated: false,
-        }));
-
-      const experimentResult = runFusionV2Experiment(
-        syncSpins,
-        rounds,
-        liveSpins,
-        weights,
-      );
-
-      setResult(experimentResult);
-
-      toast.success(
-        `V2 experiment complete — ${experimentResult.totalSpins} spins, ${experimentResult.spinsWithValidVideo} with valid video`,
-        {
-          description: experimentResult.leakageAudit.passed
-            ? "Leakage PASS"
-            : "LEAKAGE DETECTED!",
-        },
-      );
-    } catch (e) {
-      toast.error(`Experiment failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setRunning(false);
-    }
-  }, [weights]);
+  const currentSpin = getCurrentSpin();
+  const spinPhase = getSpinPhase();
+  const syncReport = getSynchronizationReport();
 
   // Lock a live prediction (no-leakage)
-  const lockNow = useCallback(() => {
+  const lockNow = () => {
     const spins = getLiveSpins();
     const physics = getVideoPhysics();
 
@@ -164,58 +118,108 @@ export function RevoFusionExperiment() {
         description: `Video ${lock.videoUsed ? "USED" : "INSUFFICIENT"} · conf ${(lock.fusionConfidence * 100).toFixed(0)}%`,
       },
     );
-  }, [weights]);
+  };
 
-  const updateWeight = useCallback((w: number) => {
-    setWeights({
-      ...weights,
-      videoWeight: w,
-      historyWeight: 1 - w,
-      version: `fusion-v2-manual-w${w.toFixed(2)}`,
-      lastUpdated: Date.now(),
-    });
-  }, [weights]);
-
-  const handleClear = useCallback(() => {
+  const handleClear = () => {
     clearAll();
-    setResult(null);
     setLiveLock(null);
     toast.info("All synchronized data cleared");
-  }, []);
+  };
+
+  const completedSpins = getCompletedSpins();
 
   return (
     <section
       id="fusion-experiment"
       className="scroll-mt-20 px-4 py-10 sm:px-6"
-      aria-label="Fusion engine experiment V2"
+      aria-label="Fusion engine experiment V2.2"
     >
       <div className="mx-auto max-w-5xl">
         {/* Heading */}
         <div className="mb-6 text-center">
           <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#ff6b9d]">
-            <i className="fas fa-flask" /> V2 · Real Synchronized Data
+            <i className="fas fa-clock-rotate-left" /> V2.2 · Physical Timeline
           </div>
           <h2 className="mt-1 text-2xl font-black text-white sm:text-3xl">
-            Fusion <span className="text-[#ff6b9d]">Engine V2</span>
+            Fusion <span className="text-[#ff6b9d]">Engine V2.2</span>
           </h2>
           <p className="mt-1 text-sm text-[#8899cc]">
-            Real pre-result video physics + history → calibrated fusion → 70-combo optimizer
+            Video-derived physical timeline → spin start/stop detection → true pre-result lock points
           </p>
         </div>
 
         {/* Warning banner */}
         <div className="mb-5 rounded-xl border border-[#ffa502]/40 bg-[#ffa502]/10 px-4 py-2.5 text-xs text-[#ffa502]">
           <i className="fas fa-triangle-exclamation mr-1.5" />
-          <b>EXPERIMENTAL V2 —</b> Video-only shows INSUFFICIENT when no valid
-          pre-result video exists. NO theoretical fallback for video. Production
-          stays C1-C9 dynamic.
+          <b>TIMELINE VALIDATION ONLY —</b> NOT prediction accuracy. The API
+          settledAt is NOT the physical stop. We now detect spin start/stop from
+          VIDEO telemetry. Lock points are relative to physical stop.
         </div>
 
-        {/* Data collection status */}
+        {/* Real-time spin state machine */}
         <div className="revo-card mb-4 p-4">
           <div className="mb-2 flex items-center justify-between">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-database text-[#00d4ff]" /> Synchronized Dataset
+              <i className="fas fa-gear text-[#00d4ff]" /> Real-time Spin State
+            </span>
+            <span
+              className="rounded-full px-2.5 py-1 text-[10px] font-black"
+              style={{
+                background: `${PHASE_COLOR[spinPhase]}20`,
+                color: PHASE_COLOR[spinPhase],
+              }}
+            >
+              ● {spinPhase}
+            </span>
+          </div>
+          {currentSpin && (
+            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+              <div>
+                <div className="text-[9px] text-[#5a6a99]">Spin start</div>
+                <div className="font-bold text-white">
+                  {currentSpin.physicalSpinStart
+                    ? new Date(currentSpin.physicalSpinStart).toLocaleTimeString()
+                    : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[9px] text-[#5a6a99]">Physical stop</div>
+                <div className="font-bold" style={{
+                  color: currentSpin.physicalSpinStop ? "#ff4757" : "#5a6a99",
+                }}>
+                  {currentSpin.physicalSpinStop
+                    ? new Date(currentSpin.physicalSpinStop).toLocaleTimeString()
+                    : "tracking…"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[9px] text-[#5a6a99]">Max velocity</div>
+                <div className="font-bold text-[#00d4ff]">
+                  {currentSpin.maxVelocity.toFixed(0)}°/s
+                </div>
+              </div>
+              <div>
+                <div className="text-[9px] text-[#5a6a99]">Stop confidence</div>
+                <div className="font-bold" style={{
+                  color: currentSpin.physicalStopConfidence > 0.5 ? "#2ed573" : "#ffa502",
+                }}>
+                  {(currentSpin.physicalStopConfidence * 100).toFixed(0)}%
+                </div>
+              </div>
+            </div>
+          )}
+          {!currentSpin && (
+            <div className="text-center text-[11px] text-[#5a6a99]">
+              Waiting for wheel movement (STOPPED → MOVING transition)…
+            </div>
+          )}
+        </div>
+
+        {/* Synchronized dataset status */}
+        <div className="revo-card mb-4 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+              <i className="fas fa-database text-[#00d4ff]" /> Physical Dataset
             </span>
             <button
               onClick={handleClear}
@@ -226,67 +230,42 @@ export function RevoFusionExperiment() {
           </div>
           <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
             <div>
-              <div className="text-[9px] text-[#5a6a99]">Synchronized Spins</div>
-              <div className="font-black text-white">{syncCount}</div>
+              <div className="text-[9px] text-[#5a6a99]">Completed spins</div>
+              <div className="font-black text-white">{syncReport.totalCompletedSpins}</div>
             </div>
             <div>
-              <div className="text-[9px] text-[#5a6a99]">Physics Snapshots</div>
-              <div className="font-black text-[#00d4ff]">{bufferStats.totalSnapshots}</div>
+              <div className="text-[9px] text-[#5a6a99]">With physical stop</div>
+              <div className="font-black text-[#2ed573]">{syncReport.spinsWithPhysicalStop}</div>
             </div>
             <div>
-              <div className="text-[9px] text-[#5a6a99]">Tracking Snapshots</div>
+              <div className="text-[9px] text-[#5a6a99]">API matched</div>
+              <div className="font-black text-[#00d4ff]">{syncReport.spinsWithApiMatch}</div>
+            </div>
+            <div>
+              <div className="text-[9px] text-[#5a6a99]">Unmatched</div>
+              <div className="font-black text-[#ffa502]">{syncReport.unmatchedSpins}</div>
+            </div>
+            <div>
+              <div className="text-[9px] text-[#5a6a99]">Physics snapshots</div>
+              <div className="font-black text-[#a78bfa]">{bufferStats.totalSnapshots}</div>
+            </div>
+            <div>
+              <div className="text-[9px] text-[#5a6a99]">Tracking snapshots</div>
               <div className="font-black text-[#2ed573]">{bufferStats.trackingSnapshots}</div>
             </div>
             <div>
-              <div className="text-[9px] text-[#5a6a99]">Spins with Video</div>
-              <div className="font-black text-[#ff6b9d]">{bufferStats.validVideoSpins}</div>
+              <div className="text-[9px] text-[#5a6a99]">Moving snapshots</div>
+              <div className="font-black text-[#ff6b9d]">{bufferStats.movingSnapshots}</div>
             </div>
-          </div>
-          <div className="mt-2 text-[10px] text-[#5a6a99]">
-            Buffer time span: {bufferStats.timeSpanSeconds.toFixed(0)}s ·
-            To collect data: start the Video Sensor above and wait for live results.
-          </div>
-        </div>
-
-        {/* Fusion weight control */}
-        <div className="revo-card mb-4 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-sliders text-[#a78bfa]" /> Fusion Weight
-            </span>
-            <span className="text-[10px] text-[#5a6a99]">
-              {weights.version}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] font-bold text-[#448AFF]">History</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={weights.videoWeight}
-              onChange={(e) => updateWeight(Number(e.target.value))}
-              className="flex-1"
-            />
-            <span className="text-[10px] font-bold text-[#ff6b9d]">Video</span>
-          </div>
-          <div className="mt-1 flex justify-between text-[9px] text-[#5a6a99]">
-            <span>History: {(weights.historyWeight * 100).toFixed(0)}%</span>
-            <span>Video: {(weights.videoWeight * 100).toFixed(0)}%</span>
+            <div>
+              <div className="text-[9px] text-[#5a6a99]">Buffer time</div>
+              <div className="font-black text-white">{(bufferStats.timeSpanSeconds / 60).toFixed(1)}min</div>
+            </div>
           </div>
         </div>
 
         {/* Action buttons */}
         <div className="mb-5 flex flex-wrap gap-2">
-          <button
-            onClick={runExperiment}
-            disabled={running}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#ff6b9d] to-[#a78bfa] px-4 py-2.5 text-sm font-bold text-white transition hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-          >
-            <i className={`fas ${running ? "fa-spinner fa-spin" : "fa-flask"}`} />
-            {running ? "Running..." : "Run V2 Experiment"}
-          </button>
           <button
             onClick={lockNow}
             className="flex items-center gap-2 rounded-xl border border-[#2ed573]/40 bg-[#2ed573]/10 px-4 py-2.5 text-sm font-bold text-[#2ed573] transition hover:bg-[#2ed573]/20"
@@ -299,8 +278,24 @@ export function RevoFusionExperiment() {
         {/* Live lock display */}
         {liveLock && <LiveLockDisplay lock={liveLock} />}
 
-        {/* V2 Experiment results */}
-        {result && <V2ExperimentResults result={result} weights={weights} />}
+        {/* Synchronization Report (TIMELINE VALIDATION) */}
+        <SyncReportView report={syncReport} completedSpins={completedSpins} />
+
+        {/* Recent spins list */}
+        {completedSpins.length > 0 && (
+          <div className="revo-card mt-4 overflow-hidden">
+            <div className="border-b border-[#1e2240] bg-gradient-to-r from-[#00d4ff]/10 to-transparent px-4 py-3">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
+                <i className="fas fa-list text-[#00d4ff]" /> Recent Physical Spins
+              </span>
+            </div>
+            <div className="max-h-64 overflow-y-auto revo-scroll p-3">
+              {completedSpins.slice(-15).reverse().map((spin) => (
+                <SpinRow key={spin.spinId} spin={spin} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -363,53 +358,10 @@ function LiveLockDisplay({ lock }: { lock: LockRecord }) {
             VIDEO: INSUFFICIENT — no valid pre-result video prediction
           </div>
         )}
-
-        <div className="grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
-          <div>
-            <div className="text-[#5a6a99]">Coverage</div>
-            <div className="font-bold text-[#2ed573]">
-              {isFinite(lock.top4Coverage) ? `${(lock.top4Coverage * 100).toFixed(1)}%` : "—"}
-            </div>
-          </div>
-          <div>
-            <div className="text-[#5a6a99]">History conf</div>
-            <div className="font-bold text-[#448AFF]">
-              {(lock.historyConfidence * 100).toFixed(0)}%
-            </div>
-          </div>
-          <div>
-            <div className="text-[#5a6a99]">Video conf</div>
-            <div className="font-bold text-[#ff6b9d]">
-              {lock.videoUsed ? `${(lock.videoConfidence * 100).toFixed(0)}%` : "INSUFFICIENT"}
-            </div>
-          </div>
-          <div>
-            <div className="text-[#5a6a99]">Fusion conf</div>
-            <div className="font-bold text-white">
-              {(lock.fusionConfidence * 100).toFixed(0)}%
-            </div>
-          </div>
-        </div>
-
-        {lock.stoppingPrediction && (
-          <div className="mt-3 rounded-lg border border-[#ff6b9d]/30 bg-[#ff6b9d]/5 p-2 text-[10px]">
-            <span className="font-bold text-[#ff6b9d]">
-              <i className="fas fa-crosshairs mr-1" />
-              Video stopping prediction:
-            </span>{" "}
-            angle {lock.stoppingPrediction.angle.toFixed(1)}° · sector #{lock.stoppingPrediction.sector} ·
-            uncertainty ±{lock.stoppingPrediction.uncertainty.toFixed(0)}° ·
-            physics conf {(lock.stoppingPrediction.physicsConfidence * 100).toFixed(0)}%
-          </div>
-        )}
-
         <div className="mt-2 flex items-center gap-2 text-[10px]">
           <i className="fas fa-shield-halved text-[#2ed573]" />
           <span className="text-[#2ed573]">
             No leakage: all inputs ≤ lock time
-          </span>
-          <span className="ml-auto text-[#5a6a99]">
-            ID: {lock.predictionId.slice(0, 16)}…
           </span>
         </div>
       </div>
@@ -417,362 +369,218 @@ function LiveLockDisplay({ lock }: { lock: LockRecord }) {
   );
 }
 
-function V2ExperimentResults({
-  result,
-  weights,
+function SyncReportView({
+  report,
+  completedSpins,
 }: {
-  result: V2ExperimentResult;
-  weights: FusionWeights;
+  report: ReturnType<typeof getSynchronizationReport>;
+  completedSpins: PhysicalSpin[];
 }) {
-  const armLabels: Record<string, string> = {
-    A_theoretical: "A: [1,2,5,10]",
-    B_history: "B: C1-C9",
-    C_video: "C: Video-only",
-    D_fusion: "D: Fusion",
-  };
-  const lockPoints = ["T-20", "T-15", "T-10", "T-5"];
+  const { apiDelayStats } = report;
+  const delays = report.apiDelays;
 
-  // Find best arm at T-5
-  let bestArm = "A_theoretical";
-  let bestRate = 0;
-  for (const arm of Object.keys(armLabels)) {
-    const rate = result.arms[arm]?.["T-5"]?.hitRate ?? 0;
-    if (rate > bestRate) {
-      bestRate = rate;
-      bestArm = arm;
-    }
-  }
+  // Timeline gates
+  const gatePhysicalStop = report.spinsWithPhysicalStop > 0;
+  const gateApiMatch = report.spinsWithApiMatch > 0;
+  const gateLockReconstruction = report.lockPointReconstruction.t5Reconstructed > 0;
+  const gateLeakage = report.leakageAudit.passed;
+  const gateMinSpins = report.spinsWithApiMatch >= 20;
+
+  const allGatesPassed =
+    gatePhysicalStop &&
+    gateApiMatch &&
+    gateLockReconstruction &&
+    gateLeakage &&
+    gateMinSpins;
 
   return (
     <div className="space-y-4">
-      {/* Dataset stats */}
-      <div className="revo-card p-4">
-        <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-          <i className="fas fa-chart-bar text-[#00d4ff]" /> Dataset Statistics
-        </div>
-        <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-          <div>
-            <div className="text-[9px] text-[#5a6a99]">Total spins</div>
-            <div className="font-black text-white">{result.totalSpins}</div>
-          </div>
-          <div>
-            <div className="text-[9px] text-[#5a6a99]">Spins with video</div>
-            <div className="font-black text-[#ff6b9d]">{result.spinsWithValidVideo}</div>
-          </div>
-          <div>
-            <div className="text-[9px] text-[#5a6a99]">Total snapshots</div>
-            <div className="font-black text-[#00d4ff]">{result.datasetStats.totalSnapshots}</div>
-          </div>
-          <div>
-            <div className="text-[9px] text-[#5a6a99]">Avg/spin</div>
-            <div className="font-black text-white">{result.datasetStats.avgSnapshotsPerSpin.toFixed(0)}</div>
-          </div>
-        </div>
-        {/* Lock-point coverage */}
-        <div className="mt-3">
-          <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
-            Lock-point video coverage
-          </div>
-          <div className="grid grid-cols-4 gap-2 text-[10px]">
-            {lockPoints.map((lp) => (
-              <div key={lp} className="rounded-lg bg-[#0d1020] p-2 text-center">
-                <div className="text-[#5a6a99]">{lp}</div>
-                <div className="font-bold" style={{
-                  color: result.lockPointCoverage[lp] > 0.5 ? "#2ed573" :
-                         result.lockPointCoverage[lp] > 0 ? "#ffa502" : "#ff4757",
-                }}>
-                  {(result.lockPointCoverage[lp] * 100).toFixed(0)}%
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Data quality report */}
-        {result.dataQuality && (
-          <div className="mt-3 border-t border-[#1e2240]/60 pt-3">
-            <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
-              Data Quality Report
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-[10px] sm:grid-cols-3">
-              <div>
-                <div className="text-[#5a6a99]">Moving spins</div>
-                <div className="font-bold" style={{
-                  color: result.dataQuality.movingSpinCount >= 10 ? "#2ed573" :
-                         result.dataQuality.movingSpinCount > 0 ? "#ffa502" : "#ff4757",
-                }}>
-                  {result.dataQuality.movingSpinCount}
-                </div>
-              </div>
-              <div>
-                <div className="text-[#5a6a99]">Tracking rate</div>
-                <div className="font-bold" style={{
-                  color: result.dataQuality.trackingRate > 0.1 ? "#2ed573" :
-                         result.dataQuality.trackingRate > 0.02 ? "#ffa502" : "#ff4757",
-                }}>
-                  {(result.dataQuality.trackingRate * 100).toFixed(1)}%
-                </div>
-              </div>
-              <div>
-                <div className="text-[#5a6a99]">Calibration stability</div>
-                <div className="font-bold" style={{
-                  color: result.dataQuality.calibrationStability > 0.8 ? "#2ed573" :
-                         result.dataQuality.calibrationStability > 0.5 ? "#ffa502" : "#ff4757",
-                }}>
-                  {(result.dataQuality.calibrationStability * 100).toFixed(0)}%
-                </div>
-              </div>
-              <div>
-                <div className="text-[#5a6a99]">Direction consistency</div>
-                <div className="font-bold" style={{
-                  color: result.dataQuality.directionConsistency > 0.9 ? "#2ed573" : "#ffa502",
-                }}>
-                  {(result.dataQuality.directionConsistency * 100).toFixed(0)}%
-                </div>
-              </div>
-              <div>
-                <div className="text-[#5a6a99]">INSUFFICIENT spins</div>
-                <div className="font-bold text-[#ff4757]">
-                  {result.dataQuality.insufficientCount}
-                </div>
-              </div>
-              <div>
-                <div className="text-[#5a6a99]">Moving snapshots</div>
-                <div className="font-bold text-[#00d4ff]">
-                  {result.datasetStats.movingSnapshots}
-                </div>
-              </div>
-            </div>
-
-            {/* Timing sync */}
-            <div className="mt-2 grid grid-cols-3 gap-2 text-[9px]">
-              <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
-                <div className="text-[#5a6a99]">Avg API delay</div>
-                <div className="font-bold text-white">{(result.dataQuality.timingSync.avgDelay / 1000).toFixed(1)}s</div>
-              </div>
-              <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
-                <div className="text-[#5a6a99]">Min API delay</div>
-                <div className="font-bold text-white">{(result.dataQuality.timingSync.minDelay / 1000).toFixed(1)}s</div>
-              </div>
-              <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
-                <div className="text-[#5a6a99]">Max API delay</div>
-                <div className="font-bold text-white">{(result.dataQuality.timingSync.maxDelay / 1000).toFixed(1)}s</div>
-              </div>
-            </div>
-
-            {/* Sector map status */}
-            <div className="mt-2 text-[10px]">
-              <span className="text-[#5a6a99]">Sector map: </span>
-              <span className="font-bold" style={{
-                color: result.dataQuality.sectorMapStatus.confident ? "#2ed573" : "#ffa502",
-              }}>
-                {result.dataQuality.sectorMapStatus.totalObservations} observations
-                ({result.dataQuality.sectorMapStatus.confident ? "confident" : "need 10+"})
-              </span>
-            </div>
-
-            {/* Ready-for-validation banner */}
-            <div className={`mt-3 rounded-lg border p-2.5 text-center text-xs font-bold ${
-              result.dataQuality.readyForValidation
-                ? "border-[#2ed573]/40 bg-[#2ed573]/10 text-[#2ed573]"
-                : "border-[#ffa502]/40 bg-[#ffa502]/10 text-[#ffa502]"
-            }`}>
-              <i className={`fas ${result.dataQuality.readyForValidation ? "fa-check-circle" : "fa-hourglass-half"} mr-1`} />
-              {result.dataQuality.readyForValidation
-                ? "DATA SUFFICIENT — Ready for physics validation"
-                : "CONTINUE COLLECTION — Need 10+ spins with movement"}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Multi-lock-point comparison table */}
       <div className="revo-card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#ff6b9d]/10 to-transparent px-4 py-3">
+        <div className="flex items-center justify-between border-b border-[#1e2240] bg-gradient-to-r from-[#00d4ff]/10 to-transparent px-4 py-3">
           <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-            <i className="fas fa-table text-[#ff6b9d]" /> A/B/C/D × T-20/T-15/T-10/T-5
+            <i className="fas fa-stopwatch text-[#00d4ff]" /> Timeline Synchronization Report
           </span>
           <span className="text-[10px] text-[#5a6a99]">
-            weights: H{(weights.historyWeight * 100).toFixed(0)}/V{(weights.videoWeight * 100).toFixed(0)}
+            {completedSpins.length} spins · {report.spinsWithApiMatch} matched
           </span>
         </div>
-        <div className="overflow-x-auto revo-scroll">
-          <table className="w-full text-center text-xs">
-            <thead>
-              <tr className="border-b border-[#1e2240] bg-[#0d1020]/60">
-                <th className="px-3 py-2 text-left">Arm</th>
-                {lockPoints.map((lp) => (
-                  <th key={lp} className="px-2 py-2">{lp}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(armLabels).map(([armId, armLabel]) => {
-                const isBest = armId === bestArm;
+        <div className="p-4">
+          {/* API delay distribution */}
+          <div className="mb-4">
+            <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+              API Delay Distribution (physical stop → API result)
+            </div>
+            {delays.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                <DelayTile label="Min" value={apiDelayStats.min} />
+                <DelayTile label="Median" value={apiDelayStats.median} />
+                <DelayTile label="Mean" value={apiDelayStats.mean} />
+                <DelayTile label="Max" value={apiDelayStats.max} />
+              </div>
+            ) : (
+              <div className="text-center text-[11px] text-[#5a6a99]">
+                No API-matched spins yet. Waiting for results…
+              </div>
+            )}
+          </div>
+
+          {/* Lock-point reconstruction */}
+          <div className="mb-4">
+            <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+              Lock-Point Reconstruction (relative to physical stop)
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-[10px]">
+              {(["T-20", "T-15", "T-10", "T-5"] as const).map((lp) => {
+                const key = `${lp}Reconstructed` as keyof typeof report.lockPointReconstruction;
+                const moveKey = `${lp}WithMovement` as keyof typeof report.lockPointReconstruction;
+                const recon = report.lockPointReconstruction[key];
+                const move = report.lockPointReconstruction[moveKey];
                 return (
-                  <tr
-                    key={armId}
-                    className={`border-b border-[#1e2240]/40 ${isBest ? "bg-[#2ed573]/5" : ""}`}
-                  >
-                    <td className="px-3 py-2 text-left font-bold text-white">
-                      {armLabel}
-                      {isBest && <span className="ml-1 text-[#2ed573]">★</span>}
-                    </td>
-                    {lockPoints.map((lp) => {
-                      const a = result.arms[armId]?.[lp];
-                      if (!a) return <td key={lp} className="px-2 py-2 text-[#5a6a99]">—</td>;
-                      const total = a.hits + a.misses;
-                      const insufficient = a.insufficientCount;
-                      return (
-                        <td key={lp} className="px-2 py-2">
-                          <div className="font-bold" style={{
-                            color: a.hitRate >= 0.8 ? "#2ed573" :
-                                   a.hitRate >= 0.7 ? "#ffa502" :
-                                   a.hitRate > 0 ? "#ff4757" : "#5a6a99",
-                          }}>
-                            {total > 0 ? `${(a.hitRate * 100).toFixed(0)}%` : "—"}
-                          </div>
-                          <div className="text-[8px] text-[#5a6a99]">
-                            {a.hits}/{total}
-                          </div>
-                          {insufficient > 0 && (
-                            <div className="text-[7px] font-bold text-[#ff4757]">
-                              {insufficient} INSUF
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                  <div key={lp} className="rounded-lg bg-[#0d1020] p-2 text-center">
+                    <div className="text-[#5a6a99]">{lp}</div>
+                    <div className="font-bold text-white">
+                      {recon}/{report.spinsWithPhysicalStop}
+                    </div>
+                    <div className="text-[8px]" style={{
+                      color: move > 0 ? "#2ed573" : "#5a6a99",
+                    }}>
+                      {move} with movement
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* McNemar */}
-      {result.mcnemar && (
-        <div className="revo-card p-4">
-          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-            <i className="fas fa-balance-scale text-[#a78bfa]" /> McNemar (D vs B at T-5)
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+
+          {/* Tracking quality */}
+          <div className="mb-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
             <div>
-              <div className="text-[9px] text-[#5a6a99]">B HIT → D MISS</div>
-              <div className="font-bold text-[#ff4757]">{result.mcnemar.r}</div>
-            </div>
-            <div>
-              <div className="text-[9px] text-[#5a6a99]">B MISS → D HIT</div>
-              <div className="font-bold text-[#2ed573]">{result.mcnemar.s}</div>
-            </div>
-            <div>
-              <div className="text-[9px] text-[#5a6a99]">p-value</div>
-              <div className={`font-bold ${result.mcnemar.significant ? "text-[#2ed573]" : "text-[#8899cc]"}`}>
-                {result.mcnemar.pValue.toFixed(4)}
+              <div className="text-[9px] text-[#5a6a99]">Avg tracking rate</div>
+              <div className="font-bold" style={{
+                color: report.trackingQuality.avgTrackingRate > 0.3 ? "#2ed573" : "#ffa502",
+              }}>
+                {(report.trackingQuality.avgTrackingRate * 100).toFixed(1)}%
               </div>
             </div>
             <div>
-              <div className="text-[9px] text-[#5a6a99]">Discordant</div>
-              <div className="font-bold text-white">{result.mcnemar.discordant}</div>
+              <div className="text-[9px] text-[#5a6a99]">Avg stop confidence</div>
+              <div className="font-bold" style={{
+                color: report.trackingQuality.avgStopConfidence > 0.5 ? "#2ed573" : "#ffa502",
+              }}>
+                {(report.trackingQuality.avgStopConfidence * 100).toFixed(0)}%
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] text-[#5a6a99]">Unmatched spins</div>
+              <div className="font-bold" style={{
+                color: report.unmatchedSpins === 0 ? "#2ed573" : "#ffa502",
+              }}>
+                {report.unmatchedSpins}
+              </div>
             </div>
           </div>
-          <div className="mt-2 text-[10px] text-[#8899cc]">
-            {result.mcnemar.discordant < 10
-              ? `⚠ Inconclusive (${result.mcnemar.discordant} discordant, need ≥10)`
-              : result.mcnemar.significant
-                ? "✓ Significant — fusion genuinely differs from history-only (p < 0.05)"
-                : "Not significant — fusion does NOT outperform history-only"}
-          </div>
-        </div>
-      )}
 
-      {/* Leakage audit */}
-      <div className={`revo-card p-3 ${result.leakageAudit.passed ? "border-[#2ed573]/40" : "border-[#ff4757]/40"}`}>
-        <div className="flex items-center gap-2 text-xs">
-          <i className={`fas ${result.leakageAudit.passed ? "fa-check-circle text-[#2ed573]" : "fa-times-circle text-[#ff4757]"}`} />
-          <span className="font-bold text-white">Leakage Audit:</span>
-          <span className={result.leakageAudit.passed ? "text-[#2ed573]" : "text-[#ff4757]"}>
-            {result.leakageAudit.details}
+          {/* Timeline gates */}
+          <div className="mb-4 border-t border-[#1e2240]/60 pt-3">
+            <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+              Timeline Success Gates
+            </div>
+            <div className="space-y-1.5 text-[11px]">
+              <GateCheck label="Physical stop detectable" passed={gatePhysicalStop} />
+              <GateCheck label="API results match physical spins" passed={gateApiMatch} />
+              <GateCheck label="Lock points reconstructable (T-5)" passed={gateLockReconstruction} />
+              <GateCheck label="No timestamp leakage" passed={gateLeakage} />
+              <GateCheck label="20+ matched spins collected" passed={gateMinSpins} />
+            </div>
+          </div>
+
+          {/* Verdict */}
+          <div className={`rounded-lg border p-3 text-center text-sm font-bold ${
+            allGatesPassed
+              ? "border-[#2ed573]/40 bg-[#2ed573]/10 text-[#2ed573]"
+              : "border-[#ffa502]/40 bg-[#ffa502]/10 text-[#ffa502]"
+          }`}>
+            <i className={`fas ${allGatesPassed ? "fa-check-circle" : "fa-hourglass-half"} mr-2`} />
+            {allGatesPassed
+              ? "READY FOR PHYSICS VALIDATION"
+              : report.spinsWithApiMatch < 20
+                ? `CONTINUE COLLECTION — ${report.spinsWithApiMatch}/20 matched spins`
+                : "TIMELINE STILL BROKEN"}
+          </div>
+
+          {report.leakageAudit.passed && (
+            <div className="mt-2 flex items-center gap-2 text-[10px]">
+              <i className="fas fa-shield-halved text-[#2ed573]" />
+              <span className="text-[#2ed573]">
+                {report.leakageAudit.details}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DelayTile({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg bg-[#0d1020] p-2 text-center">
+      <div className="text-[9px] text-[#5a6a99]">{label}</div>
+      <div className="font-bold text-white">
+        {(value / 1000).toFixed(1)}s
+      </div>
+    </div>
+  );
+}
+
+function SpinRow({ spin }: { spin: PhysicalSpin }) {
+  const matched = spin.actualOutcome !== null;
+  const imgKey = spin.actualOutcome === "COIN FLIP" ? "CoinFlip"
+    : spin.actualOutcome === "PACHINKO" ? "Pachinko"
+    : spin.actualOutcome === "CASH HUNT" ? "CashHunt"
+    : spin.actualOutcome === "CRAZY TIME" ? "CrazyTime"
+    : spin.actualOutcome ?? "";
+
+  return (
+    <div className="mb-2 rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2 text-[10px]">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-2">
+          {matched && spin.actualOutcome && (
+            <img
+              src={GAME_CARD_IMAGES[imgKey]}
+              alt={spin.actualOutcome}
+              className="h-6 w-6 rounded object-contain"
+            />
+          )}
+          <span className="font-bold text-white">
+            {spin.actualOutcome ?? "unmatched"}
           </span>
+        </span>
+        <span
+          className="rounded px-1.5 py-0.5 text-[9px] font-black"
+          style={{
+            background: `${PHASE_COLOR[spin.spinPhase]}20`,
+            color: PHASE_COLOR[spin.spinPhase],
+          }}
+        >
+          {spin.spinPhase}
+        </span>
+      </div>
+      <div className="mt-1 grid grid-cols-3 gap-2 text-[#5a6a99]">
+        <div>
+          Start: {spin.physicalSpinStart ? new Date(spin.physicalSpinStart).toLocaleTimeString() : "—"}
+        </div>
+        <div>
+          Stop: {spin.physicalSpinStop ? new Date(spin.physicalSpinStop).toLocaleTimeString() : "—"}
+        </div>
+        <div>
+          Delay: {spin.apiDelay !== null ? `${(spin.apiDelay / 1000).toFixed(1)}s` : "—"}
         </div>
       </div>
-
-      {/* Miss forensics */}
-      {result.missForensics.length > 0 && (
-        <div className="revo-card overflow-hidden">
-          <div className="border-b border-[#1e2240] bg-gradient-to-r from-[#ff4757]/10 to-transparent px-4 py-3">
-            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-              <i className="fas fa-magnifying-glass text-[#ff4757]" /> Miss Forensics ({result.missForensics.length})
-            </span>
-          </div>
-          <div className="max-h-64 overflow-y-auto revo-scroll p-3">
-            {result.missForensics.slice(0, 25).map((m, i) => (
-              <div key={i} className="mb-2 rounded-lg border border-[#1e2240] bg-[#0d1020]/60 p-2 text-[10px]">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">
-                    {m.lockPoint} · {m.arm}: actual {m.actual} (rank #{m.actualRank})
-                  </span>
-                  <span
-                    className="rounded px-1.5 py-0.5 text-[9px] font-black"
-                    style={{
-                      background: m.classification === "NO_PRE_RESULT_SIGNAL" ? "#5a6a9920" :
-                                  m.classification === "PHYSICS_ERROR" ? "#ff475720" :
-                                  m.classification === "TRACKING_ERROR" ? "#ffa50220" :
-                                  m.classification === "CALIBRATION_ERROR" ? "#448AFF20" :
-                                  m.classification === "HISTORY_ERROR" ? "#a78bfa20" : "#8899cc20",
-                      color: m.classification === "NO_PRE_RESULT_SIGNAL" ? "#5a6a99" :
-                             m.classification === "PHYSICS_ERROR" ? "#ff4757" :
-                             m.classification === "TRACKING_ERROR" ? "#ffa502" :
-                             m.classification === "CALIBRATION_ERROR" ? "#448AFF" :
-                             m.classification === "HISTORY_ERROR" ? "#a78bfa" : "#8899cc",
-                    }}
-                  >
-                    {m.classification}
-                  </span>
-                </div>
-                {m.missingSignal && (
-                  <div className="mt-1 text-[#8899cc]">{m.missingSignal}</div>
-                )}
-                {m.physicsSnapshot && (
-                  <div className="mt-0.5 text-[#5a6a99]">
-                    Video: v={m.physicsSnapshot.velocity.toFixed(0)}°/s conf={(m.physicsSnapshot.confidence * 100).toFixed(0)}%
-                    {m.angularError !== null && ` · ang err ${m.angularError.toFixed(0)}°`}
-                    {` · margin ${(m.margin4vs5 * 100).toFixed(1)}pp`}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Production integration gate */}
-      <div className="revo-card p-4">
-        <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white">
-          <i className="fas fa-traffic-light text-[#ffa502]" /> Production Integration Gate
-        </div>
-        <div className="space-y-1.5 text-[11px]">
-          <GateCheck label="Zero leakage" passed={result.leakageAudit.passed} />
-          <GateCheck label="Real video data (not theoretical fallback)" passed={result.spinsWithValidVideo > 0} />
-          <GateCheck label="Video-only made predictions (not all INSUFFICIENT)" passed={
-            Object.values(result.arms["C_video"] || {}).some((lp) => lp.hits + lp.misses > 0 && lp.insufficientCount < (lp.hits + lp.misses))
-          } />
-          <GateCheck label="Fusion outperforms history-only" passed={
-            (result.arms["D_fusion"]?.["T-5"]?.hitRate ?? 0) > (result.arms["B_history"]?.["T-5"]?.hitRate ?? 0)
-          } />
-          <GateCheck label="Statistically significant (p < 0.05)" passed={result.mcnemar?.significant ?? false} />
-          <GateCheck label="Fusion > 83.3% theoretical" passed={(result.arms["D_fusion"]?.["T-5"]?.hitRate ?? 0) > 0.833} />
-        </div>
-        <div className="mt-3 rounded-lg border border-[#ffa502]/30 bg-[#ffa502]/5 p-2 text-[11px] text-[#ffa502]">
-          <i className="fas fa-info-circle mr-1" />
-          <b>Recommendation:</b>{" "}
-          {result.leakageAudit.passed && result.spinsWithValidVideo > 0 &&
-           (result.arms["D_fusion"]?.["T-5"]?.hitRate ?? 0) > (result.arms["B_history"]?.["T-5"]?.hitRate ?? 0) &&
-           (result.mcnemar?.significant ?? false)
-            ? "Fusion shows genuine improvement — consider integration (needs 500-spin validation)"
-            : "Do NOT integrate fusion — it does not meet integration criteria. Video has NOT been validated as a genuine pre-result signal."}
-        </div>
+      <div className="mt-0.5 text-[#5a6a99]">
+        Max v={spin.maxVelocity.toFixed(0)}°/s ·
+        Tracking {spin.trackingFrameCount}/{spin.totalFrameCount} ·
+        Stop conf {(spin.physicalStopConfidence * 100).toFixed(0)}%
       </div>
     </div>
   );
