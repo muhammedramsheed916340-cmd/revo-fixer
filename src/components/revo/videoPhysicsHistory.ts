@@ -71,10 +71,12 @@ export interface PhysicalSpin {
 let currentSpin: PhysicalSpin | null = null;
 let completedSpins: PhysicalSpin[] = [];
 
-// Stop detection state
-const STOP_VELOCITY_THRESHOLD = 5; // deg/s — below this = "near stop"
-const STOP_STABILITY_FRAMES = 5; // need 5 consecutive stable frames
-let stopStabilityCount = 0;
+// Stop detection — simplified for noisy high-speed data
+// Real Crazy Time spins produce 500-2000°/s. Video compression noise
+// produces 20-100°/s. We set the threshold at 100°/s to filter noise.
+const STOP_VELOCITY_THRESHOLD = 100; // deg/s — below this = "not a real spin"
+const STOP_TIME_THRESHOLD = 5000; // ms — no real movement for 5s = physical stop
+let lastMovementTime: number | null = null; // last time we saw MOVING
 let lastAngle: number | null = null;
 let lastMovementState: MovementState = "STOPPED";
 
@@ -95,14 +97,20 @@ let sectorObservations: SectorObservation[] = [];
 
 /**
  * Classify movement state from a physics snapshot.
+ * Uses RAW velocity (not smoothed) — the smoothed median stays at 0
+ * when the wheel briefly spins (1-2 frames out of 5), causing missed
+ * movement detection.
  */
 function classifyMovement(physics: {
   velocity: number;
+  velocityRaw?: number;
   isTracking: boolean;
   confidence: number;
 }): MovementState {
   if (!physics.isTracking || physics.confidence < 0.1) return "UNKNOWN";
-  return Math.abs(physics.velocity) >= STOP_VELOCITY_THRESHOLD ? "MOVING" : "STOPPED";
+  // Use raw velocity if available (more sensitive to brief spins)
+  const effVel = physics.velocityRaw ?? physics.velocity;
+  return Math.abs(effVel) >= STOP_VELOCITY_THRESHOLD ? "MOVING" : "STOPPED";
 }
 
 /**
@@ -142,17 +150,26 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
     snapshotBuffer.shift();
   }
 
-  // ---- Physical spin state machine ----
-  if (!currentSpin) {
-    // IDLE state — check for spin start
-    if (movementState === "MOVING" && lastMovementState === "STOPPED") {
+  // ---- Physical spin state machine (simplified for noisy data) ----
+  //
+  // The phase correlation at high speeds produces intermittent results
+  // (alternating MOVING/STOPPED frames). Instead of requiring sustained
+  // movement + angle stability, we use:
+  //   1. Spin start: any STOPPED→MOVING transition
+  //   2. Physical stop: no MOVING frames for STOP_TIME_THRESHOLD (5s)
+  //
+  // This is robust to brief gaps in tracking during fast rotation.
+
+  if (movementState === "MOVING") {
+    lastMovementTime = snapshot.timestamp;
+    if (!currentSpin) {
       // SPIN START detected
       currentSpin = {
         spinId: generateSpinId(),
         physicalSpinStart: snapshot.timestamp,
         physicalSpinStop: null,
         physicalStopConfidence: 0,
-        spinPhase: "SPIN_DETECTED",
+        spinPhase: "TRACKING",
         maxVelocity: Math.abs(snapshot.velocity),
         trackingFrameCount: snapshot.isTracking ? 1 : 0,
         totalFrameCount: 1,
@@ -162,70 +179,51 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
         actualSector: null,
         snapshots: [snapshot],
       };
+    } else {
+      // Active spin — update it
+      currentSpin.snapshots.push(snapshot);
+      currentSpin.totalFrameCount++;
+      if (snapshot.isTracking) currentSpin.trackingFrameCount++;
+      if (Math.abs(snapshot.velocity) > currentSpin.maxVelocity) {
+        currentSpin.maxVelocity = Math.abs(snapshot.velocity);
+      }
+
+      // Update phase based on velocity profile
+      const absVel = Math.abs(snapshot.velocity);
+      const recent = currentSpin.snapshots.slice(-10);
+      const avgVel = recent.reduce((s, p) => s + Math.abs(p.velocity), 0) / recent.length;
+
+      if (currentSpin.maxVelocity > 100 && avgVel < currentSpin.maxVelocity * 0.5) {
+        currentSpin.spinPhase = "DECELERATION";
+      } else if (absVel > 50) {
+        currentSpin.spinPhase = "TRACKING";
+      } else if (absVel < STOP_VELOCITY_THRESHOLD) {
+        currentSpin.spinPhase = "PREDICTION_WINDOW";
+      }
     }
-  } else {
-    // Active spin — update it
+  } else if (currentSpin) {
+    // We have an active spin but this frame is STOPPED/UNKNOWN
     currentSpin.snapshots.push(snapshot);
     currentSpin.totalFrameCount++;
     if (snapshot.isTracking) currentSpin.trackingFrameCount++;
-    if (Math.abs(snapshot.velocity) > currentSpin.maxVelocity) {
-      currentSpin.maxVelocity = Math.abs(snapshot.velocity);
-    }
 
-    // Update phase
-    const absVel = Math.abs(snapshot.velocity);
-    if (currentSpin.spinPhase === "SPIN_DETECTED") {
-      if (absVel > currentSpin.maxVelocity * 0.8) {
-        currentSpin.spinPhase = "TRACKING";
-      }
-    }
+    // Check for physical stop: no movement for STOP_TIME_THRESHOLD
+    if (lastMovementTime !== null) {
+      const timeSinceMovement = snapshot.timestamp - lastMovementTime;
+      if (timeSinceMovement > STOP_TIME_THRESHOLD) {
+        // Physical stop confirmed
+        currentSpin.physicalSpinStop = lastMovementTime + 500; // approximate stop time
+        currentSpin.physicalStopConfidence = Math.min(1, timeSinceMovement / 10000);
+        currentSpin.spinPhase = "PHYSICAL_STOP";
 
-    if (currentSpin.spinPhase === "TRACKING") {
-      // Check for deceleration
-      const recent = currentSpin.snapshots.slice(-5);
-      if (recent.length >= 3) {
-        const avgRecent = recent.reduce((s, p) => s + Math.abs(p.velocity), 0) / recent.length;
-        if (avgRecent < currentSpin.maxVelocity * 0.7) {
-          currentSpin.spinPhase = "DECELERATION";
+        // Complete the spin after 10s of no movement
+        if (timeSinceMovement > STOP_TIME_THRESHOLD + 10000) {
+          currentSpin.spinPhase = "SETTLED";
+          completedSpins.push(currentSpin);
+          if (completedSpins.length > 100) completedSpins.shift();
+          currentSpin = null;
+          lastMovementTime = null;
         }
-      }
-    }
-
-    if (currentSpin.spinPhase === "DECELERATION" || currentSpin.spinPhase === "PREDICTION_WINDOW") {
-      if (absVel < STOP_VELOCITY_THRESHOLD) {
-        currentSpin.spinPhase = "PREDICTION_WINDOW";
-
-        // Check angle stability
-        if (lastAngle !== null) {
-          const angleDiff = Math.abs(snapshot.angle - lastAngle);
-          if (angleDiff < 1) {
-            stopStabilityCount++;
-          } else {
-            stopStabilityCount = 0;
-          }
-        }
-
-        // Physical stop confirmed after N stable frames
-        if (stopStabilityCount >= STOP_STABILITY_FRAMES) {
-          currentSpin.physicalSpinStop = snapshot.timestamp;
-          currentSpin.physicalStopConfidence = Math.min(1, stopStabilityCount / 10);
-          currentSpin.spinPhase = "PHYSICAL_STOP";
-        }
-      } else {
-        stopStabilityCount = 0;
-      }
-    }
-
-    // If physical stop confirmed and no movement for 10s, complete the spin
-    if (currentSpin.spinPhase === "PHYSICAL_STOP") {
-      const timeSinceStop = snapshot.timestamp - (currentSpin.physicalSpinStop ?? 0);
-      if (timeSinceStop > 10000) {
-        // Spin complete — move to completed list
-        currentSpin.spinPhase = "SETTLED";
-        completedSpins.push(currentSpin);
-        if (completedSpins.length > 100) completedSpins.shift();
-        currentSpin = null;
-        stopStabilityCount = 0;
       }
     }
   }
@@ -623,7 +621,7 @@ export function clearAll(): void {
   completedSpins = [];
   currentSpin = null;
   sectorObservations = [];
-  stopStabilityCount = 0;
+  lastMovementTime = null;
   lastAngle = null;
   lastMovementState = "STOPPED";
   bufferListeners.forEach((l) => l());
