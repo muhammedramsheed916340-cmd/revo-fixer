@@ -67,9 +67,9 @@ export function RevoFusionExperiment() {
     setResult(null);
     try {
       const syncSpins = getSynchronizedSpins();
-      if (syncSpins.length < 5) {
+      if (syncSpins.length < 2) {
         toast.error(
-          `Need at least 5 synchronized spins (currently ${syncSpins.length}). Start the video sensor and wait for live results.`,
+          `Need at least 2 synchronized spins (currently ${syncSpins.length}). Start the video sensor and wait for live results.`,
         );
         setRunning(false);
         return;
@@ -487,6 +487,103 @@ function V2ExperimentResults({
             ))}
           </div>
         </div>
+
+        {/* Data quality report */}
+        {result.dataQuality && (
+          <div className="mt-3 border-t border-[#1e2240]/60 pt-3">
+            <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">
+              Data Quality Report
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-[10px] sm:grid-cols-3">
+              <div>
+                <div className="text-[#5a6a99]">Moving spins</div>
+                <div className="font-bold" style={{
+                  color: result.dataQuality.movingSpinCount >= 10 ? "#2ed573" :
+                         result.dataQuality.movingSpinCount > 0 ? "#ffa502" : "#ff4757",
+                }}>
+                  {result.dataQuality.movingSpinCount}
+                </div>
+              </div>
+              <div>
+                <div className="text-[#5a6a99]">Tracking rate</div>
+                <div className="font-bold" style={{
+                  color: result.dataQuality.trackingRate > 0.1 ? "#2ed573" :
+                         result.dataQuality.trackingRate > 0.02 ? "#ffa502" : "#ff4757",
+                }}>
+                  {(result.dataQuality.trackingRate * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-[#5a6a99]">Calibration stability</div>
+                <div className="font-bold" style={{
+                  color: result.dataQuality.calibrationStability > 0.8 ? "#2ed573" :
+                         result.dataQuality.calibrationStability > 0.5 ? "#ffa502" : "#ff4757",
+                }}>
+                  {(result.dataQuality.calibrationStability * 100).toFixed(0)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-[#5a6a99]">Direction consistency</div>
+                <div className="font-bold" style={{
+                  color: result.dataQuality.directionConsistency > 0.9 ? "#2ed573" : "#ffa502",
+                }}>
+                  {(result.dataQuality.directionConsistency * 100).toFixed(0)}%
+                </div>
+              </div>
+              <div>
+                <div className="text-[#5a6a99]">INSUFFICIENT spins</div>
+                <div className="font-bold text-[#ff4757]">
+                  {result.dataQuality.insufficientCount}
+                </div>
+              </div>
+              <div>
+                <div className="text-[#5a6a99]">Moving snapshots</div>
+                <div className="font-bold text-[#00d4ff]">
+                  {result.datasetStats.movingSnapshots}
+                </div>
+              </div>
+            </div>
+
+            {/* Timing sync */}
+            <div className="mt-2 grid grid-cols-3 gap-2 text-[9px]">
+              <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                <div className="text-[#5a6a99]">Avg API delay</div>
+                <div className="font-bold text-white">{(result.dataQuality.timingSync.avgDelay / 1000).toFixed(1)}s</div>
+              </div>
+              <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                <div className="text-[#5a6a99]">Min API delay</div>
+                <div className="font-bold text-white">{(result.dataQuality.timingSync.minDelay / 1000).toFixed(1)}s</div>
+              </div>
+              <div className="rounded-lg bg-[#0d1020] p-1.5 text-center">
+                <div className="text-[#5a6a99]">Max API delay</div>
+                <div className="font-bold text-white">{(result.dataQuality.timingSync.maxDelay / 1000).toFixed(1)}s</div>
+              </div>
+            </div>
+
+            {/* Sector map status */}
+            <div className="mt-2 text-[10px]">
+              <span className="text-[#5a6a99]">Sector map: </span>
+              <span className="font-bold" style={{
+                color: result.dataQuality.sectorMapStatus.confident ? "#2ed573" : "#ffa502",
+              }}>
+                {result.dataQuality.sectorMapStatus.totalObservations} observations
+                ({result.dataQuality.sectorMapStatus.confident ? "confident" : "need 10+"})
+              </span>
+            </div>
+
+            {/* Ready-for-validation banner */}
+            <div className={`mt-3 rounded-lg border p-2.5 text-center text-xs font-bold ${
+              result.dataQuality.readyForValidation
+                ? "border-[#2ed573]/40 bg-[#2ed573]/10 text-[#2ed573]"
+                : "border-[#ffa502]/40 bg-[#ffa502]/10 text-[#ffa502]"
+            }`}>
+              <i className={`fas ${result.dataQuality.readyForValidation ? "fa-check-circle" : "fa-hourglass-half"} mr-1`} />
+              {result.dataQuality.readyForValidation
+                ? "DATA SUFFICIENT — Ready for physics validation"
+                : "CONTINUE COLLECTION — Need 10+ spins with movement"}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Multi-lock-point comparison table */}

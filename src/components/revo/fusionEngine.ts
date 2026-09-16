@@ -1102,6 +1102,7 @@ export interface V2ArmResult {
 export interface V2ExperimentResult {
   totalSpins: number;
   spinsWithValidVideo: number; // how many had real pre-result video
+  spinsWithMovement: number; // how many had movement in any pre-result window
   lockPointCoverage: Record<string, number>; // T-20/T-15/T-10/T-5 → % with valid video
   arms: Record<string, Record<string, V2ArmResult>>; // arm → lockPoint → result
   mcnemar: {
@@ -1120,8 +1121,26 @@ export interface V2ExperimentResult {
   datasetStats: {
     totalSnapshots: number;
     trackingSnapshots: number;
+    movingSnapshots: number;
     timeSpanSeconds: number;
     avgSnapshotsPerSpin: number;
+  };
+  dataQuality: {
+    movingSpinCount: number;
+    trackingRate: number;
+    calibrationStability: number;
+    directionConsistency: number;
+    timingSync: {
+      avgDelay: number;
+      maxDelay: number;
+      minDelay: number;
+    };
+    insufficientCount: number;
+    sectorMapStatus: {
+      totalObservations: number;
+      confident: boolean;
+    };
+    readyForValidation: boolean;
   };
 }
 
@@ -1231,22 +1250,43 @@ export function runFusionV2Experiment(
 
       // ---- Arm C: Video-only ----
       // CRITICAL: If video is not valid, mark INSUFFICIENT — do NOT fall back to theoretical
+      //
+      // V2.1: The lock point is valid if there's movement in [lock, T].
+      // When making the stopping prediction, use the LATEST MOVING physics
+      // in the window (not the physics at the lock timestamp, which might
+      // be stopped). This correctly handles spins where the wheel starts
+      // moving after T-20.
       let armC_top4: string[];
       let armC_probs: Record<string, number>;
       let videoStopping: StoppingPrediction | null = null;
 
-      if (physics && lockPoint.videoValid) {
-        // Real video prediction
+      if (lockPoint.videoValid && physics) {
+        // Find the latest MOVING physics in the window [lockTs, resultTs]
+        // This is the most physically relevant state for stopping prediction
+        const windowPhysics = spin.physicsHistory.filter(
+          (p) => p.timestamp >= lockPoint.lockTimestamp && p.timestamp <= spin.resultTimestamp,
+        );
+        // Prefer MOVING snapshots (highest |velocity|), fall back to latest tracking
+        let bestPhysics = physics;
+        let bestVel = Math.abs(physics.velocity);
+        for (const p of windowPhysics) {
+          if (p.isTracking && Math.abs(p.velocity) > bestVel) {
+            bestPhysics = p;
+            bestVel = Math.abs(p.velocity);
+          }
+        }
+
+        // Real video prediction using the best physics in the window
         videoStopping = predictStoppingAngle(
           {
-            timestamp: physics.timestamp / 1000,
-            angle: physics.angle,
-            velocity: physics.velocity,
-            acceleration: physics.acceleration,
-            confidence: physics.confidence,
-            direction: physics.direction,
-            isTracking: physics.isTracking,
-            calibrationStable: physics.calibrationStable,
+            timestamp: bestPhysics.timestamp / 1000,
+            angle: bestPhysics.angle,
+            velocity: bestPhysics.velocity,
+            acceleration: bestPhysics.acceleration,
+            confidence: bestPhysics.confidence,
+            direction: bestPhysics.direction,
+            isTracking: bestPhysics.isTracking,
+            calibrationStable: bestPhysics.calibrationStable,
           },
           null,
         );
@@ -1255,7 +1295,7 @@ export function runFusionV2Experiment(
           const armC_result = selectTop4(armC_probs);
           armC_top4 = armC_result.top4;
         } else {
-          // Video model couldn't predict — INSUFFICIENT
+          // Video model couldn't predict (e.g., deceleration too low) — INSUFFICIENT
           armC_top4 = [];
           armC_probs = Object.fromEntries(GAMES.map((g) => [g.name, 0]));
           arms["C_video"][lp].insufficientCount++;
@@ -1327,13 +1367,65 @@ export function runFusionV2Experiment(
     (sum, s) => sum + s.physicsHistory.filter((p) => p.isTracking).length,
     0,
   );
+  const movingSnapshots = spins.reduce(
+    (sum, s) => sum + s.physicsHistory.filter((p) => p.movementState === "MOVING").length,
+    0,
+  );
   const timeSpan = spins.length > 0
     ? (spins[spins.length - 1].resultTimestamp - spins[0].resultTimestamp) / 1000
     : 0;
 
+  // Spins with movement in any window
+  const spinsWithMovement = spins.filter((spin) =>
+    Object.values(spin.lockPoints).some((lp) => lp?.windowHasMovement),
+  ).length;
+
+  // Tracking rate
+  const trackingRate = totalSnapshots > 0 ? trackingSnapshots / totalSnapshots : 0;
+
+  // Calibration stability
+  const calibrationStability = totalSnapshots > 0
+    ? spins.reduce((sum, s) => sum + s.physicsHistory.filter((p) => p.calibrationStable).length, 0) / totalSnapshots
+    : 0;
+
+  // Direction consistency (majority direction across MOVING frames)
+  let cwCount = 0;
+  let ccwCount = 0;
+  for (const spin of spins) {
+    for (const p of spin.physicsHistory) {
+      if (p.movementState === "MOVING") {
+        if (p.direction > 0) cwCount++;
+        else ccwCount++;
+      }
+    }
+  }
+  const totalMoving = cwCount + ccwCount;
+  const directionConsistency = totalMoving > 0 ? Math.max(cwCount, ccwCount) / totalMoving : 0;
+
+  // Timing sync
+  const delays = spins.map((s) => s.resultToApiDelay).filter((d) => d > 0);
+  const avgDelay = delays.length > 0 ? delays.reduce((s, v) => s + v, 0) / delays.length : 0;
+  const maxDelay = delays.length > 0 ? Math.max(...delays) : 0;
+  const minDelay = delays.length > 0 ? Math.min(...delays) : 0;
+
+  // Insufficient count (spins where ALL lock points are INSUFFICIENT for video)
+  const insufficientCount = spins.filter((spin) =>
+    Object.values(spin.lockPoints).every((lp) => !lp?.videoValid),
+  ).length;
+
+  // Sector map status
+  const sectorObservationCount = spins.filter((s) => s.actualSector !== null).length;
+
+  // Ready for validation: need at least 10 spins with movement AND sufficient coverage
+  const readyForValidation =
+    spinsWithMovement >= 10 &&
+    trackingRate > 0.05 &&
+    calibrationStability > 0.5;
+
   return {
     totalSpins: spins.length,
     spinsWithValidVideo,
+    spinsWithMovement,
     lockPointCoverage,
     arms,
     mcnemar: {
@@ -1351,8 +1443,26 @@ export function runFusionV2Experiment(
     datasetStats: {
       totalSnapshots,
       trackingSnapshots,
+      movingSnapshots,
       timeSpanSeconds: timeSpan,
       avgSnapshotsPerSpin: spins.length > 0 ? totalSnapshots / spins.length : 0,
+    },
+    dataQuality: {
+      movingSpinCount: spinsWithMovement,
+      trackingRate,
+      calibrationStability,
+      directionConsistency,
+      timingSync: {
+        avgDelay,
+        maxDelay,
+        minDelay,
+      },
+      insufficientCount,
+      sectorMapStatus: {
+        totalObservations: sectorObservationCount,
+        confident: sectorObservationCount >= 10,
+      },
+      readyForValidation,
     },
   };
 }
