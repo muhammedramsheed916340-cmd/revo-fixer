@@ -702,7 +702,10 @@ export function RevoVideoSensor() {
     if (canvas.height !== CVH) canvas.height = CVH;
     ctx.drawImage(video, 0, 0, CVW, CVH);
     const imageData = ctx.getImageData(0, 0, CVW, CVH);
-    const ts = performance.now() / 1000;
+    // Use EPOCH time (Date.now()) for timestamps — NOT performance.now()
+    // performance.now() is relative to page load, which breaks synchronization
+    // with API result timestamps (which are epoch ms).
+    const ts = Date.now() / 1000;
 
     // FPS counter
     fpsFramesRef.current++;
@@ -1024,7 +1027,7 @@ export function RevoVideoSensor() {
   const startDiagnostic = useCallback(() => {
     const diag = diagnosticStateRef.current;
     diag.active = true;
-    diag.startTs = performance.now() / 1000;
+    diag.startTs = Date.now() / 1000;
     diag.frames = 0;
     diag.trackingFrames = 0;
     diag.velocities = [];
@@ -1190,7 +1193,7 @@ export function RevoVideoSensor() {
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           video.play().catch(() => {});
           setStatus("Stream loaded — auto-calibrating...");
-          fpsTimerRef.current = performance.now() / 1000;
+          fpsTimerRef.current = Date.now() / 1000;
           fpsFramesRef.current = 0;
           rafRef.current = requestAnimationFrame(processFrame);
         });
