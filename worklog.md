@@ -8802,3 +8802,82 @@ Chronological physics snapshot collector:
 
 ## Commit
 Pushed as `988f148` to GitHub.
+
+---
+Task ID: fusion-v2.1-long-lived-collection
+Agent: Z.ai Code (main)
+Task: Long-lived data collection with window-based movement detection. Don't mark spin INSUFFICIENT just because T-20 is stopped — wheel can start moving after T-20.
+
+## V2.1 Critical Fix
+**V2 bug:** Lock point was INSUFFICIENT if the wheel was stopped at the exact lock timestamp.
+**V2.1 fix:** Lock point is VALID if there's movement ANYWHERE in [lock, T]. The wheel can be stopped at T-20 but start moving at T-16.
+
+## Data Quality Report (20 spins collected)
+
+### Dataset
+- Total spins: 20
+- Physics snapshots: 6,000 (buffer maxed)
+- Tracking snapshots: 63
+- Moving snapshots: 0 (in pre-result windows)
+- Spins with valid video: 0
+- Moving spins: 0
+- INSUFFICIENT spins: 20 (all)
+
+### Lock-Point Coverage
+- T-20: 0%
+- T-15: 0%
+- T-10: 0%
+- T-5: 0%
+
+### A/B/C/D Results (T-5)
+| Arm | Hit Rate | Notes |
+|-----|----------|-------|
+| A: [1,2,5,10] ★ | 85% (17/20) | Champion |
+| B: C1-C9 | 80% (16/20) | Below theoretical |
+| C: Video-only | 0% (20 INSUF) | Correctly INSUFFICIENT — NO theoretical fallback |
+| D: Fusion | 80% (16/20) | Same as B (video weight=0) |
+
+### Timing Synchronization (CRITICAL FINDING)
+- **Avg API delay: 52.8s** (result settledAt → API delivery)
+- **Min API delay: 0.6s**
+- **Max API delay: 112.7s** (nearly 2 minutes!)
+- This means the API's `settledAt` timestamp is NOT the physical wheel stop time.
+- The physical stop happens ~50s BEFORE the API delivers the result.
+- Our lock points (T-20, T-15, T-10, T-5 relative to settledAt) are actually
+  at T+30, T+35, T+40, T+45 relative to the physical stop — all POST-STOP!
+- This explains why we see 0 movement: by the time the API delivers the result,
+  the wheel has already stopped.
+
+### Sector Map
+- Observations: 20 (confident)
+- All 8 outcomes represented
+
+### Leakage Audit
+- PASS — all inputs strictly before lock time
+
+### Miss Forensics (44 misses)
+- All classified as NO_PRE_RESULT_SIGNAL
+- Bonus outcomes (CASH HUNT) with <5% probability — no pre-result signal
+
+## Key Finding: Timestamp Synchronization Problem
+
+The API's `settledAt` timestamp is NOT the physical wheel stop time. It's the
+settlement/payout time, which arrives 50-113 seconds AFTER the physical stop.
+
+This means our lock points (T-20 to T-5 relative to settledAt) are all
+POST-STOP. We're looking at stopped-wheel frames, not pre-result frames.
+
+**The wheel WAS spinning (63 tracking snapshots) but those spins happened
+BEFORE the lock window — during the actual game, not after the API
+delivered the result.**
+
+## Recommendation
+1. **Fix the timestamp synchronization** — need to detect the physical wheel
+   stop from the video itself (velocity → 0), not from the API settledAt.
+2. **Use the video's movement detection** to identify when the spin actually
+   happens, then lock predictions BEFORE that movement starts.
+3. **Continue collection** — but with corrected lock points based on video
+   physics, not API timestamps.
+
+## Commit
+Pushed as `6386384` to GitHub.
