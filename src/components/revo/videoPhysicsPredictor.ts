@@ -24,6 +24,7 @@ import {
   BONUS_NAMES,
 } from "./decisionEngine";
 import type { PhysicsSnapshot } from "./videoPhysicsHistory";
+import { isPhysicallyMoving, countPhysicallyMovingFrames } from "./videoPhysicsHistory";
 
 // ============================================================
 // 54-SECTOR PHYSICAL ORDER (Evolution Crazy Time wheel)
@@ -109,10 +110,10 @@ export function predictStoppingAngle(
   const MODEL_VERSION = "video-physics-v2.4";
 
   // HARD ASSERTION: filter to ONLY snapshots at or before lock timestamp
-  // OPTIMIZATION: only use the last 50 snapshots (not thousands) to keep it fast
+  // OPTIMIZATION: only use the last 100 snapshots (not thousands) to keep it fast
   const validSnapshots = snapshots
     .filter((s) => s.timestamp <= lockTimestamp)
-    .slice(-50);
+    .slice(-100);
 
   if (validSnapshots.length === 0) {
     return invalidPrediction(lockTimestamp, "No snapshots at or before lock time", MODEL_VERSION);
@@ -505,11 +506,23 @@ export function runPhysicsValidation(
     if (!spin.physicalSpinStop || !spin.actualOutcome) continue;
     if (!spin.physicalSpinStart) continue;
 
-    // Determine movementStart: from spin.movementStart or first MOVING snapshot
+    // Determine movementStart: from spin.movementStart or first physically-moving snapshot
     const spinSnapshots = spin.preResultSnapshots ?? spin.snapshots;
-    const movementStart = spin.movementStart
-      ?? spinSnapshots.find((s) => s.movementState === "MOVING")?.timestamp
-      ?? spin.physicalSpinStart;
+    let movementStart: number;
+    if (spin.movementStart) {
+      movementStart = spin.movementStart;
+    } else {
+      // Find first snapshot where isPhysicallyMoving returns true
+      let found = spinSnapshots[0]?.timestamp ?? spin.physicalSpinStart;
+      for (let i = 0; i < spinSnapshots.length; i++) {
+        const prev = i > 0 ? spinSnapshots[i - 1] : null;
+        if (isPhysicallyMoving(spinSnapshots[i], prev)) {
+          found = spinSnapshots[i].timestamp;
+          break;
+        }
+      }
+      movementStart = found;
+    }
     const spinDuration = (spin.physicalSpinStop - spin.physicalSpinStart) / 1000;
     const movementDelay = (movementStart - spin.physicalSpinStart) / 1000;
 
@@ -561,13 +574,16 @@ export function runPhysicsValidation(
 
       // Check if lock point is BEFORE the spin started
       // This is NOT a leakage violation — it's just INSUFFICIENT (no movement yet)
+      // V2.5B: STOP lock points that fall before movementStart are BEFORE_SPIN,
+      // NOT POST_STOP violations.
       const isBeforeSpin = lockTs < movementStart;
 
       // Get snapshots at or before lockTs
       const preLockSnapshots = spinSnapshots.filter((s) => s.timestamp <= lockTs);
 
-      // Count moving frames
-      const movingFrames = preLockSnapshots.filter((s) => s.movementState === "MOVING").length;
+      // V2.5B: Use multi-signal movement detector (not just movementState)
+      // This catches more moving frames than the single-threshold movementState
+      const movingFrames = countPhysicallyMovingFrames(preLockSnapshots);
 
       // Get latest tracking confidence
       const latestSnapshot = preLockSnapshots[preLockSnapshots.length - 1];

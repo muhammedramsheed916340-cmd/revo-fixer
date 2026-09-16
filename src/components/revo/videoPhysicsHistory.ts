@@ -33,11 +33,128 @@ export interface PhysicsSnapshot {
   isTracking: boolean;
   calibrationStable: boolean;
   movementState: MovementState;
+  profDiff: number; // profile difference between consecutive frames
+  signalAgreement: number; // 0..1 FFT phase correlation confidence
 }
 
 // ============================================================
-// PHYSICAL SPIN DETECTION
+// MULTI-SIGNAL MOVEMENT DETECTOR (V2.5B)
 // ============================================================
+// Instead of relying solely on movementState === "MOVING" (which depends
+// on a single velocity threshold), we use multiple independent signals:
+//
+//   A. |velocityRaw| >= velocity threshold (50°/s)
+//   B. profDiff >= adaptive noise threshold (noiseMedian + K * noiseMAD)
+//   C. angle change across consecutive frames (multi-frame)
+//   D. phase-correlation confidence (signalAgreement)
+//
+// Evidence combination: require at least 2 independent signals to agree.
+// This is more robust than any single signal.
+
+// Noise baseline estimation (while wheel is stopped)
+let noiseBaseline: { median: number; mad: number; p95: number } | null = null;
+const NOISE_BASELINE_SIZE = 100; // frames to estimate baseline
+let noiseProfDiffs: number[] = [];
+
+/**
+ * Estimate noise baseline from stopped-wheel frames.
+ * Called periodically to update the adaptive threshold.
+ */
+function updateNoiseBaseline(): void {
+  if (snapshotBuffer.length < NOISE_BASELINE_SIZE) return;
+
+  // Take the last N frames that are STOPPED (low velocity)
+  const stoppedFrames = snapshotBuffer
+    .filter((s) => Math.abs(s.velocityRaw) < 10 && s.profDiff > 0)
+    .slice(-NOISE_BASELINE_SIZE);
+
+  if (stoppedFrames.length < 20) return;
+
+  const diffs = stoppedFrames.map((s) => s.profDiff).sort((a, b) => a - b);
+  const median = diffs[Math.floor(diffs.length / 2)];
+  const mad = diffs.map((d) => Math.abs(d - median)).sort((a, b) => a - b)[Math.floor(diffs.length / 2)];
+  const p95 = diffs[Math.floor(diffs.length * 0.95)];
+
+  noiseBaseline = { median, mad, p95 };
+}
+
+/**
+ * FROZEN K value for adaptive threshold (set BEFORE validation).
+ * profDiff > noiseMedian + K * noiseMAD → evidence of movement.
+ */
+const PROF_DIFF_K = 5.0;
+
+/**
+ * Multi-signal movement detector.
+ * Returns true if at least 2 independent signals indicate movement.
+ */
+export function isPhysicallyMoving(snapshot: PhysicsSnapshot, prevSnapshot: PhysicsSnapshot | null): boolean {
+  let evidenceCount = 0;
+
+  // Signal A: Raw velocity exceeds threshold
+  const velEvidence = Math.abs(snapshot.velocityRaw) >= 50;
+  if (velEvidence) evidenceCount++;
+
+  // Signal B: profDiff exceeds adaptive noise threshold
+  if (noiseBaseline && snapshot.profDiff > 0) {
+    const threshold = noiseBaseline.median + PROF_DIFF_K * noiseBaseline.mad;
+    if (snapshot.profDiff > threshold) {
+      evidenceCount++;
+    }
+  } else if (snapshot.profDiff > 15) {
+    // Fallback when no noise baseline (K * MAD not yet estimated)
+    evidenceCount++;
+  }
+
+  // Signal C: Angle change across consecutive frames
+  if (prevSnapshot) {
+    const dt = (snapshot.timestamp - prevSnapshot.timestamp) / 1000;
+    if (dt > 0 && dt < 0.5) {
+      const angleChange = Math.abs(snapshot.angle - prevSnapshot.angle);
+      // If angle changed more than 2° in one frame, that's evidence of movement
+      if (angleChange > 2) {
+        evidenceCount++;
+      }
+    }
+  }
+
+  // Signal D: Phase correlation confidence (signalAgreement)
+  if (snapshot.signalAgreement > 0.3 && Math.abs(snapshot.velocityRaw) > 5) {
+    evidenceCount++;
+  }
+
+  // Require at least 2 independent signals
+  return evidenceCount >= 2;
+}
+
+/**
+ * Count "physically moving" frames in a snapshot array.
+ * Uses the multi-signal detector, not just movementState.
+ */
+export function countPhysicallyMovingFrames(snapshots: PhysicsSnapshot[]): number {
+  let count = 0;
+  for (let i = 0; i < snapshots.length; i++) {
+    const prev = i > 0 ? snapshots[i - 1] : null;
+    if (isPhysicallyMoving(snapshots[i], prev)) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Get noise baseline statistics (for UI display).
+ */
+export function getNoiseBaseline(): { median: number; mad: number; p95: number; threshold: number } | null {
+  if (!noiseBaseline) return null;
+  return {
+    ...noiseBaseline,
+    threshold: noiseBaseline.median + PROF_DIFF_K * noiseBaseline.mad,
+  };
+}
+
+// Periodically update noise baseline (every 500 snapshots)
+let noiseUpdateCounter = 0;
 
 export type SpinPhase =
   | "IDLE" // no spin detected
@@ -168,6 +285,8 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
     isTracking: physics.isTracking,
     calibrationStable: physics.calibrationStable,
     movementState,
+    profDiff: physics.profDiff ?? 0,
+    signalAgreement: physics.signalAgreement ?? 0,
   };
 
   snapshotBuffer.push(snapshot);
@@ -175,17 +294,29 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
     snapshotBuffer.shift();
   }
 
+  // Periodically update noise baseline (every 500 frames)
+  noiseUpdateCounter++;
+  if (noiseUpdateCounter >= 500) {
+    noiseUpdateCounter = 0;
+    updateNoiseBaseline();
+  }
+
   // ---- Physical spin state machine (simplified for noisy data) ----
+  //
+  // V2.5B: Uses multi-signal movement detector (isPhysicallyMoving) instead
+  // of just movementState === "MOVING". This catches more moving frames.
   //
   // The phase correlation at high speeds produces intermittent results
   // (alternating MOVING/STOPPED frames). Instead of requiring sustained
   // movement + angle stability, we use:
-  //   1. Spin start: any STOPPED→MOVING transition
-  //   2. Physical stop: no MOVING frames for STOP_TIME_THRESHOLD (5s)
-  //
-  // This is robust to brief gaps in tracking during fast rotation.
+  //   1. Spin start: any isPhysicallyMoving() transition
+  //   2. Physical stop: no isPhysicallyMoving() for STOP_TIME_THRESHOLD (5s)
 
-  if (movementState === "MOVING") {
+  // Get the previous snapshot for multi-signal movement detection
+  const prevSnap = snapshotBuffer.length > 1 ? snapshotBuffer[snapshotBuffer.length - 2] : null;
+  const isMoving = isPhysicallyMoving(snapshot, prevSnap);
+
+  if (isMoving) {
     lastMovementTime = snapshot.timestamp;
     if (!currentSpin) {
       // SPIN START detected
@@ -248,10 +379,11 @@ export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
         if (timeSinceMovement > STOP_TIME_THRESHOLD + 10000) {
           // Save pre-result snapshots for validation (60s window before stop)
           // These are frozen at spin completion time — no future data enters
+          // V2.5B: increased to 300 snapshots (was 100) for better coverage
           const stopTs = currentSpin.physicalSpinStop!;
           currentSpin.preResultSnapshots = snapshotBuffer
             .filter((s) => s.timestamp >= stopTs - 60000 && s.timestamp <= stopTs)
-            .slice(-100); // limit for memory
+            .slice(-300); // increased for better moving-frame coverage
 
           currentSpin.spinPhase = "SETTLED";
           completedSpins.push(currentSpin);

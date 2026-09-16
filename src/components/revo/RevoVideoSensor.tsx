@@ -43,6 +43,7 @@ export interface WheelPhysicsState {
   signalA?: number; // phase correlation shift (deg)
   signalB?: number; // optical flow shift (deg)
   signalAgreement?: number; // 0..1
+  profDiff?: number; // profile difference (brightness change between frames)
 }
 
 let currentPhysics: WheelPhysicsState | null = null;
@@ -952,6 +953,7 @@ export function RevoVideoSensor() {
           signalA: sigA.shift,
           signalB: sigB.shift,
           signalAgreement: agreement,
+          profDiff,
         };
         notifyPhysics();
 
