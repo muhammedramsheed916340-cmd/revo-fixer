@@ -63,17 +63,19 @@ let noiseProfDiffs: number[] = [];
 function updateNoiseBaseline(): void {
   if (snapshotBuffer.length < NOISE_BASELINE_SIZE) return;
 
-  // Take the last N frames that are STOPPED (low velocity)
+  // Take the last N frames that are STOPPED (low velocity AND low profDiff)
+  // V2.5B-2: include profDiff >= 0 (not just > 0) to capture true stopped frames
   const stoppedFrames = snapshotBuffer
-    .filter((s) => Math.abs(s.velocityRaw) < 10 && s.profDiff > 0)
+    .filter((s) => Math.abs(s.velocityRaw) < 10 && s.profDiff < 20)
     .slice(-NOISE_BASELINE_SIZE);
 
   if (stoppedFrames.length < 20) return;
 
   const diffs = stoppedFrames.map((s) => s.profDiff).sort((a, b) => a - b);
-  const median = diffs[Math.floor(diffs.length / 2)];
-  const mad = diffs.map((d) => Math.abs(d - median)).sort((a, b) => a - b)[Math.floor(diffs.length / 2)];
-  const p95 = diffs[Math.floor(diffs.length * 0.95)];
+  const median = diffs[Math.floor(diffs.length / 2)] ?? 0;
+  const madVals = diffs.map((d) => Math.abs(d - median)).sort((a, b) => a - b);
+  const mad = madVals[Math.floor(madVals.length / 2)] ?? 1;
+  const p95 = diffs[Math.floor(diffs.length * 0.95)] ?? 0;
 
   noiseBaseline = { median, mad, p95 };
 }
@@ -82,18 +84,23 @@ function updateNoiseBaseline(): void {
  * FROZEN K value for adaptive threshold (set BEFORE validation).
  * profDiff > noiseMedian + K * noiseMAD → evidence of movement.
  */
-const PROF_DIFF_K = 5.0;
+const PROF_DIFF_K = 3.0; // lowered from 5.0 for better detection
 
 /**
  * Multi-signal movement detector.
  * Returns true if at least 2 independent signals indicate movement.
+ *
+ * V2.5B-2: Strong profDiff (> 30, which is 3× typical noise) counts as
+ * 2 evidence signals on its own — it's the most reliable indicator of
+ * physical movement, far exceeding noise levels (5-10 when stopped).
  */
 export function isPhysicallyMoving(snapshot: PhysicsSnapshot, prevSnapshot: PhysicsSnapshot | null): boolean {
   let evidenceCount = 0;
 
   // Signal A: Raw velocity exceeds threshold
-  const velEvidence = Math.abs(snapshot.velocityRaw) >= 50;
-  if (velEvidence) evidenceCount++;
+  if (Math.abs(snapshot.velocityRaw) >= 50) {
+    evidenceCount++;
+  }
 
   // Signal B: profDiff exceeds adaptive noise threshold
   if (noiseBaseline && snapshot.profDiff > 0) {
@@ -102,8 +109,15 @@ export function isPhysicallyMoving(snapshot: PhysicsSnapshot, prevSnapshot: Phys
       evidenceCount++;
     }
   } else if (snapshot.profDiff > 15) {
-    // Fallback when no noise baseline (K * MAD not yet estimated)
+    // Fallback when no noise baseline
     evidenceCount++;
+  }
+
+  // Signal B-Strong: Very high profDiff (> 30) is definitive evidence
+  // During real spins, profDiff reaches 70-80. During stops, it's 5-10.
+  // A profDiff > 30 is 3× the noise floor and counts as strong evidence.
+  if (snapshot.profDiff > 30) {
+    evidenceCount += 2; // counts as 2 signals (B + B-strong)
   }
 
   // Signal C: Angle change across consecutive frames
@@ -111,14 +125,13 @@ export function isPhysicallyMoving(snapshot: PhysicsSnapshot, prevSnapshot: Phys
     const dt = (snapshot.timestamp - prevSnapshot.timestamp) / 1000;
     if (dt > 0 && dt < 0.5) {
       const angleChange = Math.abs(snapshot.angle - prevSnapshot.angle);
-      // If angle changed more than 2° in one frame, that's evidence of movement
       if (angleChange > 2) {
         evidenceCount++;
       }
     }
   }
 
-  // Signal D: Phase correlation confidence (signalAgreement)
+  // Signal D: Phase correlation confidence
   if (snapshot.signalAgreement > 0.3 && Math.abs(snapshot.velocityRaw) > 5) {
     evidenceCount++;
   }

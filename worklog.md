@@ -8962,3 +8962,102 @@ the matching should work automatically.
 - `46d3e71` — V2.2 physical timeline (state machine, sync report, UI)
 - `3a61800` — V2.2 spin detection working (threshold fix, raw velocity)
 - `1a50df5` — V2.2 velocityRaw stored in snapshots
+
+---
+Task ID: api-audit
+Agent: subagent
+Task: Build API exploitation analysis module
+
+Work Log:
+- Read worklog.md for context: identified Crazy Time live feed (CasinoScores upstream behind Cloudflare, REST-only, 403 for headless), Firebase RTDB (public-read rules), admin PIN bypass (8950888988), liveResultsBus dedup (sector-time Set, last 100 keys), recentFetchPromise coalescing, statsCache 15s TTL, polling cadence 1.5s in RevoLiveResults.tsx.
+- Mapped all 19 endpoints in /api/* by inspecting route.ts files: crazy-time (recent+stats), app-settings, packages, payment-methods, testimonials, stats, online-users, notifications, activity, revenue, verify-license, verify-admin, admin-data, user, generate-keys, video-proxy, export-pdf, export-csv. Marked POST mutations (verify-license, verify-admin, generate-keys) as probe:false so the audit is read-only.
+- Built /home/z/my-project/src/components/revo/apiAudit.ts (~640 lines) exporting:
+  * Types: ApiEndpointInfo, ApiAuditReport, BypassAnalysisResult (+ supporting: ApiDataSource, AuthorizationStatus, HttpMethod, CachingInfo, DuplicateDetectionInfo, LatencySample, ApiLatencyStats, RunApiAuditOptions, GetApiLatencyStatsOptions).
+  * `runApiAudit(opts)` → ApiAuditReport. Probes every endpoint in KNOWN_ENDPOINTS, collects latency samples (default 5 per multiSample endpoint), extracts round metadata (settledAt, roundId) for the crazy-time recent endpoint, computes featureTimestamp (response arrival), availabilityTimestamp (settledAt from upstream), deliveryLagMs (source→app), stale detection (5-min threshold), per-endpoint caching/dedup metadata, and a roll-up summary (public/authed/admin/cache/dedup counts).
+  * `getApiLatencyStats(opts)` → ApiLatencyStats. Focused probe of /api/crazy-time?type=recent&size=30&duration=24 (default 8 samples, 1500ms cadence matching app polling). Returns min/max/mean/median/p95/p99/stdDev, deliveryLagMs stats, staleResponseCount, lastSampleAt, samplesList.
+  * KNOWN_ENDPOINTS (19 entries), KNOWN_BYPASS_PROTECTIONS (7 entries), STALE_RESPONSE_THRESHOLD_MS constant re-exports.
+- BYPASS ANALYSIS (DIAGNOSTIC ONLY): documented Cloudflare + UA-filter + Origin/Referer-filter + bot-detection on the CasinoScores upstream, authorization on Firebase RTDB + admin endpoints, unknown on the video-proxy. For each: recorded protectionType, statusCode, latencyMs, reason, legitimateAccessAvailable=true, legitimateAccessDescription (the Next.js route adds required headers server-side; admin PIN 8950888988 is a documented legitimate access path), and diagnosticOnly:true. The audit optionally probes the upstream DIRECTLY WITHOUT the legitimate headers (probeUpstreamDirectly:true) purely to confirm the protection exists — the probe is expected to fail (403/challenge) and never attempts to circumvent. NO bypass/circumvention/evasion is implemented anywhere in the module.
+- Added prominent DIAGNOSTIC ONLY notice in the file header, on each BypassAnalysisResult (diagnosticOnly:true), and in the returned ApiAuditReport.diagnosticOnlyNotice.
+- Verified: `bunx eslint src/components/revo/apiAudit.ts` → 0 errors. `bunx tsc --noEmit` → no errors attributable to apiAudit.ts (all reported errors are pre-existing in other files). Smoke-tested imports via bun: 5 exports present (runApiAudit, getApiLatencyStats, KNOWN_ENDPOINTS[19], KNOWN_BYPASS_PROTECTIONS[7], STALE_RESPONSE_THRESHOLD_MS), both functions are async.
+
+Stage Summary:
+- New module at /home/z/my-project/src/components/revo/apiAudit.ts provides a complete read-only audit of all 19 API endpoints the Revo Fixer app uses.
+- Crazy Time live feed is the primary audit target: latency samples + delivery-lag (source→app) + stale-response detection + round-id extraction (sector-settledAt).
+- Bypass analysis confirms 4 protection layers on the CasinoScores upstream (Cloudflare, UA filter, Origin/Referer filter, bot-detection) and authorization on Firebase RTDB + admin endpoints — all with legitimate access already available through the existing Next.js proxy routes (no circumvention needed or implemented).
+- Module is purely diagnostic; it documents what protections exist and how the app legitimately accesses the data, without implementing any bypass.
+- Exports: `runApiAudit()`, `getApiLatencyStats()`, and types `ApiEndpointInfo`, `ApiAuditReport`, `BypassAnalysisResult` (+ helpers KNOWN_ENDPOINTS, KNOWN_BYPASS_PROTECTIONS, STALE_RESPONSE_THRESHOLD_MS).
+
+---
+Task ID: ml-model
+Agent: subagent
+Task: Build ML model module
+
+Work Log:
+- Read worklog.md context and existing revo modules (videoPhysicsPredictor, videoPhysicsHistory, fusionEngine, decisionEngine, aiStats) to understand PhysicsSnapshot + SpinData + GAMES outcome conventions.
+- Designed ML module surface to satisfy the requested exports:
+    * `trainMLModel(spinData)` — trains and stores singleton model, returns MLModelStats
+    * `predictML(features)` — uses singleton; returns 8 probabilities (uniform fallback if untrained)
+    * `extractFeatures(snapshots, history, lockTimestamp?, spinStartTimestamp?)` — pre-lock feature builder
+    * Types: MLFeatures, MLPrediction, MLModelStats, MLModel, MLSpinSample
+- Implemented at /home/z/my-project/src/components/revo/mlModel.ts (1379 lines, pure TypeScript, type-only imports from sibling modules).
+- Feature extraction covers all requested groups:
+    * Physics (18 features): angle, raw/smoothed velocity, |velocity|, acceleration, deceleration,
+      movement duration, spin duration, predicted stop angle, predicted sector, angular uncertainty,
+      tracking confidence, signal agreement, calibration stable, direction, moving/tracking frame ratios,
+      distance to nearest bonus sector.
+    * History (17 features): 8 outcome frequencies, 8-dim one-hot last outcome, log-scaled history count.
+    * Transition (8 features): empirical P(next = k | last outcome) per outcome.
+    * Context (4 features): spin duration, sin/cos time-of-day, recent-movement rate.
+  TOTAL = 47 features (FEATURE_NAMES list documents exact ordering).
+- Implemented logistic regression from scratch (no external ML library):
+    * `BinaryLogisticRegression` class with `weights` + `bias`, `predictProb(x)` = sigmoid(w·x+b).
+    * Batch gradient descent with L2 regularization (lambda = 0.01, lr = 0.1, epochs = 300).
+    * 8 one-vs-rest classifiers trained independently. Predictions normalized to sum to 1.
+- Feature standardization: mean/std computed on TRAINING set only (no leakage). Applied to both
+  train and validation, and at inference. Eps guard prevents /0.
+- Chronological walk-forward split: samples sorted by lockTimestamp ascending (NEVER shuffled),
+  first 70% → train, last 30% → validation. Verified with a smoke test that re-running with
+  reversed input order produces bit-identical classifier weights.
+- Leakage guarantees (all enforced structurally):
+    * `extractFeatures()` hard-filters snapshots with timestamp > lockTimestamp and history
+      spins with settledAt > lockTimestamp.
+    * `assertNoLeakage()` exported for callers/tests to verify.
+    * Training never shuffles; chronological split mirrors realistic deployment.
+- Insufficient-data fallback: if samples < MIN_SAMPLES (20) or no class has ≥ MIN_POSITIVES_PER_CLASS (2)
+  positive examples, model is marked `trained: false` and `predictML()` returns uniform 1/8
+  probabilities with `isFallback: true`.
+- Built /home/z/my-project/tests/revo/ml-model-smoke.test.ts (15 tests covering: type/constants,
+  extractFeatures + leakage filter, train/predict end-to-end, chronological split determinism,
+  never-shuffle property, finite/normalized probabilities, fallback path, assertNoLeakage).
+- Verified: `bun test tests/revo/ml-model-smoke.test.ts` → 15/15 pass (129 expect() calls, 237ms).
+- Verified: `npx tsc --noEmit` shows zero errors originating from mlModel.ts (pre-existing errors in
+  other project files remain untouched).
+- Verified: `npx eslint src/components/revo/mlModel.ts` → clean (no warnings, no errors).
+
+Stage Summary:
+- New file: /home/z/my-project/src/components/revo/mlModel.ts (1379 lines, pure TS, no external ML deps).
+- New test: /home/z/my-project/tests/revo/ml-model-smoke.test.ts (15 passing tests).
+- Exports delivered:
+    * Constants: ML_MODEL_VERSION, OUTCOME_NAMES, PHYSICAL_ORDER_54, SECTOR_WIDTH, FEATURE_NAMES,
+      NUM_FEATURES, MIN_SAMPLES.
+    * Types: MLFeatures, MLPrediction, MLModelStats, MLModel, MLSpinSample.
+    * Functions: trainMLModel, predictML, predictWithModel, extractFeatures, featuresToVector,
+      uniformPrediction, resetMLModel, getMLModel, assertNoLeakage.
+- Architecture:
+    * 8 binary one-vs-rest logistic regressions.
+    * Batch gradient descent (lr=0.1, epochs=300) with L2 (lambda=0.01).
+    * Standardization (mean/std from TRAIN set only, eps-guarded).
+    * Chronological 70/30 walk-forward split; never shuffles.
+    * Singleton model state (set by trainMLModel, read by predictML).
+- Feature vector: 47 dims (18 physics + 17 history + 8 transition + 4 context), each pre-scaled
+  to roughly [-1, 1] or [0, 1] then standardized.
+- Leakage: structural guards in extractFeatures + chronological split + train-only standardizer.
+  assertNoLeakage() exported for runtime verification.
+- Fallback: returns uniform 1/8 probabilities with isFallback=true when (a) samples < 20,
+  (b) no class has ≥2 positives, or (c) trainedModel is null.
+- Next actions:
+    * Wire extractFeatures → predictML into a live spin pipeline alongside videoPhysicsPredictor
+      and fusionEngine when a sufficient labelled dataset (≥20 spins with video) is available.
+    * Add an ML arm to the A/B/C/D fusion benchmark (Arm E: ML-only, Arm F: ML+physics fusion)
+      to measure whether logistic regression adds value above the existing C1–C9 engine.
+    * Consider persisting the trained MLModel (JSON) so trained weights survive page reloads.

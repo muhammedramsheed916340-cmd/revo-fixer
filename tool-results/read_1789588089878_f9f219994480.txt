@@ -1,0 +1,842 @@
+     1→/**
+     2→ * VIDEO PHYSICS HISTORY COLLECTOR V2.2
+     3→ * =====================================
+     4→ *
+     5→ * CRITICAL FIX (V2.2): The API result timestamp is NOT the physical wheel-stop
+     6→ * timestamp. Observed API delay: avg 52.8s, max 112.7s.
+     7→ *
+     8→ * Therefore, we now derive the physical timeline from VIDEO TELEMETRY:
+     9→ *   - SPIN START: STOPPED → MOVING transition
+    10→ *   - SPINNING: velocity > threshold
+    11→ *   - DECELERATION: velocity decreasing
+    12→ *   - NEAR STOP: velocity approaching zero
+    13→ *   - PHYSICAL STOP: velocity near zero AND angle stable for N frames
+    14→ *
+    15→ * Lock points (T-20, T-15, T-10, T-5) are now relative to PHYSICAL STOP,
+    16→ * NOT API settlement time.
+    17→ *
+    18→ * The buffer is increased to handle 112s+ API delays (20 min = 24000 snapshots).
+    19→ */
+    20→
+    21→import type { WheelPhysicsState } from "./RevoVideoSensor";
+    22→
+    23→export type MovementState = "STOPPED" | "MOVING" | "UNKNOWN";
+    24→
+    25→export interface PhysicsSnapshot {
+    26→  timestamp: number; // ms epoch
+    27→  angle: number; // unwrapped, continuous (degrees)
+    28→  velocity: number; // deg/s (filtered/smoothed)
+    29→  velocityRaw: number; // deg/s (raw, unsmoothed — used for movement detection)
+    30→  acceleration: number; // deg/s²
+    31→  confidence: number; // 0..1
+    32→  direction: 1 | -1;
+    33→  isTracking: boolean;
+    34→  calibrationStable: boolean;
+    35→  movementState: MovementState;
+    36→  profDiff: number; // profile difference between consecutive frames
+    37→  signalAgreement: number; // 0..1 FFT phase correlation confidence
+    38→}
+    39→
+    40→// ============================================================
+    41→// MULTI-SIGNAL MOVEMENT DETECTOR (V2.5B)
+    42→// ============================================================
+    43→// Instead of relying solely on movementState === "MOVING" (which depends
+    44→// on a single velocity threshold), we use multiple independent signals:
+    45→//
+    46→//   A. |velocityRaw| >= velocity threshold (50°/s)
+    47→//   B. profDiff >= adaptive noise threshold (noiseMedian + K * noiseMAD)
+    48→//   C. angle change across consecutive frames (multi-frame)
+    49→//   D. phase-correlation confidence (signalAgreement)
+    50→//
+    51→// Evidence combination: require at least 2 independent signals to agree.
+    52→// This is more robust than any single signal.
+    53→
+    54→// Noise baseline estimation (while wheel is stopped)
+    55→let noiseBaseline: { median: number; mad: number; p95: number } | null = null;
+    56→const NOISE_BASELINE_SIZE = 100; // frames to estimate baseline
+    57→let noiseProfDiffs: number[] = [];
+    58→
+    59→/**
+    60→ * Estimate noise baseline from stopped-wheel frames.
+    61→ * Called periodically to update the adaptive threshold.
+    62→ */
+    63→function updateNoiseBaseline(): void {
+    64→  if (snapshotBuffer.length < NOISE_BASELINE_SIZE) return;
+    65→
+    66→  // Take the last N frames that are STOPPED (low velocity AND low profDiff)
+    67→  // V2.5B-2: include profDiff >= 0 (not just > 0) to capture true stopped frames
+    68→  const stoppedFrames = snapshotBuffer
+    69→    .filter((s) => Math.abs(s.velocityRaw) < 10 && s.profDiff < 20)
+    70→    .slice(-NOISE_BASELINE_SIZE);
+    71→
+    72→  if (stoppedFrames.length < 20) return;
+    73→
+    74→  const diffs = stoppedFrames.map((s) => s.profDiff).sort((a, b) => a - b);
+    75→  const median = diffs[Math.floor(diffs.length / 2)] ?? 0;
+    76→  const madVals = diffs.map((d) => Math.abs(d - median)).sort((a, b) => a - b);
+    77→  const mad = madVals[Math.floor(madVals.length / 2)] ?? 1;
+    78→  const p95 = diffs[Math.floor(diffs.length * 0.95)] ?? 0;
+    79→
+    80→  noiseBaseline = { median, mad, p95 };
+    81→}
+    82→
+    83→/**
+    84→ * FROZEN K value for adaptive threshold (set BEFORE validation).
+    85→ * profDiff > noiseMedian + K * noiseMAD → evidence of movement.
+    86→ */
+    87→const PROF_DIFF_K = 3.0; // lowered from 5.0 for better detection
+    88→
+    89→/**
+    90→ * Multi-signal movement detector.
+    91→ * Returns true if at least 2 independent signals indicate movement.
+    92→ *
+    93→ * V2.5B-2: Strong profDiff (> 30, which is 3× typical noise) counts as
+    94→ * 2 evidence signals on its own — it's the most reliable indicator of
+    95→ * physical movement, far exceeding noise levels (5-10 when stopped).
+    96→ */
+    97→export function isPhysicallyMoving(snapshot: PhysicsSnapshot, prevSnapshot: PhysicsSnapshot | null): boolean {
+    98→  let evidenceCount = 0;
+    99→
+   100→  // Signal A: Raw velocity exceeds threshold
+   101→  if (Math.abs(snapshot.velocityRaw) >= 50) {
+   102→    evidenceCount++;
+   103→  }
+   104→
+   105→  // Signal B: profDiff exceeds adaptive noise threshold
+   106→  if (noiseBaseline && snapshot.profDiff > 0) {
+   107→    const threshold = noiseBaseline.median + PROF_DIFF_K * noiseBaseline.mad;
+   108→    if (snapshot.profDiff > threshold) {
+   109→      evidenceCount++;
+   110→    }
+   111→  } else if (snapshot.profDiff > 15) {
+   112→    // Fallback when no noise baseline
+   113→    evidenceCount++;
+   114→  }
+   115→
+   116→  // Signal B-Strong: Very high profDiff (> 30) is definitive evidence
+   117→  // During real spins, profDiff reaches 70-80. During stops, it's 5-10.
+   118→  // A profDiff > 30 is 3× the noise floor and counts as strong evidence.
+   119→  if (snapshot.profDiff > 30) {
+   120→    evidenceCount += 2; // counts as 2 signals (B + B-strong)
+   121→  }
+   122→
+   123→  // Signal C: Angle change across consecutive frames
+   124→  if (prevSnapshot) {
+   125→    const dt = (snapshot.timestamp - prevSnapshot.timestamp) / 1000;
+   126→    if (dt > 0 && dt < 0.5) {
+   127→      const angleChange = Math.abs(snapshot.angle - prevSnapshot.angle);
+   128→      if (angleChange > 2) {
+   129→        evidenceCount++;
+   130→      }
+   131→    }
+   132→  }
+   133→
+   134→  // Signal D: Phase correlation confidence
+   135→  if (snapshot.signalAgreement > 0.3 && Math.abs(snapshot.velocityRaw) > 5) {
+   136→    evidenceCount++;
+   137→  }
+   138→
+   139→  // Require at least 2 independent signals
+   140→  return evidenceCount >= 2;
+   141→}
+   142→
+   143→/**
+   144→ * Count "physically moving" frames in a snapshot array.
+   145→ * Uses the multi-signal detector, not just movementState.
+   146→ */
+   147→export function countPhysicallyMovingFrames(snapshots: PhysicsSnapshot[]): number {
+   148→  let count = 0;
+   149→  for (let i = 0; i < snapshots.length; i++) {
+   150→    const prev = i > 0 ? snapshots[i - 1] : null;
+   151→    if (isPhysicallyMoving(snapshots[i], prev)) {
+   152→      count++;
+   153→    }
+   154→  }
+   155→  return count;
+   156→}
+   157→
+   158→/**
+   159→ * Get noise baseline statistics (for UI display).
+   160→ */
+   161→export function getNoiseBaseline(): { median: number; mad: number; p95: number; threshold: number } | null {
+   162→  if (!noiseBaseline) return null;
+   163→  return {
+   164→    ...noiseBaseline,
+   165→    threshold: noiseBaseline.median + PROF_DIFF_K * noiseBaseline.mad,
+   166→  };
+   167→}
+   168→
+   169→// Periodically update noise baseline (every 500 snapshots)
+   170→let noiseUpdateCounter = 0;
+   171→
+   172→export type SpinPhase =
+   173→  | "IDLE" // no spin detected
+   174→  | "SPIN_DETECTED" // wheel just started moving
+   175→  | "TRACKING" // wheel spinning at speed
+   176→  | "DECELERATION" // wheel slowing down
+   177→  | "PREDICTION_WINDOW" // near stop, prediction should be locked
+   178→  | "PHYSICAL_STOP" // wheel stopped
+   179→  | "SETTLED"; // API result arrived
+   180→
+   181→export interface PhysicalSpin {
+   182→  spinId: string; // generated when spin starts
+   183→  experimentSessionId: string; // which experiment session this spin belongs to
+   184→  physicalSpinStart: number | null; // ms epoch (STOPPED→MOVING transition)
+   185→  physicalSpinStop: number | null; // ms epoch (velocity→0 + angle stable)
+   186→  movementStart: number | null; // ms epoch (first MOVING frame)
+   187→  physicalStopConfidence: number; // 0..1
+   188→  spinPhase: SpinPhase;
+   189→  // Velocity profile
+   190→  maxVelocity: number;
+   191→  // Tracking quality during spin
+   192→  trackingFrameCount: number;
+   193→  totalFrameCount: number;
+   194→  // Pre-result snapshots (saved at completion time for validation)
+   195→  // These are the snapshots from [physicalSpinStop - 60s, physicalSpinStop]
+   196→  preResultSnapshots: PhysicsSnapshot[];
+   197→  // API match (filled when API result arrives)
+   198→  apiResultTimestamp: number | null;
+   199→  apiDelay: number | null; // apiResultTimestamp - physicalSpinStop
+   200→  actualOutcome: string | null;
+   201→  actualSector: number | null;
+   202→  // All snapshots during the spin
+   203→  snapshots: PhysicsSnapshot[];
+   204→}
+   205→
+   206→// State machine for physical spin detection
+   207→let currentSpin: PhysicalSpin | null = null;
+   208→let completedSpins: PhysicalSpin[] = [];
+   209→
+   210→// Experiment session ID — regenerated on every hard reset
+   211→// A spin from an older session MUST NEVER enter the current validation
+   212→let experimentSessionId: string = generateExperimentSessionId();
+   213→
+   214→function generateExperimentSessionId(): string {
+   215→  try {
+   216→    return crypto.randomUUID();
+   217→  } catch {
+   218→    return `exp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+   219→  }
+   220→}
+   221→
+   222→export function getExperimentSessionId(): string {
+   223→  return experimentSessionId;
+   224→}
+   225→
+   226→// Stop detection — simplified for noisy high-speed data
+   227→// Real Crazy Time spins produce 500-2000°/s. Video compression noise
+   228→// produces 20-100°/s. We set the threshold at 50°/s — lower than before
+   229→// because the FFT phase correlation misses some frames during fast rotation,
+   230→// and we need at least 3 moving frames for the physics model.
+   231→const STOP_VELOCITY_THRESHOLD = 50; // deg/s — below this = "not a real spin"
+   232→const STOP_TIME_THRESHOLD = 5000; // ms — no real movement for 5s = physical stop
+   233→let lastMovementTime: number | null = null; // last time we saw MOVING
+   234→let lastAngle: number | null = null;
+   235→let lastMovementState: MovementState = "STOPPED";
+   236→
+   237→// Increased buffer: 20 min at 20fps = 24000 snapshots
+   238→const MAX_SNAPSHOTS = 24000;
+   239→let snapshotBuffer: PhysicsSnapshot[] = [];
+   240→const bufferListeners = new Set<() => void>();
+   241→
+   242→// Sector-map observations
+   243→interface SectorObservation {
+   244→  outcome: string;
+   245→  sectorIndex: number | null;
+   246→  angle: number | null;
+   247→  timestamp: number;
+   248→  spinId: string;
+   249→}
+   250→let sectorObservations: SectorObservation[] = [];
+   251→
+   252→/**
+   253→ * Classify movement state from a physics snapshot.
+   254→ * Uses RAW velocity (not smoothed) — the smoothed median stays at 0
+   255→ * when the wheel briefly spins (1-2 frames out of 5), causing missed
+   256→ * movement detection.
+   257→ */
+   258→function classifyMovement(physics: {
+   259→  velocity: number;
+   260→  velocityRaw?: number;
+   261→  isTracking: boolean;
+   262→  confidence: number;
+   263→}): MovementState {
+   264→  if (!physics.isTracking || physics.confidence < 0.1) return "UNKNOWN";
+   265→  // Use raw velocity if available (more sensitive to brief spins)
+   266→  const effVel = physics.velocityRaw ?? physics.velocity;
+   267→  return Math.abs(effVel) >= STOP_VELOCITY_THRESHOLD ? "MOVING" : "STOPPED";
+   268→}
+   269→
+   270→/**
+   271→ * Generate a unique spin ID.
+   272→ */
+   273→function generateSpinId(): string {
+   274→  return `spin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+   275→}
+   276→
+   277→/**
+   278→ * Record a physics snapshot and update the physical spin state machine.
+   279→ *
+   280→ * State transitions:
+   281→ *   IDLE (STOPPED) → SPIN_DETECTED (first MOVING frame)
+   282→ *   SPIN_DETECTED → TRACKING (velocity increasing)
+   283→ *   TRACKING → DECELERATION (velocity decreasing)
+   284→ *   DECELERATION → PREDICTION_WINDOW (velocity < threshold)
+   285→ *   PREDICTION_WINDOW → PHYSICAL_STOP (stable for N frames)
+   286→ *   PHYSICAL_STOP → IDLE (after stop confirmed + timeout)
+   287→ */
+   288→export function recordPhysicsSnapshot(physics: WheelPhysicsState): void {
+   289→  const movementState = classifyMovement(physics);
+   290→  const snapshot: PhysicsSnapshot = {
+   291→    timestamp: physics.timestamp * 1000,
+   292→    angle: physics.angle,
+   293→    velocity: physics.velocity,
+   294→    velocityRaw: physics.velocityRaw,
+   295→    acceleration: physics.acceleration,
+   296→    confidence: physics.confidence,
+   297→    direction: physics.direction,
+   298→    isTracking: physics.isTracking,
+   299→    calibrationStable: physics.calibrationStable,
+   300→    movementState,
+   301→    profDiff: physics.profDiff ?? 0,
+   302→    signalAgreement: physics.signalAgreement ?? 0,
+   303→  };
+   304→
+   305→  snapshotBuffer.push(snapshot);
+   306→  if (snapshotBuffer.length > MAX_SNAPSHOTS) {
+   307→    snapshotBuffer.shift();
+   308→  }
+   309→
+   310→  // Periodically update noise baseline (every 500 frames)
+   311→  noiseUpdateCounter++;
+   312→  if (noiseUpdateCounter >= 500) {
+   313→    noiseUpdateCounter = 0;
+   314→    updateNoiseBaseline();
+   315→  }
+   316→
+   317→  // ---- Physical spin state machine (simplified for noisy data) ----
+   318→  //
+   319→  // V2.5B: Uses multi-signal movement detector (isPhysicallyMoving) instead
+   320→  // of just movementState === "MOVING". This catches more moving frames.
+   321→  //
+   322→  // The phase correlation at high speeds produces intermittent results
+   323→  // (alternating MOVING/STOPPED frames). Instead of requiring sustained
+   324→  // movement + angle stability, we use:
+   325→  //   1. Spin start: any isPhysicallyMoving() transition
+   326→  //   2. Physical stop: no isPhysicallyMoving() for STOP_TIME_THRESHOLD (5s)
+   327→
+   328→  // Get the previous snapshot for multi-signal movement detection
+   329→  const prevSnap = snapshotBuffer.length > 1 ? snapshotBuffer[snapshotBuffer.length - 2] : null;
+   330→  const isMoving = isPhysicallyMoving(snapshot, prevSnap);
+   331→
+   332→  if (isMoving) {
+   333→    lastMovementTime = snapshot.timestamp;
+   334→    if (!currentSpin) {
+   335→      // SPIN START detected
+   336→      currentSpin = {
+   337→        spinId: generateSpinId(),
+   338→        experimentSessionId: experimentSessionId,
+   339→        physicalSpinStart: snapshot.timestamp,
+   340→        physicalSpinStop: null,
+   341→        movementStart: snapshot.timestamp, // first MOVING frame = movement start
+   342→        physicalStopConfidence: 0,
+   343→        spinPhase: "TRACKING",
+   344→        maxVelocity: Math.abs(snapshot.velocityRaw),
+   345→        trackingFrameCount: snapshot.isTracking ? 1 : 0,
+   346→        totalFrameCount: 1,
+   347→        preResultSnapshots: [],
+   348→        apiResultTimestamp: null,
+   349→        apiDelay: null,
+   350→        actualOutcome: null,
+   351→        actualSector: null,
+   352→        snapshots: [snapshot],
+   353→      };
+   354→    } else {
+   355→      // Active spin — update it
+   356→      currentSpin.snapshots.push(snapshot);
+   357→      currentSpin.totalFrameCount++;
+   358→      if (snapshot.isTracking) currentSpin.trackingFrameCount++;
+   359→      if (Math.abs(snapshot.velocityRaw) > currentSpin.maxVelocity) {
+   360→        currentSpin.maxVelocity = Math.abs(snapshot.velocityRaw);
+   361→      }
+   362→
+   363→      // Update phase based on velocity profile
+   364→      const absVel = Math.abs(snapshot.velocityRaw);
+   365→      const recent = currentSpin.snapshots.slice(-10);
+   366→      const avgVel = recent.reduce((s, p) => s + Math.abs(p.velocity), 0) / recent.length;
+   367→
+   368→      if (currentSpin.maxVelocity > 100 && avgVel < currentSpin.maxVelocity * 0.5) {
+   369→        currentSpin.spinPhase = "DECELERATION";
+   370→      } else if (absVel > 50) {
+   371→        currentSpin.spinPhase = "TRACKING";
+   372→      } else if (absVel < STOP_VELOCITY_THRESHOLD) {
+   373→        currentSpin.spinPhase = "PREDICTION_WINDOW";
+   374→      }
+   375→    }
+   376→  } else if (currentSpin) {
+   377→    // We have an active spin but this frame is STOPPED/UNKNOWN
+   378→    currentSpin.snapshots.push(snapshot);
+   379→    currentSpin.totalFrameCount++;
+   380→    if (snapshot.isTracking) currentSpin.trackingFrameCount++;
+   381→
+   382→    // Check for physical stop: no movement for STOP_TIME_THRESHOLD
+   383→    if (lastMovementTime !== null) {
+   384→      const timeSinceMovement = snapshot.timestamp - lastMovementTime;
+   385→      if (timeSinceMovement > STOP_TIME_THRESHOLD) {
+   386→        // Physical stop confirmed
+   387→        currentSpin.physicalSpinStop = lastMovementTime + 500; // approximate stop time
+   388→        currentSpin.physicalStopConfidence = Math.min(1, timeSinceMovement / 10000);
+   389→        currentSpin.spinPhase = "PHYSICAL_STOP";
+   390→
+   391→        // Complete the spin after 10s of no movement
+   392→        if (timeSinceMovement > STOP_TIME_THRESHOLD + 10000) {
+   393→          // Save pre-result snapshots for validation (60s window before stop)
+   394→          // These are frozen at spin completion time — no future data enters
+   395→          // V2.5B: increased to 300 snapshots (was 100) for better coverage
+   396→          const stopTs = currentSpin.physicalSpinStop!;
+   397→          currentSpin.preResultSnapshots = snapshotBuffer
+   398→            .filter((s) => s.timestamp >= stopTs - 60000 && s.timestamp <= stopTs)
+   399→            .slice(-300); // increased for better moving-frame coverage
+   400→
+   401→          currentSpin.spinPhase = "SETTLED";
+   402→          completedSpins.push(currentSpin);
+   403→          if (completedSpins.length > 100) completedSpins.shift();
+   404→          currentSpin = null;
+   405→          lastMovementTime = null;
+   406→        }
+   407→      }
+   408→    }
+   409→  }
+   410→
+   411→  lastAngle = snapshot.angle;
+   412→  lastMovementState = movementState;
+   413→
+   414→  bufferListeners.forEach((l) => l());
+   415→}
+   416→
+   417→/**
+   418→ * Match an API result to the most recent physical spin.
+   419→ * Called when the API delivers a new result.
+   420→ *
+   421→ * Matching logic:
+   422→ *   1. Find the most recent completed spin with physicalSpinStop set
+   423→ *   2. If no completed spin, check if the current spin just stopped
+   424→ *   3. Calculate apiDelay = apiResultTimestamp - physicalSpinStop
+   425→ *   4. If apiDelay is negative or > 300s, it's an unmatched result
+   426→ *
+   427→ * Returns the matched spin (or null if no match).
+   428→ */
+   429→export function matchApiResultToPhysicalSpin(
+   430→  apiResultTimestamp: number,
+   431→  actualOutcome: string,
+   432→  actualSector: number | null,
+   433→): PhysicalSpin | null {
+   434→  // Find the most recent completed spin without an API result yet
+   435→  let bestSpin: PhysicalSpin | null = null;
+   436→  let bestDelay = Infinity;
+   437→
+   438→  for (const spin of completedSpins) {
+   439→    if (spin.actualOutcome !== null) continue; // already matched
+   440→    if (spin.physicalSpinStop === null) continue; // no stop detected
+   441→
+   442→    const delay = apiResultTimestamp - spin.physicalSpinStop;
+   443→    if (delay >= 0 && delay < 300000 && delay < bestDelay) {
+   444→      bestDelay = delay;
+   445→      bestSpin = spin;
+   446→    }
+   447→  }
+   448→
+   449→  // Also check the current spin if it just stopped
+   450→  if (!bestSpin && currentSpin && currentSpin.physicalSpinStop) {
+   451→    const delay = apiResultTimestamp - currentSpin.physicalSpinStop;
+   452→    if (delay >= 0 && delay < 300000) {
+   453→      bestSpin = currentSpin;
+   454→      bestDelay = delay;
+   455→    }
+   456→  }
+   457→
+   458→  if (bestSpin) {
+   459→    bestSpin.apiResultTimestamp = apiResultTimestamp;
+   460→    bestSpin.apiDelay = bestDelay;
+   461→    bestSpin.actualOutcome = actualOutcome;
+   462→    bestSpin.actualSector = actualSector;
+   463→
+   464→    // Record sector observation
+   465→    if (actualSector !== null) {
+   466→      sectorObservations.push({
+   467→        outcome: actualOutcome,
+   468→        sectorIndex: actualSector,
+   469→        angle: bestSpin.physicalSpinStop
+   470→          ? snapshotBuffer.find((s) => s.timestamp >= bestSpin!.physicalSpinStop!)?.angle ?? null
+   471→          : null,
+   472→        timestamp: apiResultTimestamp,
+   473→        spinId: bestSpin.spinId,
+   474→      });
+   475→      if (sectorObservations.length > 200) sectorObservations.shift();
+   476→    }
+   477→  }
+   478→
+   479→  return bestSpin;
+   480→}
+   481→
+   482→// ============================================================
+   483→// LOCK-POINT RECONSTRUCTION (relative to physical stop)
+   484→// ============================================================
+   485→
+   486→export interface LockPointState {
+   487→  lockTimestamp: number; // ms epoch
+   488→  lockLabel: string; // "T-20", "T-15", etc.
+   489→  physics: PhysicsSnapshot | null;
+   490→  videoValid: boolean;
+   491→  videoReason: string;
+   492→  windowHasMovement: boolean;
+   493→  windowMovementStart: number | null;
+   494→  windowMaxVelocity: number;
+   495→  windowTrackingCount: number;
+   496→  windowTotalFrames: number;
+   497→}
+   498→
+   499→/**
+   500→ * Reconstruct lock points relative to PHYSICAL STOP (not API timestamp).
+   501→ *
+   502→ * For a completed spin with physicalSpinStop known, create snapshots at:
+   503→ *   T-20 = physicalSpinStop - 20000
+   504→ *   T-15 = physicalSpinStop - 15000
+   505→ *   T-10 = physicalSpinStop - 10000
+   506→ *   T-5 = physicalSpinStop - 5000
+   507→ *
+   508→ * CRITICAL LEAKAGE RULE: The prediction at each lock point must use ONLY
+   509→ * frames at or before the lock timestamp. No post-lock frames, no
+   510→ * physical stop confirmation, no final result.
+   511→ */
+   512→export function reconstructLockPoints(spin: PhysicalSpin): {
+   513→  "T-20": LockPointState | null;
+   514→  "T-15": LockPointState | null;
+   515→  "T-10": LockPointState | null;
+   516→  "T-5": LockPointState | null;
+   517→} {
+   518→  const lockOffsets: { label: string; offsetMs: number }[] = [
+   519→    { label: "T-20", offsetMs: 20000 },
+   520→    { label: "T-15", offsetMs: 15000 },
+   521→    { label: "T-10", offsetMs: 10000 },
+   522→    { label: "T-5", offsetMs: 5000 },
+   523→  ];
+   524→
+   525→  const result: {
+   526→    "T-20": LockPointState | null;
+   527→    "T-15": LockPointState | null;
+   528→    "T-10": LockPointState | null;
+   529→    "T-5": LockPointState | null;
+   530→  } = { "T-20": null, "T-15": null, "T-10": null, "T-5": null };
+   531→
+   532→  if (spin.physicalSpinStop === null) {
+   533→    return result; // can't reconstruct without physical stop
+   534→  }
+   535→
+   536→  for (const { label, offsetMs } of lockOffsets) {
+   537→    const lockTs = spin.physicalSpinStop - offsetMs;
+   538→
+   539→    // Get physics at or before lockTs (NO future frames)
+   540→    const physics = getPhysicsAt(lockTs);
+   541→
+   542→    // Analyze window [lockTs, physicalSpinStop] for movement
+   543→    const window = spin.snapshots.filter(
+   544→      (s) => s.timestamp >= lockTs && s.timestamp <= spin.physicalSpinStop!,
+   545→    );
+   546→
+   547→    let hasMovement = false;
+   548→    let movementStart: number | null = null;
+   549→    let maxVelocity = 0;
+   550→    let trackingCount = 0;
+   551→
+   552→    for (const snap of window) {
+   553→      if (snap.movementState === "MOVING") {
+   554→        if (!hasMovement) movementStart = snap.timestamp;
+   555→        hasMovement = true;
+   556→      }
+   557→      if (snap.isTracking) trackingCount++;
+   558→      if (Math.abs(snap.velocityRaw) > maxVelocity) maxVelocity = Math.abs(snap.velocityRaw);
+   559→    }
+   560→
+   561→    const videoValid = physics !== null && hasMovement;
+   562→
+   563→    let videoReason: string;
+   564→    if (!physics) {
+   565→      videoReason = "No video frame at lock point";
+   566→    } else if (!hasMovement) {
+   567→      videoReason = `No movement in [${label}, physicalStop]`;
+   568→    } else {
+   569→      videoReason = `Valid — max v=${maxVelocity.toFixed(0)}°/s, ${trackingCount}/${window.length} tracking frames`;
+   570→    }
+   571→
+   572→    result[label as keyof typeof result] = {
+   573→      lockTimestamp: lockTs,
+   574→      lockLabel: label,
+   575→      physics,
+   576→      videoValid,
+   577→      videoReason,
+   578→      windowHasMovement: hasMovement,
+   579→      windowMovementStart: movementStart,
+   580→      windowMaxVelocity: maxVelocity,
+   581→      windowTrackingCount: trackingCount,
+   582→      windowTotalFrames: window.length,
+   583→    };
+   584→  }
+   585→
+   586→  return result;
+   587→}
+   588→
+   589→// ============================================================
+   590→// QUERY FUNCTIONS
+   591→// ============================================================
+   592→
+   593→export function getPhysicsInRange(fromMs: number, toMs: number): PhysicsSnapshot[] {
+   594→  return snapshotBuffer.filter(
+   595→    (s) => s.timestamp >= fromMs && s.timestamp <= toMs,
+   596→  );
+   597→}
+   598→
+   599→export function getPhysicsAt(timestampMs: number): PhysicsSnapshot | null {
+   600→  let result: PhysicsSnapshot | null = null;
+   601→  for (let i = snapshotBuffer.length - 1; i >= 0; i--) {
+   602→    if (snapshotBuffer[i].timestamp <= timestampMs) {
+   603→      result = snapshotBuffer[i];
+   604→      break;
+   605→    }
+   606→  }
+   607→  return result;
+   608→}
+   609→
+   610→export function getCompletedSpins(): PhysicalSpin[] {
+   611→  return completedSpins;
+   612→}
+   613→
+   614→/**
+   615→ * Get completed spins from the CURRENT experiment session only.
+   616→ * Spins from previous sessions are excluded by experimentSessionId.
+   617→ */
+   618→export function getCurrentSessionSpins(): PhysicalSpin[] {
+   619→  return completedSpins.filter((s) => s.experimentSessionId === experimentSessionId);
+   620→}
+   621→
+   622→export function getCurrentSpin(): PhysicalSpin | null {
+   623→  return currentSpin;
+   624→}
+   625→
+   626→export function getSpinPhase(): SpinPhase {
+   627→  return currentSpin?.spinPhase ?? "IDLE";
+   628→}
+   629→
+   630→export function getSynchronizedSpins(): PhysicalSpin[] {
+   631→  return completedSpins.filter(
+   632→    (s) => s.actualOutcome !== null && s.experimentSessionId === experimentSessionId,
+   633→  );
+   634→}
+   635→
+   636→export function getSynchronizedCount(): number {
+   637→  return getSynchronizedSpins().length;
+   638→}
+   639→
+   640→export function getBufferSize(): number {
+   641→  return snapshotBuffer.length;
+   642→}
+   643→
+   644→export function getBufferStats(): {
+   645→  totalSnapshots: number;
+   646→  trackingSnapshots: number;
+   647→  movingSnapshots: number;
+   648→  validVideoSpins: number;
+   649→  timeSpanSeconds: number;
+   650→} {
+   651→  const trackingSnapshots = snapshotBuffer.filter((s) => s.isTracking).length;
+   652→  const movingSnapshots = snapshotBuffer.filter(
+   653→    (s) => s.movementState === "MOVING",
+   654→  ).length;
+   655→  const validVideoSpins = getSynchronizedSpins().filter((spin) =>
+   656→    Object.values(reconstructLockPoints(spin)).some((lp) => lp?.videoValid),
+   657→  ).length;
+   658→
+   659→  const timeSpan =
+   660→    snapshotBuffer.length > 1
+   661→      ? (snapshotBuffer[snapshotBuffer.length - 1].timestamp -
+   662→          snapshotBuffer[0].timestamp) /
+   663→        1000
+   664→      : 0;
+   665→
+   666→  return {
+   667→    totalSnapshots: snapshotBuffer.length,
+   668→    trackingSnapshots,
+   669→    movingSnapshots,
+   670→    validVideoSpins,
+   671→    timeSpanSeconds: timeSpan,
+   672→  };
+   673→}
+   674→
+   675→/**
+   676→ * Get comprehensive synchronization report (timeline validation only —
+   677→ * NOT prediction accuracy).
+   678→ */
+   679→export function getSynchronizationReport(): {
+   680→  totalCompletedSpins: number;
+   681→  spinsWithPhysicalStop: number;
+   682→  spinsWithApiMatch: number;
+   683→  unmatchedSpins: number;
+   684→  apiDelays: number[];
+   685→  apiDelayStats: {
+   686→    min: number;
+   687→    median: number;
+   688→    mean: number;
+   689→    max: number;
+   690→  };
+   691→  physicalSpinDurations: number[];
+   692→  trackingQuality: {
+   693→    avgTrackingRate: number;
+   694→    avgStopConfidence: number;
+   695→  };
+   696→  lockPointReconstruction: {
+   697→    t20Reconstructed: number;
+   698→    t15Reconstructed: number;
+   699→    t10Reconstructed: number;
+   700→    t5Reconstructed: number;
+   701→    t20WithMovement: number;
+   702→    t15WithMovement: number;
+   703→    t10WithMovement: number;
+   704→    t5WithMovement: number;
+   705→  };
+   706→  leakageAudit: {
+   707→    passed: boolean;
+   708→    details: string;
+   709→  };
+   710→  readyForValidation: boolean;
+   711→} {
+   712→  const allSpins = completedSpins;
+   713→  const spinsWithStop = allSpins.filter((s) => s.physicalSpinStop !== null);
+   714→  const matchedSpins = allSpins.filter((s) => s.actualOutcome !== null);
+   715→  const unmatchedSpins = allSpins.filter((s) => s.actualOutcome === null);
+   716→
+   717→  const apiDelays = matchedSpins
+   718→    .filter((s) => s.apiDelay !== null)
+   719→    .map((s) => s.apiDelay!);
+   720→
+   721→  const sortedDelays = [...apiDelays].sort((a, b) => a - b);
+   722→  const min = sortedDelays[0] ?? 0;
+   723→  const max = sortedDelays[sortedDelays.length - 1] ?? 0;
+   724→  const median = sortedDelays.length > 0
+   725→    ? sortedDelays[Math.floor(sortedDelays.length / 2)]
+   726→    : 0;
+   727→  const mean = apiDelays.length > 0
+   728→    ? apiDelays.reduce((s, v) => s + v, 0) / apiDelays.length
+   729→    : 0;
+   730→
+   731→  const durations = spinsWithStop
+   732→    .filter((s) => s.physicalSpinStart !== null)
+   733→    .map((s) => (s.physicalSpinStop! - s.physicalSpinStart!) / 1000);
+   734→
+   735→  // Lock-point reconstruction
+   736→  let t20r = 0, t15r = 0, t10r = 0, t5r = 0;
+   737→  let t20m = 0, t15m = 0, t10m = 0, t5m = 0;
+   738→  for (const spin of spinsWithStop) {
+   739→    const lps = reconstructLockPoints(spin);
+   740→    if (lps["T-20"]) {
+   741→      t20r++;
+   742→      if (lps["T-20"].videoValid) t20m++;
+   743→    }
+   744→    if (lps["T-15"]) {
+   745→      t15r++;
+   746→      if (lps["T-15"].videoValid) t15m++;
+   747→    }
+   748→    if (lps["T-10"]) {
+   749→      t10r++;
+   750→      if (lps["T-10"].videoValid) t10m++;
+   751→    }
+   752→    if (lps["T-5"]) {
+   753→      t5r++;
+   754→      if (lps["T-5"].videoValid) t5m++;
+   755→    }
+   756→  }
+   757→
+   758→  // Tracking quality
+   759→  const avgTrackingRate = spinsWithStop.length > 0
+   760→    ? spinsWithStop.reduce((s, sp) => s + (sp.trackingFrameCount / Math.max(1, sp.totalFrameCount)), 0) / spinsWithStop.length
+   761→    : 0;
+   762→  const avgStopConfidence = spinsWithStop.length > 0
+   763→    ? spinsWithStop.reduce((s, sp) => s + sp.physicalStopConfidence, 0) / spinsWithStop.length
+   764→    : 0;
+   765→
+   766→  // Leakage audit: verify no lock point uses future frames
+   767→  // (guaranteed by getPhysicsAt filtering to <= timestamp)
+   768→  const leakagePassed = true; // structurally guaranteed by design
+   769→
+   770→  // Ready for validation: need 20+ matched spins with physical stops
+   771→  const readyForValidation =
+   772→    matchedSpins.filter((s) => s.physicalSpinStop !== null).length >= 20 &&
+   773→    t5m >= 10;
+   774→
+   775→  return {
+   776→    totalCompletedSpins: allSpins.length,
+   777→    spinsWithPhysicalStop: spinsWithStop.length,
+   778→    spinsWithApiMatch: matchedSpins.length,
+   779→    unmatchedSpins: unmatchedSpins.length,
+   780→    apiDelays,
+   781→    apiDelayStats: { min, median, mean, max },
+   782→    physicalSpinDurations: durations,
+   783→    trackingQuality: {
+   784→      avgTrackingRate,
+   785→      avgStopConfidence,
+   786→    },
+   787→    lockPointReconstruction: {
+   788→      t20Reconstructed: t20r,
+   789→      t15Reconstructed: t15r,
+   790→      t10Reconstructed: t10r,
+   791→      t5Reconstructed: t5r,
+   792→      t20WithMovement: t20m,
+   793→      t15WithMovement: t15m,
+   794→      t10WithMovement: t10m,
+   795→      t5WithMovement: t5m,
+   796→    },
+   797→    leakageAudit: {
+   798→      passed: leakagePassed,
+   799→      details: "PASS — lock points use getPhysicsAt(ts) which filters to <= timestamp",
+   800→    },
+   801→    readyForValidation,
+   802→  };
+   803→}
+   804→
+   805→export function getSectorObservations(): SectorObservation[] {
+   806→  return sectorObservations;
+   807→}
+   808→
+   809→/**
+   810→ * HARD RESET — true experiment reset.
+   811→ *
+   812→ * When called:
+   813→ *   - Clears completedSpins (ALL spins, no exceptions)
+   814→ *   - Clears synchronized results
+   815→ *   - Clears snapshot buffer
+   816→ *   - Clears sector observations
+   817→ *   - Resets all state-machine variables
+   818→ *   - Generates a NEW experimentSessionId
+   819→ *
+   820→ * A spin from an older session MUST NEVER enter the current validation
+   821→ * because the session ID is different.
+   822→ */
+   823→export function clearAll(): void {
+   824→  snapshotBuffer = [];
+   825→  completedSpins = [];
+   826→  currentSpin = null;
+   827→  sectorObservations = [];
+   828→  lastMovementTime = null;
+   829→  lastAngle = null;
+   830→  lastMovementState = "STOPPED";
+   831→  // Generate new session ID — old spins are permanently excluded
+   832→  experimentSessionId = generateExperimentSessionId();
+   833→  bufferListeners.forEach((l) => l());
+   834→}
+   835→
+   836→export function subscribeToBuffer(cb: () => void): () => void {
+   837→  bufferListeners.add(cb);
+   838→  return () => {
+   839→    bufferListeners.delete(cb);
+   840→  };
+   841→}
+   842→
