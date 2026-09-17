@@ -6,7 +6,7 @@ import {
   getLiveSpinsVersion,
   subscribeLiveSpins,
 } from "./liveSpinStore";
-import { runFrozenWalkForward, ALL_FLAGS_OFF } from "./decisionEngine";
+import { runFrozenWalkForward, ALL_FLAGS_OFF, buildPredictionFromHistory, replayPrediction, type RoundResult } from "./decisionEngine";
 import {
   DISPLAY_NAMES,
   GAME_CARD_IMAGES,
@@ -160,6 +160,73 @@ export function RevoPredictionTimeline() {
     fwfTotal !== roundByRoundTotal ||
     Math.abs(fwfHitRate - roundByRoundHitRate) > 0.001;
 
+  // V2.5B-5: Deterministic replay — re-run replayPrediction for each round
+  // using the EXACT same state as FWF. Must produce identical Top-4.
+  const replayMismatches = useMemo(() => {
+    if (!backtest || backtest.rounds.length === 0) return [];
+    const mismatches: Array<{
+      round: number;
+      storedTop4: string[];
+      replayedTop4: string[];
+      storedPrevPredNames: string[];
+      replayedPrevPredNames: string[];
+      storedLastHit: boolean | null;
+      replayedLastHit: boolean | null;
+      historyLength: number;
+    }> = [];
+
+    const recent = spins.slice(0, MAX_ROUNDS).reverse();
+    const actualNames = recent.map((s) => SECTOR_TO_GAME[s.sector] ?? s.sector);
+
+    // Rebuild walk-forward history incrementally (EXACT same as FWF)
+    const wfRounds: RoundResult[] = [];
+    for (let i = 0; i < actualNames.length; i++) {
+      // Capture state BEFORE prediction (same as FWF)
+      const prevPredNames = wfRounds.length > 0
+        ? wfRounds[wfRounds.length - 1].prediction.map((p) => p.game.name)
+        : [];
+      const lastHit = wfRounds.length > 0 ? wfRounds[wfRounds.length - 1].hit : null;
+
+      // Run replayPrediction (uses runEngine with same state)
+      const replayed = replayPrediction(wfRounds, spins);
+      const replayedTop4 = replayed.predictions.map((p) => p.game.name);
+
+      // Compare with stored FWF round
+      const storedRound = backtest.rounds[i];
+      if (storedRound) {
+        const storedTop4 = storedRound.preds;
+        const sortedReplay = [...replayedTop4].sort();
+        const sortedStored = [...storedTop4].sort();
+        if (JSON.stringify(sortedReplay) !== JSON.stringify(sortedStored)) {
+          mismatches.push({
+            round: storedRound.idx,
+            storedTop4,
+            replayedTop4,
+            storedPrevPredNames: prevPredNames,
+            replayedPrevPredNames: prevPredNames, // same by construction
+            storedLastHit: lastHit,
+            replayedLastHit: lastHit, // same by construction
+            historyLength: wfRounds.length,
+          });
+        }
+      }
+
+      // Settle the round (same as FWF)
+      const actualName = actualNames[i];
+      const actualGame = { name: actualName, imageKey: actualName, confidenceRange: [50, 90] as [number, number], isBonus: !["1","2","5","10"].includes(actualName) };
+      const hit = replayedTop4.includes(actualName);
+      wfRounds.push({
+        prediction: replayed.predictions.map((g, idx) => ({ game: g.game, confidence: 50, time: Date.now() + i, rank: idx + 1 })),
+        actualResult: actualGame,
+        hit,
+        time: Date.now() + i,
+        confidence: 50,
+        recalibrated: false,
+      });
+    }
+    return mismatches;
+  }, [backtest, spins]);
+
   // Current streak (most recent consecutive hits or misses)
   // Derived from the SAME roundByRoundResults (single source of truth)
   const currentStreak = useMemo(() => {
@@ -203,6 +270,27 @@ export function RevoPredictionTimeline() {
             <b>DEV WARNING:</b> Main summary mismatch! roundByRound: {roundByRoundHits}/{roundByRoundTotal}
             ({(roundByRoundHitRate * 100).toFixed(1)}%) vs FWF: {fwfHits}/{fwfTotal}
             ({(fwfHitRate * 100).toFixed(1)}%). Using roundByRound as source of truth.
+          </div>
+        )}
+
+        {/* === Deterministic replay mismatches === */}
+        {replayMismatches.length > 0 && (
+          <div className="mb-3 rounded-lg border border-[#ffa502]/40 bg-[#ffa502]/10 px-3 py-2 text-[10px] text-[#ffa502]">
+            <i className="fas fa-triangle-exclamation mr-1" />
+            <b>REPLAY MISMATCH:</b> {replayMismatches.length} round(s) produce different Top-4 on replay.
+            {replayMismatches.map((m, i) => (
+              <div key={i} className="mt-1 font-mono">
+                Round #{m.round} (history={m.historyLength}):
+                stored=[{m.storedTop4.join(", ")}] vs replayed=[{m.replayedTop4.join(", ")}]
+                prevPred={JSON.stringify(m.storedPrevPredNames)} lastHit={String(m.storedLastHit)}
+              </div>
+            ))}
+          </div>
+        )}
+        {replayMismatches.length === 0 && backtest && roundByRoundResults.length > 0 && (
+          <div className="mb-3 rounded-lg border border-[#2ed573]/40 bg-[#2ed573]/10 px-3 py-2 text-[10px] text-[#2ed573]">
+            <i className="fas fa-check-circle mr-1" />
+            <b>REPLAY CONSISTENT:</b> {roundByRoundResults.length} rounds — all produce identical Top-4 on replay.
           </div>
         )}
 

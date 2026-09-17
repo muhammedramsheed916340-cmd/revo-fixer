@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { subscribeLiveResults, isResultProcessed, type LiveResultEvent } from "./liveResultsBus";
 import { getLiveSpins, subscribeLiveSpins } from "./liveSpinStore";
 import {
+  buildPredictionFromHistory,
   GAMES as ENGINE_GAMES,
   type GameModel,
   type RoundResult,
@@ -379,7 +380,7 @@ function subscribeExpFlag(cb: () => void): () => void {
 // under `revo_cFlags`. The server snapshot is ALWAYS ALL_FLAGS_OFF so the
 // active displayed prediction (baseline path) is bit-for-bit identical to
 // production. These flags ONLY thread into the EXPERIMENTAL shadow engine
-// calls (4 sites) — never the live baseline `buildInitial(roundHistory, liveSpins)`.
+// calls (4 sites) — never the live baseline `buildPredictionFromHistory(roundHistory, liveSpins)`.
 const CFLAGS_KEY = "revo_cFlags";
 
 /** Stable server snapshot — always ALL_FLAGS_OFF (never reads localStorage). */
@@ -627,7 +628,7 @@ export function RevoGame() {
   // Passes REAL casino spins to the engine so predictions are data-driven
   // (not always [1,2,5,10]) and varied via weighted probabilistic sampling.
   const engine: EngineOutput = useMemo(() => {
-    return buildInitial(roundHistory, liveSpins);
+    return buildPredictionFromHistory(roundHistory, liveSpins);
   }, [roundHistory, liveSpins]);
 
   // ===== STABLE PREDICTION VIEW =====
@@ -679,7 +680,7 @@ export function RevoGame() {
   // selectActualResult thread `cFlags` into their experimental shadow builds.
   // Server snapshot = ALL_FLAGS_OFF (bit-for-bit baseline). These flags ONLY
   // thread into the 4 experimental shadow buildInitial/recalibrate calls —
-  // NEVER the live baseline `buildInitial(roundHistory, liveSpins)`.
+  // NEVER the live baseline `buildPredictionFromHistory(roundHistory, liveSpins)`.
   const cFlags: FeatureFlags = useSyncExternalStore(
     subscribeCFlags,
     readCFlags,
@@ -712,7 +713,7 @@ export function RevoGame() {
     setPredictions(null);
     const allRounds = readRoundHistory();
     const spins = getLiveSpins();
-    const eng = buildInitial(allRounds, spins);
+    const eng = buildPredictionFromHistory(allRounds, spins);
     const preds = engineToPredictions(eng);
     setPredictions(preds);
     setLoading(false);
@@ -839,7 +840,7 @@ export function RevoGame() {
         // to compare against. Don't record this round.
         const allRounds = readRoundHistory();
         const spins = getLiveSpins();
-        const eng = buildInitial(allRounds, spins);
+        const eng = buildPredictionFromHistory(allRounds, spins);
         const preds = engineToPredictions(eng);
         setPredictions(preds);
         setRunning(true);
@@ -1194,7 +1195,7 @@ export function RevoGame() {
     // 4) Seed both locked data stores fresh from current history + spins.
     const allRounds = readRoundHistory();
     const spins = getLiveSpins();
-    const baseEng = buildInitial(allRounds, spins);
+    const baseEng = buildPredictionFromHistory(allRounds, spins);
     baselineLockedData = extractEngineData(baseEng);
     const expEng = buildInitial(allRounds, spins, "experimental");
     expLockedData = extractEngineData(expEng);

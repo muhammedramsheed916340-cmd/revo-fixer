@@ -2578,6 +2578,47 @@ export function buildInitial(rounds: RoundResult[], liveSpins: SpinData[] = [], 
   return runEngine(rounds, prevPredNames, lastHit, false, "", liveSpins, mode, flags);
 }
 
+/**
+ * SHARED PREDICTION FUNCTION — single source of truth for both
+ * NEXT PREDICTION (live) and ROUND-BY-ROUND (walk-forward backtest).
+ */
+export function buildPredictionFromHistory(
+  rounds: RoundResult[],
+  liveSpins: SpinData[] = [],
+): EngineOutput {
+  return buildInitial(rounds, liveSpins, "baseline", ALL_FLAGS_OFF);
+}
+
+/**
+ * Walk-forward state — the EXACT state used by runFrozenWalkForward.
+ */
+export interface WalkForwardState {
+  rounds: RoundResult[];
+  prevPredNames: string[];
+  lastHit: boolean | null;
+  liveSpins: SpinData[];
+}
+
+/**
+ * Deterministic replay: re-run the engine for a specific historical round
+ * using the EXACT same state as runFrozenWalkForward.
+ *
+ * V2.5B-5: Uses runEngine directly with the same prevPredNames/lastHit
+ * computation as FWF — NOT buildInitial (which may compute them differently).
+ */
+export function replayPrediction(
+  preRoundHistory: RoundResult[],
+  liveSpins: SpinData[] = [],
+): EngineOutput {
+  const prevPredNames = preRoundHistory.length > 0
+    ? preRoundHistory[preRoundHistory.length - 1].prediction.map((p) => p.game.name)
+    : [];
+  const lastHit = preRoundHistory.length > 0
+    ? preRoundHistory[preRoundHistory.length - 1].hit
+    : null;
+  return runEngine(preRoundHistory, prevPredNames, lastHit, false, "", liveSpins, "baseline", ALL_FLAGS_OFF);
+}
+
 // ============================================================
 // RETROSPECTIVE DIAGNOSTIC — replay a result sequence in BOTH modes
 // ============================================================
