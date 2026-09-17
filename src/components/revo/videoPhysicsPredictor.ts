@@ -110,10 +110,9 @@ export function predictStoppingAngle(
   const MODEL_VERSION = "video-physics-v2.4";
 
   // HARD ASSERTION: filter to ONLY snapshots at or before lock timestamp
-  // OPTIMIZATION: only use the last 100 snapshots (not thousands) to keep it fast
+  // V2.5B-5: No slice limit — preResultSnapshots is already capped at 300
   const validSnapshots = snapshots
-    .filter((s) => s.timestamp <= lockTimestamp)
-    .slice(-100);
+    .filter((s) => s.timestamp <= lockTimestamp);
 
   if (validSnapshots.length === 0) {
     return invalidPrediction(lockTimestamp, "No snapshots at or before lock time", MODEL_VERSION);
@@ -163,25 +162,35 @@ export function predictStoppingAngle(
   }
 
   // Multi-frame velocity history for deceleration estimation
-  // Use the last N snapshots (up to 20) that have non-zero velocity
+  // Use the last N snapshots (up to 20) that have non-zero velocity OR
+  // significant profDiff (profile evidence of movement even when FFT velocity = 0)
   const movingSnapshots = validSnapshots
     .filter((s) => Math.abs(s.velocityRaw) > 25 || s.profDiff > 20)
     .slice(-20);
 
   if (movingSnapshots.length < 2) {
     return invalidPrediction(lockTimestamp,
-      `Insufficient moving frames (${movingSnapshots.length} — need >= 2)`,
+      `Insufficient moving frames (${movingSnapshots.length} — need >= 2). validSnapshots=${validSnapshots.length}, bestVel=${bestVel.toFixed(1)}`,
       MODEL_VERSION, bestPhysics);
   }
 
   // Estimate deceleration from velocity history using linear regression
   // v(t) = v0 + a*t → a = slope of v vs t
-  const n = movingSnapshots.length;
+  // V2.5B-5: Only use frames with NON-ZERO velocity for the regression.
+  // Frames with profDiff > 20 but velocityRaw = 0 confirm movement exists
+  // but don't contribute to the velocity slope (they'd flatten it to 0).
+  const velocityFrames = movingSnapshots.filter((s) => Math.abs(s.velocityRaw) > 5);
+  if (velocityFrames.length < 2) {
+    return invalidPrediction(lockTimestamp,
+      `Insufficient velocity frames for regression (${velocityFrames.length} — need >= 2). movingSnapshots=${movingSnapshots.length}`,
+      MODEL_VERSION, bestPhysics);
+  }
+  const n = velocityFrames.length;
   let sumT = 0, sumV = 0, sumTV = 0, sumT2 = 0;
-  const t0 = movingSnapshots[0].timestamp / 1000; // seconds
-  for (const s of movingSnapshots) {
+  const t0 = velocityFrames[0].timestamp / 1000;
+  for (const s of velocityFrames) {
     const t = s.timestamp / 1000 - t0;
-    const v = s.velocityRaw; // signed
+    const v = s.velocityRaw;
     sumT += t;
     sumV += v;
     sumTV += t * v;
@@ -232,12 +241,12 @@ export function predictStoppingAngle(
 
   // Acceleration variance (how stable is the deceleration?)
   let accelVar = 0;
-  if (movingSnapshots.length >= 4) {
-    const accels = movingSnapshots.map((s, i) => {
+  if (velocityFrames.length >= 4) {
+    const accels = velocityFrames.map((s, i) => {
       if (i === 0) return 0;
-      const dt = (s.timestamp - movingSnapshots[i - 1].timestamp) / 1000;
+      const dt = (s.timestamp - velocityFrames[i - 1].timestamp) / 1000;
       if (dt <= 0) return 0;
-      return (s.velocityRaw - movingSnapshots[i - 1].velocityRaw) / dt;
+      return (s.velocityRaw - velocityFrames[i - 1].velocityRaw) / dt;
     });
     const meanAccel = accels.reduce((s, v) => s + v, 0) / accels.length;
     accelVar = accels.reduce((s, v) => s + (v - meanAccel) ** 2, 0) / accels.length;

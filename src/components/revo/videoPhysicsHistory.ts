@@ -692,7 +692,7 @@ export function matchApiResultToPhysicalSpin(
     if (spin.physicalSpinStop === null) continue; // no stop detected
 
     const delay = apiResultTimestamp - spin.physicalSpinStop;
-    if (delay >= 0 && delay < 300000 && delay < bestDelay) {
+    if (delay >= 0 && delay < 600000 && delay < bestDelay) {
       bestDelay = delay;
       bestSpin = spin;
     }
@@ -701,7 +701,7 @@ export function matchApiResultToPhysicalSpin(
   // Also check the current spin if it just stopped
   if (!bestSpin && currentSpin && currentSpin.physicalSpinStop) {
     const delay = apiResultTimestamp - currentSpin.physicalSpinStop;
-    if (delay >= 0 && delay < 300000) {
+    if (delay >= 0 && delay < 600000) {
       bestSpin = currentSpin;
       bestDelay = delay;
     }
