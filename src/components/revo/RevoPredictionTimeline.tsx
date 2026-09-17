@@ -137,17 +137,34 @@ export function RevoPredictionTimeline() {
     }
   }, [spinCount, latestSettledAt]);
 
-  // Derived stats
-  const hits = backtest?.hits ?? 0;
-  const total = backtest?.totalRounds ?? 0;
-  const hitRate = backtest?.hitRate ?? 0;
+  // Derived stats — SINGLE SOURCE OF TRUTH: roundByRoundResults
+  // Do NOT use backtest.hits or backtest.totalRounds (they may be calculated
+  // differently). Instead, count directly from the rounds array.
+  const roundByRoundResults = backtest?.rounds ?? [];
+  const roundByRoundHits = roundByRoundResults.filter((r) => r.hit).length;
+  const roundByRoundTotal = roundByRoundResults.length;
+  const roundByRoundHitRate = roundByRoundTotal > 0 ? roundByRoundHits / roundByRoundTotal : 0;
+
+  const hits = roundByRoundHits;
+  const total = roundByRoundTotal;
+  const hitRate = roundByRoundHitRate;
   const theoRate = backtest?.theoreticalHitRate ?? 0;
   const delta = hitRate - theoRate;
 
+  // Consistency assertion: verify main matches round-by-round
+  const fwfHits = backtest?.hits ?? 0;
+  const fwfTotal = backtest?.totalRounds ?? 0;
+  const fwfHitRate = backtest?.hitRate ?? 0;
+  const consistencyMismatch =
+    fwfHits !== roundByRoundHits ||
+    fwfTotal !== roundByRoundTotal ||
+    Math.abs(fwfHitRate - roundByRoundHitRate) > 0.001;
+
   // Current streak (most recent consecutive hits or misses)
+  // Derived from the SAME roundByRoundResults (single source of truth)
   const currentStreak = useMemo(() => {
-    if (!backtest || backtest.rounds.length === 0) return { type: "none", count: 0 };
-    const rounds = backtest.rounds;
+    if (roundByRoundResults.length === 0) return { type: "none", count: 0 };
+    const rounds = roundByRoundResults;
     const last = rounds[rounds.length - 1];
     let count = 1;
     for (let i = rounds.length - 2; i >= 0; i--) {
@@ -155,7 +172,7 @@ export function RevoPredictionTimeline() {
       else break;
     }
     return { type: last.hit ? "hit" : "miss", count };
-  }, [backtest]);
+  }, [roundByRoundResults]);
 
   return (
     <section
@@ -178,6 +195,16 @@ export function RevoPredictionTimeline() {
             the engine predicted vs what actually hit. No data leakage.
           </p>
         </div>
+
+        {/* === Consistency assertion warning === */}
+        {consistencyMismatch && (
+          <div className="mb-3 rounded-lg border border-[#ff4757]/40 bg-[#ff4757]/10 px-3 py-2 text-[10px] text-[#ff4757]">
+            <i className="fas fa-triangle-exclamation mr-1" />
+            <b>DEV WARNING:</b> Main summary mismatch! roundByRound: {roundByRoundHits}/{roundByRoundTotal}
+            ({(roundByRoundHitRate * 100).toFixed(1)}%) vs FWF: {fwfHits}/{fwfTotal}
+            ({(fwfHitRate * 100).toFixed(1)}%). Using roundByRound as source of truth.
+          </div>
+        )}
 
         {/* === Summary KPIs === */}
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
