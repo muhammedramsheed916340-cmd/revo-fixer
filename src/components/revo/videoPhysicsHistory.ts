@@ -113,11 +113,14 @@ export function isPhysicallyMoving(snapshot: PhysicsSnapshot, prevSnapshot: Phys
     evidenceCount++;
   }
 
-  // Signal B-Strong: Very high profDiff (> 20, which is 2× P95 noise) is definitive evidence
-  // During real spins, profDiff reaches 70-80. During stops, P95 is ~10.
-  // A profDiff > 20 is 2× the noise P95 and counts as strong evidence.
-  if (snapshot.profDiff > 20) {
+  // Signal B-Strong: profDiff exceeds noise P95 (definitive above noise)
+  // During real spins, profDiff reaches 70-80. During stops, P95 is ~13.
+  // A profDiff > noiseP95 is above the 95th percentile of stopped-wheel noise.
+  if (noiseBaseline && snapshot.profDiff > noiseBaseline.p95) {
     evidenceCount += 2; // counts as 2 signals (B + B-strong)
+  } else if (snapshot.profDiff > 20) {
+    // Fallback when no noise baseline: profDiff > 20 is 2× typical noise
+    evidenceCount += 2;
   }
 
   // Signal C: Angle change across consecutive frames

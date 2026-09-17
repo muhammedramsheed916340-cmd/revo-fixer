@@ -11,6 +11,7 @@ import {
 } from "./videoPhysicsPredictor";
 import {
   getCurrentSessionSpins,
+  getCompletedSpins,
   getSynchronizedCount,
   getBufferStats,
   getSpinPhase,
@@ -48,7 +49,7 @@ export function RevoPhysicsValidation() {
   useBufferVersion();
   const syncCount = getSynchronizedCount();
   const bufferStats = getBufferStats();
-  const completedSpins = getCurrentSessionSpins();
+  const completedSpins = getCompletedSpins();
   const spinPhase = getSpinPhase();
   const sessionId = getExperimentSessionId();
 
@@ -58,8 +59,9 @@ export function RevoPhysicsValidation() {
     setRunning(true);
     setReport(null);
     try {
-      const spins = getCurrentSessionSpins();
+      const spins = getCompletedSpins();
       const matched = spins.filter(s => s.actualOutcome);
+      console.log(`[V2.5B4] Validation start: ${spins.length} spins, ${matched.length} matched`);
       if (matched.length < 3) {
         toast.error(`Need at least 3 matched spins from current session (currently ${matched.length})`);
         setRunning(false);
@@ -76,9 +78,12 @@ export function RevoPhysicsValidation() {
         snapshots: s.snapshots,
         movementStart: s.movementStart,
       })));
+      console.log(`[V2.5B4] Validation done: ${result.matchedSpins} spins, leakage ${result.leakageAudit.passed?'PASS':'FAIL'}`);
+      console.log(`[V2.5B4] STOP-3: N=${result.lockPointSummaries['STOP-3']?.sampleSize}, hits=${result.lockPointSummaries['STOP-3']?.hits}, insuf=${result.lockPointSummaries['STOP-3']?.insufficientCount}`);
       setReport(result);
       toast.success(`Validation complete — ${result.matchedSpins} spins, leakage ${result.leakageAudit.passed ? "PASS" : "FAIL"}`);
     } catch (e) {
+      console.error(`[V2.5B4] Validation ERROR:`, e);
       toast.error(`Validation failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setRunning(false);

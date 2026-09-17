@@ -122,15 +122,37 @@ export function predictStoppingAngle(
   // Find the latest snapshot at or before lock time
   const latest = validSnapshots[validSnapshots.length - 1];
 
+  // V2.5B-4 FIX: Use the BEST moving frame's velocity, not just the latest frame.
+  // The FFT phase correlation only detects movement on ~5-20% of frames during
+  // fast rotation. The latest frame might have velocityRaw=0 even though the
+  // wheel IS spinning. We search the last 20 snapshots for the frame with the
+  // highest |velocityRaw| and use that as the "current" physics state.
+  let bestPhysics = latest;
+  let bestVel = Math.abs(latest.velocityRaw);
+  const recentSnapshots = validSnapshots.slice(-20);
+  for (const s of recentSnapshots) {
+    const absVel = Math.abs(s.velocityRaw);
+    if (absVel > bestVel) {
+      bestVel = absVel;
+      bestPhysics = s;
+    }
+  }
+
   // Use RAW velocity for movement detection (smoothed median can be 0 during fast spins)
-  const rawVel = latest.velocityRaw;
-  const smoothedVel = latest.velocity;
+  const rawVel = bestPhysics.velocityRaw;
+  const smoothedVel = bestPhysics.velocity;
 
   // Check if we have enough movement to predict
-  if (Math.abs(rawVel) < 50) {
-    return invalidPrediction(lockTimestamp,
-      `Velocity too low (${rawVel.toFixed(1)}°/s — wheel nearly stopped or not spinning)`,
-      MODEL_VERSION, latest);
+  // V2.5B-4: Lower threshold to 25°/s since we now search for the best frame
+  if (Math.abs(rawVel) < 25) {
+    // V2.5B-4: Also check if ANY frame has significant profDiff (profile evidence)
+    // The wheel might be moving even if FFT velocity is 0 on all frames
+    const hasProfileEvidence = recentSnapshots.some((s) => s.profDiff > 20);
+    if (!hasProfileEvidence) {
+      return invalidPrediction(lockTimestamp,
+        `Velocity too low (${rawVel.toFixed(1)}°/s) and no profile evidence`,
+        MODEL_VERSION, bestPhysics);
+    }
   }
 
   // Check tracking confidence
@@ -143,13 +165,13 @@ export function predictStoppingAngle(
   // Multi-frame velocity history for deceleration estimation
   // Use the last N snapshots (up to 20) that have non-zero velocity
   const movingSnapshots = validSnapshots
-    .filter((s) => Math.abs(s.velocityRaw) > 50)
+    .filter((s) => Math.abs(s.velocityRaw) > 25 || s.profDiff > 20)
     .slice(-20);
 
-  if (movingSnapshots.length < 3) {
+  if (movingSnapshots.length < 2) {
     return invalidPrediction(lockTimestamp,
-      `Insufficient moving frames (${movingSnapshots.length} — need >= 3)`,
-      MODEL_VERSION, latest);
+      `Insufficient moving frames (${movingSnapshots.length} — need >= 2)`,
+      MODEL_VERSION, bestPhysics);
   }
 
   // Estimate deceleration from velocity history using linear regression
@@ -190,7 +212,7 @@ export function predictStoppingAngle(
   // Remaining rotation: Δθ = -v² / (2a)
   // v is signed, a opposes velocity → Δθ is positive (forward rotation)
   const remainingRotation = -(rawVel * rawVel) / (2 * (-slope));
-  const stopAngleRaw = latest.angle + remainingRotation;
+  const stopAngleRaw = bestPhysics.angle + remainingRotation;
   const stopAngleWrapped = ((stopAngleRaw % 360) + 360) % 360;
   const stopSector = angleToSector(stopAngleWrapped);
   const stopOutcome = sectorToOutcome(stopSector);
