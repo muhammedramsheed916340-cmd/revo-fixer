@@ -702,11 +702,10 @@ function formatDash(token: string): string {
   return token.match(/.{1,4}/g)?.slice(0, 4).join("-") ?? token;
 }
 
-/** 10-digit numeric signal code. */
+/** Signal code — same dashed format as license keys (XXXX-XXXX-XXXX-XXXX).
+ *  The original Revo Fixer app uses this format for activation_codes. */
 function randomSignalCode(): string {
-  const arr = new Uint32Array(10);
-  crypto.getRandomValues(arr);
-  return Array.from(arr, (n) => String(n % 10)).join("");
+  return formatDash(randomToken(16));
 }
 
 /** Generate a license key (stored under securityCodes/{key}). */
