@@ -748,7 +748,8 @@ export async function generateLicenseKey(opts: {
   return { key: token };
 }
 
-/** Generate a signal/activation code (stored under activation_codes/{code}). */
+/** Generate a signal/activation code (stored under activation_codes/{code}).
+ *  Signal codes NEVER expire — they remain active until manually used. */
 export async function generateActivationCode(opts: {
   usedFor?: string;
   createdBy?: string;
@@ -762,6 +763,7 @@ export async function generateActivationCode(opts: {
     usedFor: opts.usedFor ?? "Crazy Time Revo Signal",
     createdBy: opts.createdBy ?? "admin-panel",
     createdAt: now,
+    // NO expiry/validity field — signal codes never expire
   });
   memCache.delete("activationCodes");
   memCache.delete("stats");
