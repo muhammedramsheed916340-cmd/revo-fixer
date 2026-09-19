@@ -20,6 +20,14 @@ import { RevoStreakTracker } from "./RevoStreakTracker";
 import { RevoPredictionTimeline } from "./RevoPredictionTimeline";
 import { RevoFusionExperiment } from "./RevoFusionExperiment";
 import { RevoPhysicsValidation } from "./RevoPhysicsValidation";
+// ADDITIVE: experimental time / dealer / physics signal layers + ensemble.
+// These are new panels; every existing panel above is untouched and keeps its
+// own behaviour. The new signals default to OFF (see signalFlags.ts).
+import { RevoSignalCollector } from "./RevoSignalCollector";
+import { RevoTimeSignalPanel } from "./RevoTimeSignalPanel";
+import { RevoPhysicsMotionPanel } from "./RevoPhysicsMotionPanel";
+import { RevoDealerPanel } from "./RevoDealerPanel";
+import { RevoSignalEnsemblePanel } from "./RevoSignalEnsemblePanel";
 import { RevoComparison } from "./RevoComparison";
 import { RevoDeposit } from "./RevoDeposit";
 import { RevoScrollTop, RevoDivider } from "./RevoScrollTop";
@@ -217,6 +225,24 @@ export function RevoApp() {
 
           <RevoReveal>
             <RevoPhysicsValidation />
+          </RevoReveal>
+
+          {/* ===== ADDITIVE EXPERIMENTAL SIGNAL LAYERS =====
+              Time-based wheel analysis · wheel physics/motion · dealer/agent
+              analysis · ensemble fusion. All four default to OFF; diagnostics
+              and data collection run regardless. */}
+          <RevoSignalCollector />
+          <RevoReveal>
+            <RevoTimeSignalPanel />
+          </RevoReveal>
+          <RevoReveal>
+            <RevoPhysicsMotionPanel />
+          </RevoReveal>
+          <RevoReveal>
+            <RevoDealerPanel />
+          </RevoReveal>
+          <RevoReveal>
+            <RevoSignalEnsemblePanel />
           </RevoReveal>
 
           <RevoReveal>

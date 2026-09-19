@@ -9061,3 +9061,55 @@ Stage Summary:
     * Add an ML arm to the A/B/C/D fusion benchmark (Arm E: ML-only, Arm F: ML+physics fusion)
       to measure whether logistic regression adds value above the existing C1–C9 engine.
     * Consider persisting the trained MLModel (JSON) so trained weights survive page reloads.
+
+---
+
+## Stage: Experimental Signal Layers (time · dealer · physics · ensemble) — additive
+
+Date: 2026-09-19. Scope: purely additive; no existing file's behaviour removed, disabled or simplified.
+
+- New modules (10): src/components/revo/signalStats.ts, timeSignal.ts, wheelPhysicsLayer.ts,
+  physicsDossier.ts, dealerSignal.ts, signalFlags.ts, signalEnsemble.ts, signalValidation.ts,
+  signalDataStore.ts, signalSectorMap.ts.
+- New UI/diagnostics (5): RevoTimeSignalPanel.tsx, RevoPhysicsMotionPanel.tsx, RevoDealerPanel.tsx,
+  RevoSignalEnsemblePanel.tsx, RevoSignalCollector.tsx (headless).
+- New tooling (4): scripts/validate_signal_layers.ts, scripts/verify_signal_layers.ts,
+  scripts/ts-resolve-loader.mjs, scripts/ts-resolve-register.mjs.
+- Existing files touched (additive only, 107 insertions / 0 deletions):
+    * RevoVideoSensor.tsx — registerDealerFrames hook: an 8-bin coarse luminance signature captured
+      only while a sink is registered (NOT facial recognition, never leaves the browser).
+    * RevoApp.tsx — mounts the collector + the four new panels.
+    * RevoGame.tsx — publishes the CURRENT production prediction (Top-4 + per-outcome scores) to the
+      signal store for passthrough/history use. Read-only: the engine is never influenced.
+- Feature flags: TIME_SIGNAL / DEALER_SIGNAL / PHYSICS_SIGNAL / FUSION default OFF.
+  setSignalFlag(flag,true) is REFUSED unless a registered out-of-sample validation result shows
+  >=200 paired rounds, a positive CI-supported delta vs BOTH the production engine and the
+  theoretical [1,2,5,10] baseline, McNemar p<0.05 and clean leakage/duplicate/timestamp audits.
+- Data contract: latestUsedTimestamp <= lockTimestamp < physicalStopTimestamp. The physics lock is
+  REFUSED at/after the physical stop; the prediction ledger's strict append rejects latestUsed>lock,
+  lock>=physicalStop and any Top-4 that is not exactly 4 distinct outcomes. No post-stop frame, no
+  API-arrival time, no future timestamp and no retrospective correction is usable anywhere.
+- Verification (executed, real repository data):
+    * mechanisms: `node --import ./scripts/ts-resolve-register.mjs scripts/verify_signal_layers.ts`
+      → 106 passed / 0 failed.
+    * walk-forward A–J: `node --import ./scripts/ts-resolve-register.mjs scripts/validate_signal_layers.ts --max-rounds 1279`
+      → 500 benchmark rounds + 1279 ledger rounds; audits PASS (0 duplicates, 0 timestamp problems,
+      0 leakage violations across 1779 checked predictions).
+- Results (real files only): A theoretical 81.60% / 83.89%; B production 55.40%; C time-only 80.77%
+  (n=468) / 83.64% (n=1247); F history+time 73.29%; J full ensemble 70.80%. Arms D/E/G/H/I are
+  UNAVAILABLE because the stored round ledgers contain no dealer or video-physics observations —
+  they are reported, never fabricated.
+- Promotion gate verdict: TIME_SIGNAL NOT PROMOTABLE (delta -1.07 pp vs theoretical), FUSION NOT
+  PROMOTABLE (delta -10.80 pp), DEALER_SIGNAL / PHYSICS_SIGNAL no data. No signal may influence the
+  production prediction; all four remain diagnostic/data-collection only.
+- Defects found and fixed while verifying (tests were never loosened):
+    1. chiSquareHomogeneity pooled small-expected cells into neighbouring columns, which could
+       collapse the table to one column and report an obvious shift as p=1.0000 (inconclusive).
+       Now pooled into one extra "other" column; the regime detector then reported its first 41
+       CONFIRMED_REGIME rounds on the 1279-round ledger.
+    2. computePhysicsEvidence now re-normalises its 8-outcome vector (54-sector -> 8-outcome mapping
+       left a rounding remainder, e.g. 0.99997).
+- Deliverables: SIGNAL_LAYERS_REPORT.md (13-item report), SIGNAL_LAYERS_VALIDATION.md (machine
+  generated), scripts/data/signal_validation_report.json.
+- Next actions: accumulate real dealer/video observations through the collector, then re-run the
+  walk-forward harness; only a validated delta vs the theoretical baseline may flip a flag.

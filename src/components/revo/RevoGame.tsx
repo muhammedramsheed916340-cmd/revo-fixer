@@ -27,6 +27,10 @@ import {
   runFrozenWalkForward,
   type RetroDiagnostic,
 } from "./decisionEngine";
+// ADDITIVE (new experimental signal layers): read-only publication of the
+// production prediction so the new layers can run in passthrough / shadow mode.
+// Nothing in the production prediction path depends on this import.
+import { publishProductionPrediction } from "./signalDataStore";
 
 // Real game outcomes + Cloudinary card images (from the original Revo Fixer app)
 const GAME_IMAGES: Record<string, string> = {
@@ -655,6 +659,27 @@ export function RevoGame() {
       // Keep engine's analysis fields (dashboard, candidateScores, RCA, etc.)
     };
   }, [engine, displayPredictions]);
+
+  // ===== ADDITIVE: hand the CURRENT production prediction to the experimental
+  // signal layers (read-only). This is a publication, not a computation: the
+  // production prediction, its state and its UI are unchanged. The experimental
+  // ensemble uses it as (a) its passthrough output and (b) the history channel.
+  useEffect(() => {
+    const scores: Record<string, number> = {};
+    let sum = 0;
+    for (const c of view.candidateScores ?? []) {
+      const v = Number.isFinite(c.rawScore) ? Math.max(0, c.rawScore) : 0;
+      scores[c.game.name] = v;
+      sum += v;
+    }
+    if (sum > 0) for (const k of Object.keys(scores)) scores[k] /= sum;
+    publishProductionPrediction({
+      top4: view.nextSignalNames.slice(0, 4),
+      probabilities: sum > 0 ? scores : null,
+      lockTimestamp: Date.now(),
+      modelVersion: view.modelVersion,
+    });
+  }, [view]);
 
   // Derived display values (hydration-safe)
   const verifiedRounds = roundHistory.length;

@@ -63,6 +63,47 @@ function notifyPhysics() {
 }
 
 // ---------------------------------------------------------------------------
+// ADDITIVE (new signal layers): coarse appearance-frame sink
+// ---------------------------------------------------------------------------
+// The new dealer layer needs a COARSE, NON-REVERSIBLE appearance signature of
+// the live frame (8 average-luminance bins) to decide whether the same person
+// is still on screen. This hook only runs when a sink is actually registered,
+// takes 8 samples per frame, and changes nothing in the existing processing
+// path. It is explicitly NOT facial recognition and never leaves the browser.
+export type DealerFrameSink = (coarseLuma: number[], timestampMs: number) => void;
+const dealerFrameSinks = new Set<DealerFrameSink>();
+
+export function subscribeDealerFrames(cb: DealerFrameSink): () => void {
+  dealerFrameSinks.add(cb);
+  return () => {
+    dealerFrameSinks.delete(cb);
+  };
+}
+
+/** 8-bin average-luminance signature of the frame (coarse by design). */
+function sampleCoarseLumaGrid(data: Uint8ClampedArray, width: number, height: number, bins = 8): number[] {
+  const out = new Array(bins).fill(0) as number[];
+  const counts = new Array(bins).fill(0) as number[];
+  const stepX = Math.max(1, Math.floor(width / 32));
+  const stepY = Math.max(1, Math.floor(height / 16));
+  for (let y = 0; y < height; y += stepY) {
+    const rowOffset = y * width;
+    for (let x = 0; x < width; x += stepX) {
+      const idx = (rowOffset + x) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      const bin = Math.min(bins - 1, Math.floor((x / width) * bins));
+      out[bin] += luma;
+      counts[bin]++;
+    }
+  }
+  for (let i = 0; i < bins; i++) out[i] = counts[i] > 0 ? out[i] / counts[i] : 0;
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Calibration state (module-level so it survives re-renders)
 // ---------------------------------------------------------------------------
 interface Calibration {
@@ -703,6 +744,21 @@ export function RevoVideoSensor() {
     if (canvas.height !== CVH) canvas.height = CVH;
     ctx.drawImage(video, 0, 0, CVW, CVH);
     const imageData = ctx.getImageData(0, 0, CVW, CVH);
+
+    // ADDITIVE: coarse appearance signature for the experimental dealer layer.
+    // Runs ONLY when a sink is registered; 8 samples/frame; no existing
+    // computation is touched or reordered.
+    if (dealerFrameSinks.size > 0) {
+      const grid = sampleCoarseLumaGrid(imageData.data, CVW, CVH, 8);
+      const gridTs = Date.now();
+      dealerFrameSinks.forEach((sink) => {
+        try {
+          sink(grid, gridTs);
+        } catch {
+          /* a failing sink must never break the video pipeline */
+        }
+      });
+    }
     // Use EPOCH time (Date.now()) for timestamps — NOT performance.now()
     // performance.now() is relative to page load, which breaks synchronization
     // with API result timestamps (which are epoch ms).

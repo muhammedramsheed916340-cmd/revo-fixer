@@ -1,0 +1,2656 @@
+{
+  "primary": {
+    "version": "signal-validation-v1.0",
+    "dataset": "final_benchmark_rounds.jsonl (500 rounds, production locks stored live)",
+    "generatedAt": 1789844255370,
+    "roundsEvaluated": 500,
+    "roundsAvailable": 500,
+    "roundRange": {
+      "from": 1789342766841,
+      "to": 1789369836940
+    },
+    "arms": {
+      "A_theoretical": {
+        "key": "A_theoretical",
+        "label": "A · theoretical [1,2,5,10]",
+        "available": true,
+        "unavailableReason": null,
+        "rounds": 500,
+        "hits": 408,
+        "hitRate": 0.816,
+        "wilson": {
+          "low": 0.7796701866722183,
+          "high": 0.8475110544162506,
+          "width": 0.06784086774403231,
+          "center": 0.816
+        },
+        "bootstrapCI": {
+          "low": 0.782,
+          "high": 0.848,
+          "width": 0.06599999999999995,
+          "center": 0.816
+        },
+        "brier": 0.779833,
+        "logLoss": 1.731581,
+        "calibration": [
+          {
+            "bucketIndex": 0,
+            "lower": 0,
+            "upper": 0.2,
+            "n": 3000,
+            "meanPredicted": 0.061728395061728177,
+            "observedRate": 0.064,
+            "gap": 0.002271604938271825
+          },
+          {
+            "bucketIndex": 1,
+            "lower": 0.2,
+            "upper": 0.4,
+            "n": 1000,
+            "meanPredicted": 0.3148148148148172,
+            "observedRate": 0.308,
+            "gap": -0.006814814814817216
+          }
+        ],
+        "expectedCalibrationError": 0.003407,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 172,
+            "covered": 172,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "2",
+            "actuals": 136,
+            "covered": 136,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "5",
+            "actuals": 59,
+            "covered": 59,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "10",
+            "actuals": 41,
+            "covered": 41,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 42,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 17,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 21,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 12,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": 0
+      },
+      "B_history": {
+        "key": "B_history",
+        "label": "B · existing production history engine",
+        "available": true,
+        "unavailableReason": null,
+        "rounds": 500,
+        "hits": 277,
+        "hitRate": 0.554,
+        "wilson": {
+          "low": 0.5101821562121956,
+          "high": 0.5969943849864668,
+          "width": 0.0868122287742712,
+          "center": 0.554
+        },
+        "bootstrapCI": {
+          "low": 0.512,
+          "high": 0.596,
+          "width": 0.08399999999999996,
+          "center": 0.554
+        },
+        "brier": 0.911526,
+        "logLoss": 2.191028,
+        "calibration": [
+          {
+            "bucketIndex": 0,
+            "lower": 0,
+            "upper": 0.2,
+            "n": 3439,
+            "meanPredicted": 0.09731243269555147,
+            "observedRate": 0.12474556557138704,
+            "gap": 0.02743313287583557
+          },
+          {
+            "bucketIndex": 1,
+            "lower": 0.2,
+            "upper": 0.4,
+            "n": 525,
+            "meanPredicted": 0.2843190738857146,
+            "observedRate": 0.11619047619047619,
+            "gap": -0.1681285976952384
+          },
+          {
+            "bucketIndex": 2,
+            "lower": 0.4,
+            "upper": 0.6,
+            "n": 36,
+            "meanPredicted": 0.44652861472222205,
+            "observedRate": 0.2777777777777778,
+            "gap": -0.16875083694444426
+          }
+        ],
+        "expectedCalibrationError": 0.047171,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 172,
+            "covered": 99,
+            "inclusionRate": 0.668,
+            "coverageRate": 0.5756
+          },
+          {
+            "outcome": "2",
+            "actuals": 136,
+            "covered": 104,
+            "inclusionRate": 0.758,
+            "coverageRate": 0.7647
+          },
+          {
+            "outcome": "5",
+            "actuals": 59,
+            "covered": 22,
+            "inclusionRate": 0.37,
+            "coverageRate": 0.3729
+          },
+          {
+            "outcome": "10",
+            "actuals": 41,
+            "covered": 19,
+            "inclusionRate": 0.604,
+            "coverageRate": 0.4634
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 42,
+            "covered": 18,
+            "inclusionRate": 0.51,
+            "coverageRate": 0.4286
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 17,
+            "covered": 4,
+            "inclusionRate": 0.298,
+            "coverageRate": 0.2353
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 21,
+            "covered": 8,
+            "inclusionRate": 0.466,
+            "coverageRate": 0.381
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 12,
+            "covered": 3,
+            "inclusionRate": 0.326,
+            "coverageRate": 0.25
+          }
+        ],
+        "bonusInclusionRate": 1.6
+      },
+      "C_time": {
+        "key": "C_time",
+        "label": "C · time-only",
+        "available": true,
+        "unavailableReason": null,
+        "rounds": 468,
+        "hits": 378,
+        "hitRate": 0.807692,
+        "wilson": {
+          "low": 0.7695376021926628,
+          "high": 0.8408367268194463,
+          "width": 0.07129912462678356,
+          "center": 0.8076923076923077
+        },
+        "bootstrapCI": {
+          "low": 0.7692307692307693,
+          "high": 0.8418803418803419,
+          "width": 0.07264957264957261,
+          "center": 0.8076923076923077
+        },
+        "brier": 0.778946,
+        "logLoss": 1.730388,
+        "calibration": [
+          {
+            "bucketIndex": 0,
+            "lower": 0,
+            "upper": 0.2,
+            "n": 2808,
+            "meanPredicted": 0.0630726102670941,
+            "observedRate": 0.06374643874643875,
+            "gap": 0.0006738284793446486
+          },
+          {
+            "bucketIndex": 1,
+            "lower": 0.2,
+            "upper": 0.4,
+            "n": 936,
+            "meanPredicted": 0.31078216940170944,
+            "observedRate": 0.3087606837606838,
+            "gap": -0.0020214856410256665
+          }
+        ],
+        "expectedCalibrationError": 0.001011,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 160,
+            "covered": 160,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "2",
+            "actuals": 129,
+            "covered": 129,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "5",
+            "actuals": 56,
+            "covered": 56,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "10",
+            "actuals": 38,
+            "covered": 23,
+            "inclusionRate": 0.703,
+            "coverageRate": 0.6053
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 38,
+            "covered": 10,
+            "inclusionRate": 0.297,
+            "coverageRate": 0.2632
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 16,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 19,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 12,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": 0.297009
+      },
+      "D_dealer": {
+        "key": "D_dealer",
+        "label": "D · dealer-only",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for dealer channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "E_physics": {
+        "key": "E_physics",
+        "label": "E · physics-only",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for physics channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "F_history_time": {
+        "key": "F_history_time",
+        "label": "F · history + time",
+        "available": true,
+        "unavailableReason": null,
+        "rounds": 468,
+        "hits": 343,
+        "hitRate": 0.732906,
+        "wilson": {
+          "low": 0.6910425463191856,
+          "high": 0.7709769110580357,
+          "width": 0.07993436473885007,
+          "center": 0.7329059829059829
+        },
+        "bootstrapCI": {
+          "low": 0.6901709401709402,
+          "high": 0.7735042735042735,
+          "width": 0.08333333333333337,
+          "center": 0.7329059829059829
+        },
+        "brier": 0.841215,
+        "logLoss": 1.941785,
+        "calibration": [
+          {
+            "bucketIndex": 0,
+            "lower": 0,
+            "upper": 0.2,
+            "n": 3087,
+            "meanPredicted": 0.09962755970845462,
+            "observedRate": 0.11046323291221251,
+            "gap": 0.01083567320375789
+          },
+          {
+            "bucketIndex": 1,
+            "lower": 0.2,
+            "upper": 0.4,
+            "n": 644,
+            "meanPredicted": 0.2405018170807454,
+            "observedRate": 0.18633540372670807,
+            "gap": -0.054166413354037324
+          },
+          {
+            "bucketIndex": 2,
+            "lower": 0.4,
+            "upper": 0.6,
+            "n": 13,
+            "meanPredicted": 0.42819636846153847,
+            "observedRate": 0.5384615384615384,
+            "gap": 0.11026516999999997
+          }
+        ],
+        "expectedCalibrationError": 0.018634,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 160,
+            "covered": 157,
+            "inclusionRate": 0.9872,
+            "coverageRate": 0.9813
+          },
+          {
+            "outcome": "2",
+            "actuals": 129,
+            "covered": 115,
+            "inclusionRate": 0.8846,
+            "coverageRate": 0.8915
+          },
+          {
+            "outcome": "5",
+            "actuals": 56,
+            "covered": 25,
+            "inclusionRate": 0.4124,
+            "coverageRate": 0.4464
+          },
+          {
+            "outcome": "10",
+            "actuals": 38,
+            "covered": 18,
+            "inclusionRate": 0.5043,
+            "coverageRate": 0.4737
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 38,
+            "covered": 16,
+            "inclusionRate": 0.4359,
+            "coverageRate": 0.4211
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 16,
+            "covered": 4,
+            "inclusionRate": 0.1944,
+            "coverageRate": 0.25
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 19,
+            "covered": 5,
+            "inclusionRate": 0.3889,
+            "coverageRate": 0.2632
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 12,
+            "covered": 3,
+            "inclusionRate": 0.1923,
+            "coverageRate": 0.25
+          }
+        ],
+        "bonusInclusionRate": 1.211538
+      },
+      "G_history_dealer": {
+        "key": "G_history_dealer",
+        "label": "G · history + dealer",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for dealer channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "H_history_physics": {
+        "key": "H_history_physics",
+        "label": "H · history + physics",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for physics channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "I_time_dealer_physics": {
+        "key": "I_time_dealer_physics",
+        "label": "I · time + dealer + physics",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for time, dealer, physics channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "J_full": {
+        "key": "J_full",
+        "label": "J · full ensemble",
+        "available": true,
+        "unavailableReason": null,
+        "rounds": 500,
+        "hits": 354,
+        "hitRate": 0.708,
+        "wilson": {
+          "low": 0.6666799846544007,
+          "high": 0.7461481740367435,
+          "width": 0.07946818938234279,
+          "center": 0.708
+        },
+        "bootstrapCI": {
+          "low": 0.668,
+          "high": 0.746,
+          "width": 0.07799999999999996,
+          "center": 0.708
+        },
+        "brier": 0.858054,
+        "logLoss": 1.998029,
+        "calibration": [
+          {
+            "bucketIndex": 0,
+            "lower": 0,
+            "upper": 0.2,
+            "n": 3357,
+            "meanPredicted": 0.10043741044384856,
+            "observedRate": 0.11647304140601727,
+            "gap": 0.016035630962168715
+          },
+          {
+            "bucketIndex": 1,
+            "lower": 0.2,
+            "upper": 0.4,
+            "n": 626,
+            "meanPredicted": 0.24837699779552735,
+            "observedRate": 0.1597444089456869,
+            "gap": -0.08863258884984046
+          },
+          {
+            "bucketIndex": 2,
+            "lower": 0.4,
+            "upper": 0.6,
+            "n": 17,
+            "meanPredicted": 0.432212494117647,
+            "observedRate": 0.5294117647058824,
+            "gap": 0.09719927058823535
+          }
+        ],
+        "expectedCalibrationError": 0.027742,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 172,
+            "covered": 163,
+            "inclusionRate": 0.966,
+            "coverageRate": 0.9477
+          },
+          {
+            "outcome": "2",
+            "actuals": 136,
+            "covered": 118,
+            "inclusionRate": 0.84,
+            "coverageRate": 0.8676
+          },
+          {
+            "outcome": "5",
+            "actuals": 59,
+            "covered": 24,
+            "inclusionRate": 0.408,
+            "coverageRate": 0.4068
+          },
+          {
+            "outcome": "10",
+            "actuals": 41,
+            "covered": 19,
+            "inclusionRate": 0.496,
+            "coverageRate": 0.4634
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 42,
+            "covered": 17,
+            "inclusionRate": 0.44,
+            "coverageRate": 0.4048
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 17,
+            "covered": 4,
+            "inclusionRate": 0.226,
+            "coverageRate": 0.2353
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 21,
+            "covered": 6,
+            "inclusionRate": 0.402,
+            "coverageRate": 0.2857
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 12,
+            "covered": 3,
+            "inclusionRate": 0.222,
+            "coverageRate": 0.25
+          }
+        ],
+        "bonusInclusionRate": 1.29
+      }
+    },
+    "comparisons": [
+      {
+        "label": "C (time-only) vs B (production)",
+        "armA": "C_time",
+        "armB": "B_history",
+        "pairedRounds": 468,
+        "onlyA": 153,
+        "onlyB": 31,
+        "rateA": 0.807692,
+        "rateB": 0.547009,
+        "deltaPp": 26.068,
+        "mcnemarP": 0,
+        "mcnemarConclusive": true,
+        "significant": true,
+        "ciLowDeltaPp": 21.154,
+        "ciHighDeltaPp": 31.41,
+        "note": "McNemar χ²(1)=79.571, p=0.0000 — SIGNIFICANT difference (r=153 A-only hits, s=31 B-only hits). [survives BH-FDR 5% across the comparison family]"
+      },
+      {
+        "label": "F (history+time) vs B (production)",
+        "armA": "F_history_time",
+        "armB": "B_history",
+        "pairedRounds": 468,
+        "onlyA": 98,
+        "onlyB": 11,
+        "rateA": 0.732906,
+        "rateB": 0.547009,
+        "deltaPp": 18.59,
+        "mcnemarP": 0,
+        "mcnemarConclusive": true,
+        "significant": true,
+        "ciLowDeltaPp": 14.744,
+        "ciHighDeltaPp": 22.65,
+        "note": "McNemar χ²(1)=67.853, p=0.0000 — SIGNIFICANT difference (r=98 A-only hits, s=11 B-only hits). [survives BH-FDR 5% across the comparison family]"
+      },
+      {
+        "label": "D (dealer-only) vs B (production)",
+        "armA": "D_dealer",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm D_dealer has no real data on this dataset."
+      },
+      {
+        "label": "G (history+dealer) vs B (production)",
+        "armA": "G_history_dealer",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm G_history_dealer has no real data on this dataset."
+      },
+      {
+        "label": "E (physics-only) vs B (production)",
+        "armA": "E_physics",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm E_physics has no real data on this dataset."
+      },
+      {
+        "label": "H (history+physics) vs B (production)",
+        "armA": "H_history_physics",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm H_history_physics has no real data on this dataset."
+      },
+      {
+        "label": "I (time+dealer+physics) vs B (production)",
+        "armA": "I_time_dealer_physics",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm I_time_dealer_physics has no real data on this dataset."
+      },
+      {
+        "label": "J (full ensemble) vs B (production)",
+        "armA": "J_full",
+        "armB": "B_history",
+        "pairedRounds": 500,
+        "onlyA": 88,
+        "onlyB": 11,
+        "rateA": 0.708,
+        "rateB": 0.554,
+        "deltaPp": 15.4,
+        "mcnemarP": 0,
+        "mcnemarConclusive": true,
+        "significant": true,
+        "ciLowDeltaPp": 11.8,
+        "ciHighDeltaPp": 19.2,
+        "note": "McNemar χ²(1)=58.343, p=0.0000 — SIGNIFICANT difference (r=88 A-only hits, s=11 B-only hits). [survives BH-FDR 5% across the comparison family]"
+      },
+      {
+        "label": "J (full ensemble) vs F (history+time)",
+        "armA": "J_full",
+        "armB": "F_history_time",
+        "pairedRounds": 468,
+        "onlyA": 0,
+        "onlyB": 10,
+        "rateA": 0.711538,
+        "rateB": 0.732906,
+        "deltaPp": -2.137,
+        "mcnemarP": 0.004427,
+        "mcnemarConclusive": true,
+        "significant": true,
+        "ciLowDeltaPp": -3.632,
+        "ciHighDeltaPp": -0.855,
+        "note": "McNemar χ²(1)=8.100, p=0.0044 — SIGNIFICANT difference (r=0 A-only hits, s=10 B-only hits). [survives BH-FDR 5% across the comparison family]"
+      },
+      {
+        "label": "C (time-only) vs A (theoretical)",
+        "armA": "C_time",
+        "armB": "A_theoretical",
+        "pairedRounds": 468,
+        "onlyA": 10,
+        "onlyB": 15,
+        "rateA": 0.807692,
+        "rateB": 0.818376,
+        "deltaPp": -1.068,
+        "mcnemarP": 0.423711,
+        "mcnemarConclusive": true,
+        "significant": false,
+        "ciLowDeltaPp": -3.205,
+        "ciHighDeltaPp": 0.855,
+        "note": "McNemar χ²(1)=0.640, p=0.4237 — no significant difference (r=10 A-only hits, s=15 B-only hits)."
+      },
+      {
+        "label": "F (history+time) vs A (theoretical)",
+        "armA": "F_history_time",
+        "armB": "A_theoretical",
+        "pairedRounds": 468,
+        "onlyA": 28,
+        "onlyB": 68,
+        "rateA": 0.732906,
+        "rateB": 0.818376,
+        "deltaPp": -8.547,
+        "mcnemarP": 0.000069,
+        "mcnemarConclusive": true,
+        "significant": true,
+        "ciLowDeltaPp": -12.607,
+        "ciHighDeltaPp": -4.487,
+        "note": "McNemar χ²(1)=15.844, p=0.0001 — SIGNIFICANT difference (r=28 A-only hits, s=68 B-only hits). [survives BH-FDR 5% across the comparison family]"
+      },
+      {
+        "label": "D (dealer-only) vs A (theoretical)",
+        "armA": "D_dealer",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm D_dealer has no real data on this dataset."
+      },
+      {
+        "label": "G (history+dealer) vs A (theoretical)",
+        "armA": "G_history_dealer",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm G_history_dealer has no real data on this dataset."
+      },
+      {
+        "label": "E (physics-only) vs A (theoretical)",
+        "armA": "E_physics",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm E_physics has no real data on this dataset."
+      },
+      {
+        "label": "H (history+physics) vs A (theoretical)",
+        "armA": "H_history_physics",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm H_history_physics has no real data on this dataset."
+      },
+      {
+        "label": "I (time+dealer+physics) vs A (theoretical)",
+        "armA": "I_time_dealer_physics",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm I_time_dealer_physics has no real data on this dataset."
+      },
+      {
+        "label": "B (production) vs A (theoretical)",
+        "armA": "B_history",
+        "armB": "A_theoretical",
+        "pairedRounds": 500,
+        "onlyA": 33,
+        "onlyB": 164,
+        "rateA": 0.554,
+        "rateB": 0.816,
+        "deltaPp": -26.2,
+        "mcnemarP": 0,
+        "mcnemarConclusive": true,
+        "significant": true,
+        "ciLowDeltaPp": -31,
+        "ciHighDeltaPp": -20.8,
+        "note": "McNemar χ²(1)=85.787, p=0.0000 — SIGNIFICANT difference (r=33 A-only hits, s=164 B-only hits). [survives BH-FDR 5% across the comparison family]"
+      },
+      {
+        "label": "J (full ensemble) vs A (theoretical)",
+        "armA": "J_full",
+        "armB": "A_theoretical",
+        "pairedRounds": 500,
+        "onlyA": 30,
+        "onlyB": 84,
+        "rateA": 0.708,
+        "rateB": 0.816,
+        "deltaPp": -10.8,
+        "mcnemarP": 0.000001,
+        "mcnemarConclusive": true,
+        "significant": true,
+        "ciLowDeltaPp": -15,
+        "ciHighDeltaPp": -6.8,
+        "note": "McNemar χ²(1)=24.640, p=0.0000 — SIGNIFICANT difference (r=30 A-only hits, s=84 B-only hits). [survives BH-FDR 5% across the comparison family]"
+      }
+    ],
+    "audits": {
+      "duplicate": {
+        "passed": true,
+        "duplicates": []
+      },
+      "timestamp": {
+        "passed": true,
+        "problems": [],
+        "firstSettledAt": 1789342766841,
+        "lastSettledAt": 1789369836940,
+        "monotonic": true
+      },
+      "leakage": {
+        "passed": true,
+        "violations": [],
+        "checkedRounds": 500
+      },
+      "integrity": {
+        "passed": true,
+        "problems": []
+      }
+    },
+    "timeSignalDiagnostics": {
+      "regimeStatusCounts": {
+        "INSUFFICIENT_DATA": 90,
+        "NO_REGIME": 410
+      },
+      "activeRounds": 468,
+      "meanConfidence": 0.4406,
+      "meanPrimarySample": 47.45,
+      "windowUsage": {
+        "rolling_10": 11,
+        "rolling_25": 15,
+        "rolling_50": 474
+      }
+    },
+    "recommendation": {
+      "promotable": [
+        {
+          "signal": "TIME_SIGNAL",
+          "allowed": false,
+          "reasons": [
+            "does NOT beat the theoretical [1,2,5,10] baseline (Δ=-1.07 pp over 468 paired rounds)"
+          ]
+        },
+        {
+          "signal": "DEALER_SIGNAL",
+          "allowed": false,
+          "reasons": [
+            "arm has no real data on this dataset",
+            "only 0 rounds (need ≥200)",
+            "no paired comparison available vs B_history",
+            "no paired comparison available vs the theoretical [1,2,5,10] baseline"
+          ]
+        },
+        {
+          "signal": "PHYSICS_SIGNAL",
+          "allowed": false,
+          "reasons": [
+            "arm has no real data on this dataset",
+            "only 0 rounds (need ≥200)",
+            "no paired comparison available vs B_history",
+            "no paired comparison available vs the theoretical [1,2,5,10] baseline"
+          ]
+        },
+        {
+          "signal": "FUSION",
+          "allowed": false,
+          "reasons": [
+            "does NOT beat the theoretical [1,2,5,10] baseline (Δ=-10.80 pp over 500 paired rounds)"
+          ]
+        }
+      ],
+      "summary": "Evaluated 500 real settled rounds. Promotion requires ≥200 paired rounds with a positive, CI-supported out-of-sample delta and clean audits."
+    },
+    "disclaimer": "100% accuracy is a DEVELOPMENT TARGET, never a guarantee. Walk-forward results are out-of-sample for the model but come from a historical dataset; a genuine promotion additionally requires fresh live paired rounds. No signal is promoted on a small sample, and the production scorer is untouched until a promotion gate passes."
+  },
+  "secondary": {
+    "version": "signal-validation-v1.0",
+    "dataset": "pass179_history.json (1279 rounds, live baseline ledger)",
+    "generatedAt": 1789844257786,
+    "roundsEvaluated": 1279,
+    "roundsAvailable": 1279,
+    "roundRange": {
+      "from": 1789058112914,
+      "to": 1789134522048
+    },
+    "arms": {
+      "A_theoretical": {
+        "key": "A_theoretical",
+        "label": "A · theoretical [1,2,5,10]",
+        "available": true,
+        "unavailableReason": null,
+        "rounds": 1279,
+        "hits": 1073,
+        "hitRate": 0.838937,
+        "wilson": {
+          "low": 0.8177805221142759,
+          "high": 0.8580628555872268,
+          "width": 0.04028233347295096,
+          "center": 0.8389366692728695
+        },
+        "bootstrapCI": {
+          "low": 0.818608287724785,
+          "high": 0.8592650508209538,
+          "width": 0.040656763096168835,
+          "center": 0.8389366692728695
+        },
+        "brier": 0.751942,
+        "logLoss": 1.670481,
+        "calibration": [
+          {
+            "bucketIndex": 0,
+            "lower": 0,
+            "upper": 0.2,
+            "n": 7674,
+            "meanPredicted": 0.06172839506172432,
+            "observedRate": 0.05759708105290592,
+            "gap": -0.004131314008818401
+          },
+          {
+            "bucketIndex": 1,
+            "lower": 0.2,
+            "upper": 0.4,
+            "n": 2558,
+            "meanPredicted": 0.3148148148148298,
+            "observedRate": 0.32720875684128226,
+            "gap": 0.012393942026452442
+          }
+        ],
+        "expectedCalibrationError": 0.006197,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 512,
+            "covered": 512,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "2",
+            "actuals": 325,
+            "covered": 325,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "5",
+            "actuals": 137,
+            "covered": 137,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "10",
+            "actuals": 99,
+            "covered": 99,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 74,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 44,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 52,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 36,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": 0
+      },
+      "B_history": {
+        "key": "B_history",
+        "label": "B · existing production history engine",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for history channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "C_time": {
+        "key": "C_time",
+        "label": "C · time-only",
+        "available": true,
+        "unavailableReason": null,
+        "rounds": 1247,
+        "hits": 1043,
+        "hitRate": 0.836407,
+        "wilson": {
+          "low": 0.814848565064763,
+          "high": 0.8558998334534826,
+          "width": 0.04105126838871964,
+          "center": 0.8364073777064955
+        },
+        "bootstrapCI": {
+          "low": 0.8171611868484362,
+          "high": 0.8564554931836408,
+          "width": 0.03929430633520459,
+          "center": 0.8364073777064955
+        },
+        "brier": 0.752946,
+        "logLoss": 1.673102,
+        "calibration": [
+          {
+            "bucketIndex": 0,
+            "lower": 0,
+            "upper": 0.2,
+            "n": 7482,
+            "meanPredicted": 0.06072865643009922,
+            "observedRate": 0.05800588078053996,
+            "gap": -0.0027227756495592573
+          },
+          {
+            "bucketIndex": 1,
+            "lower": 0.2,
+            "upper": 0.4,
+            "n": 2430,
+            "meanPredicted": 0.3155852742757208,
+            "observedRate": 0.3242798353909465,
+            "gap": 0.008694561115225707
+          },
+          {
+            "bucketIndex": 2,
+            "lower": 0.4,
+            "upper": 0.6,
+            "n": 64,
+            "meanPredicted": 0.40243712484374994,
+            "observedRate": 0.390625,
+            "gap": -0.011812124843749938
+          }
+        ],
+        "expectedCalibrationError": 0.004236,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 498,
+            "covered": 498,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "2",
+            "actuals": 315,
+            "covered": 315,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "5",
+            "actuals": 135,
+            "covered": 135,
+            "inclusionRate": 1,
+            "coverageRate": 1
+          },
+          {
+            "outcome": "10",
+            "actuals": 96,
+            "covered": 76,
+            "inclusionRate": 0.7963,
+            "coverageRate": 0.7917
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 73,
+            "covered": 19,
+            "inclusionRate": 0.2037,
+            "coverageRate": 0.2603
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 44,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 50,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 36,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": 0.203689
+      },
+      "D_dealer": {
+        "key": "D_dealer",
+        "label": "D · dealer-only",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for dealer channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "E_physics": {
+        "key": "E_physics",
+        "label": "E · physics-only",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for physics channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "F_history_time": {
+        "key": "F_history_time",
+        "label": "F · history + time",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for history, time channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "G_history_dealer": {
+        "key": "G_history_dealer",
+        "label": "G · history + dealer",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for history, dealer channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "H_history_physics": {
+        "key": "H_history_physics",
+        "label": "H · history + physics",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for history, physics channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "I_time_dealer_physics": {
+        "key": "I_time_dealer_physics",
+        "label": "I · time + dealer + physics",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for time, dealer, physics channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      },
+      "J_full": {
+        "key": "J_full",
+        "label": "J · full ensemble",
+        "available": false,
+        "unavailableReason": "NO REAL DATA for history channel(s) — arm not evaluated (never fabricated).",
+        "rounds": 0,
+        "hits": 0,
+        "hitRate": 0,
+        "wilson": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0.5
+        },
+        "bootstrapCI": {
+          "low": 0,
+          "high": 1,
+          "width": 1,
+          "center": 0
+        },
+        "brier": null,
+        "logLoss": null,
+        "calibration": [],
+        "expectedCalibrationError": null,
+        "perOutcome": [
+          {
+            "outcome": "1",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "2",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "5",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "10",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "COIN FLIP",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "PACHINKO",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CASH HUNT",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          },
+          {
+            "outcome": "CRAZY TIME",
+            "actuals": 0,
+            "covered": 0,
+            "inclusionRate": 0,
+            "coverageRate": 0
+          }
+        ],
+        "bonusInclusionRate": null
+      }
+    },
+    "comparisons": [
+      {
+        "label": "C (time-only) vs B (production)",
+        "armA": "C_time",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm B_history has no real data on this dataset."
+      },
+      {
+        "label": "F (history+time) vs B (production)",
+        "armA": "F_history_time",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm F_history_time has no real data on this dataset."
+      },
+      {
+        "label": "D (dealer-only) vs B (production)",
+        "armA": "D_dealer",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm D_dealer has no real data on this dataset."
+      },
+      {
+        "label": "G (history+dealer) vs B (production)",
+        "armA": "G_history_dealer",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm G_history_dealer has no real data on this dataset."
+      },
+      {
+        "label": "E (physics-only) vs B (production)",
+        "armA": "E_physics",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm E_physics has no real data on this dataset."
+      },
+      {
+        "label": "H (history+physics) vs B (production)",
+        "armA": "H_history_physics",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm H_history_physics has no real data on this dataset."
+      },
+      {
+        "label": "I (time+dealer+physics) vs B (production)",
+        "armA": "I_time_dealer_physics",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm I_time_dealer_physics has no real data on this dataset."
+      },
+      {
+        "label": "J (full ensemble) vs B (production)",
+        "armA": "J_full",
+        "armB": "B_history",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm J_full has no real data on this dataset."
+      },
+      {
+        "label": "J (full ensemble) vs F (history+time)",
+        "armA": "J_full",
+        "armB": "F_history_time",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm J_full has no real data on this dataset."
+      },
+      {
+        "label": "C (time-only) vs A (theoretical)",
+        "armA": "C_time",
+        "armB": "A_theoretical",
+        "pairedRounds": 1247,
+        "onlyA": 19,
+        "onlyB": 20,
+        "rateA": 0.836407,
+        "rateB": 0.837209,
+        "deltaPp": -0.08,
+        "mcnemarP": 1,
+        "mcnemarConclusive": true,
+        "significant": false,
+        "ciLowDeltaPp": -1.043,
+        "ciHighDeltaPp": 0.882,
+        "note": "McNemar χ²(1)=0.000, p=1.0000 — no significant difference (r=19 A-only hits, s=20 B-only hits)."
+      },
+      {
+        "label": "F (history+time) vs A (theoretical)",
+        "armA": "F_history_time",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm F_history_time has no real data on this dataset."
+      },
+      {
+        "label": "D (dealer-only) vs A (theoretical)",
+        "armA": "D_dealer",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm D_dealer has no real data on this dataset."
+      },
+      {
+        "label": "G (history+dealer) vs A (theoretical)",
+        "armA": "G_history_dealer",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm G_history_dealer has no real data on this dataset."
+      },
+      {
+        "label": "E (physics-only) vs A (theoretical)",
+        "armA": "E_physics",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm E_physics has no real data on this dataset."
+      },
+      {
+        "label": "H (history+physics) vs A (theoretical)",
+        "armA": "H_history_physics",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm H_history_physics has no real data on this dataset."
+      },
+      {
+        "label": "I (time+dealer+physics) vs A (theoretical)",
+        "armA": "I_time_dealer_physics",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm I_time_dealer_physics has no real data on this dataset."
+      },
+      {
+        "label": "B (production) vs A (theoretical)",
+        "armA": "B_history",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm B_history has no real data on this dataset."
+      },
+      {
+        "label": "J (full ensemble) vs A (theoretical)",
+        "armA": "J_full",
+        "armB": "A_theoretical",
+        "pairedRounds": 0,
+        "onlyA": 0,
+        "onlyB": 0,
+        "rateA": 0,
+        "rateB": 0,
+        "deltaPp": 0,
+        "mcnemarP": 1,
+        "mcnemarConclusive": false,
+        "significant": false,
+        "ciLowDeltaPp": 0,
+        "ciHighDeltaPp": 0,
+        "note": "NOT EVALUATED — arm J_full has no real data on this dataset."
+      }
+    ],
+    "audits": {
+      "duplicate": {
+        "passed": true,
+        "duplicates": []
+      },
+      "timestamp": {
+        "passed": true,
+        "problems": [],
+        "firstSettledAt": 1789058112914,
+        "lastSettledAt": 1789134522048,
+        "monotonic": true
+      },
+      "leakage": {
+        "passed": true,
+        "violations": [],
+        "checkedRounds": 1279
+      },
+      "integrity": {
+        "passed": true,
+        "problems": []
+      }
+    },
+    "timeSignalDiagnostics": {
+      "regimeStatusCounts": {
+        "INSUFFICIENT_DATA": 90,
+        "NO_REGIME": 1148,
+        "CONFIRMED_REGIME": 41
+      },
+      "activeRounds": 1247,
+      "meanConfidence": 0.4569,
+      "meanPrimarySample": 49,
+      "windowUsage": {
+        "rolling_10": 11,
+        "rolling_25": 15,
+        "rolling_50": 1253
+      }
+    },
+    "recommendation": {
+      "promotable": [
+        {
+          "signal": "TIME_SIGNAL",
+          "allowed": false,
+          "reasons": [
+            "no paired comparison available vs B_history",
+            "does NOT beat the theoretical [1,2,5,10] baseline (Δ=-0.08 pp over 1247 paired rounds)"
+          ]
+        },
+        {
+          "signal": "DEALER_SIGNAL",
+          "allowed": false,
+          "reasons": [
+            "arm has no real data on this dataset",
+            "only 0 rounds (need ≥200)",
+            "no paired comparison available vs B_history",
+            "no paired comparison available vs the theoretical [1,2,5,10] baseline"
+          ]
+        },
+        {
+          "signal": "PHYSICS_SIGNAL",
+          "allowed": false,
+          "reasons": [
+            "arm has no real data on this dataset",
+            "only 0 rounds (need ≥200)",
+            "no paired comparison available vs B_history",
+            "no paired comparison available vs the theoretical [1,2,5,10] baseline"
+          ]
+        },
+        {
+          "signal": "FUSION",
+          "allowed": false,
+          "reasons": [
+            "arm has no real data on this dataset",
+            "only 0 rounds (need ≥200)",
+            "no paired comparison available vs B_history",
+            "no paired comparison available vs the theoretical [1,2,5,10] baseline"
+          ]
+        }
+      ],
+      "summary": "Evaluated 1279 real settled rounds. Promotion requires ≥200 paired rounds with a positive, CI-supported out-of-sample delta and clean audits."
+    },
+    "disclaimer": "100% accuracy is a DEVELOPMENT TARGET, never a guarantee. Walk-forward results are out-of-sample for the model but come from a historical dataset; a genuine promotion additionally requires fresh live paired rounds. No signal is promoted on a small sample, and the production scorer is untouched until a promotion gate passes."
+  },
+  "meta": {
+    "generatedAt": 1789844257786,
+    "runner": "scripts/validate_signal_layers.ts",
+    "nodeRuntime": "v22.22.3",
+    "note": "Both datasets contain REAL settled rounds collected from the live game. No mock or synthetic rounds are used in any accuracy metric."
+  }
+}
