@@ -61,11 +61,15 @@ export function RevoSignalEnsemblePanel() {
   const rounds = getTimedRounds();
   const [message, setMessage] = useState<string | null>(null);
   const mounted = useMounted();
+  // Simple, lint-friendly dependency values.
+  const roundCount = rounds.length;
+  const latestSettledAt = rounds.length > 0 ? rounds[rounds.length - 1].settledAt : null;
 
   // Build the live bundle from real data only. Production probabilities are
   // not supplied here (the panel is a diagnostic view); the bundle therefore
   // reports exactly which channels have real data at this moment.
   const production = getProductionPrediction();
+  const publishedAt = production?.publishedAt ?? 0;
 
   // (a) the REAL bundle for this moment — governed by the actual flags, so with
   //     everything OFF it is PRODUCTION_PASSTHROUGH and the production Top-4 is
@@ -81,7 +85,7 @@ export function RevoSignalEnsemblePanel() {
         historyTop4: production?.top4 ?? null,
         recordPrediction: false,
       }),
-    [rounds.length, rounds[rounds.length - 1]?.settledAt, production?.publishedAt, flags.TIME_SIGNAL, flags.DEALER_SIGNAL, flags.PHYSICS_SIGNAL, flags.FUSION],
+    [roundCount, latestSettledAt, publishedAt, production, flags.TIME_SIGNAL, flags.DEALER_SIGNAL, flags.PHYSICS_SIGNAL, flags.FUSION],
   );
 
   const shadowFlags: SignalFeatureFlags = useMemo(
@@ -97,7 +101,7 @@ export function RevoSignalEnsemblePanel() {
         flagsOverride: shadowFlags,
         recordPrediction: false,
       }),
-    [rounds.length, rounds[rounds.length - 1]?.settledAt, production?.publishedAt, shadowFlags],
+    [roundCount, latestSettledAt, publishedAt, production, shadowFlags],
   );
 
   const ensemble = bundle.ensemble;
@@ -202,6 +206,7 @@ export function RevoSignalEnsemblePanel() {
               <thead>
                 <tr className="text-left text-[#5a6a99]">
                   <th className="py-1 pr-2">Channel</th>
+                  <th className="py-1 pr-2">Status</th>
                   <th className="py-1 pr-2">Enabled</th>
                   <th className="py-1 pr-2">Data</th>
                   <th className="py-1 pr-2">Confidence</th>
@@ -213,6 +218,9 @@ export function RevoSignalEnsemblePanel() {
                 {ensemble.channels.map((c) => (
                   <tr key={c.key} className="border-t border-[#151a33]">
                     <td className="py-1 pr-2 text-white">{c.label}</td>
+                    <td className="py-1 pr-2 font-bold" style={{ color: c.status === "READY" ? "#2ed573" : "#ffa502" }}>
+                      {c.status === "READY" ? "READY" : "INSUFFICIENT"}
+                    </td>
                     <td className="py-1 pr-2" style={{ color: c.enabled ? "#2ed573" : "#5a6a99" }}>{c.enabled ? "on" : "off"}</td>
                     <td className="py-1 pr-2" style={{ color: c.available ? "#2ed573" : "#ff4757" }}>{c.available ? "real" : "none"}</td>
                     <td className="py-1 pr-2 text-[#8899cc]">{pct(c.confidence, 0)}</td>

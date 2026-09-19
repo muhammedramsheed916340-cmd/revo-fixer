@@ -152,6 +152,120 @@ export function appearanceDistance(a: AppearanceDescriptor, b: AppearanceDescrip
 export const APPEARANCE_MATCH_THRESHOLD = 0.9; // L1 sum over 8 bins (≈0.11 per bin)
 
 // ============================================================
+// 1b. DEALER POSITION (video geometry — measured, never hardcoded)
+// ============================================================
+// The dealer position is derived from WHERE the frame-to-frame image change is
+// concentrated: the live frame is reduced to a coarse column-luminance grid and
+// the temporal change is summed per screen third (left third / middle / right
+// third). This is a MOVEMENT-LOCALISATION estimate (the person operating the
+// table is the dominant moving subject in the frame), NOT a face detector and
+// NOT a biometric measure.
+//
+// It only answers when the evidence is concentrated enough (share of the total
+// change energy in the winning third, plus a minimum absolute energy). Below
+// that it returns UNKNOWN with the exact reason — the position is never guessed
+// and never hardcoded.
+
+export type DealerPosition = "LEFT" | "CENTER" | "RIGHT" | "UNKNOWN";
+
+export const DEALER_POSITION_COLUMNS = 12;
+export const DEALER_POSITION_MIN_SHARE = 0.5;   // winning third must own ≥50% of the change energy
+export const DEALER_POSITION_MIN_ENERGY = 0.02; // minimum mean |Δluma| for the frame to carry any signal
+
+export interface DealerPositionEstimate {
+  position: DealerPosition;
+  confidence: number;                 // 0..1
+  method: "frame-change-localization";
+  share: number;                      // share of the change energy in the winning third
+  energy: number;                     // total change energy of the sample
+  thirds: { left: number; center: number; right: number };
+  reason: string;
+  timestamp: number;
+}
+
+function thirdsOf(columns: number[]): { left: number; center: number; right: number; bounds: [number, number][] } {
+  const n = columns.length;
+  const third = Math.max(1, Math.round(n / 3));
+  const ranges: [number, number][] = [
+    [0, third],
+    [third, Math.min(n, third * 2)],
+    [Math.min(n, third * 2), n],
+  ];
+  const sums = ranges.map(([a, b]) => columns.slice(a, b).reduce((acc, v) => acc + Math.abs(Number.isFinite(v) ? v : 0), 0));
+  return { left: sums[0], center: sums[1], right: sums[2], bounds: ranges };
+}
+
+/**
+ * Estimate the dealer position from two consecutive coarse column-luminance
+ * samples of the live frame. `previousColumns` is required — a single frame
+ * carries no movement information, and the estimator says so instead of
+ * inventing a position.
+ */
+export function estimateDealerPosition(input: {
+  columns: number[] | null | undefined;
+  previousColumns: number[] | null | undefined;
+  timestamp: number;
+}): DealerPositionEstimate {
+  const empty: DealerPositionEstimate = {
+    position: "UNKNOWN",
+    confidence: 0,
+    method: "frame-change-localization",
+    share: 0,
+    energy: 0,
+    thirds: { left: 0, center: 0, right: 0 },
+    reason: "no frame data",
+    timestamp: input.timestamp,
+  };
+  const cols = input.columns;
+  const prev = input.previousColumns;
+  if (!Array.isArray(cols) || cols.length < 6) {
+    return { ...empty, reason: `frame grid too small (${Array.isArray(cols) ? cols.length : 0} columns)` };
+  }
+  if (!Array.isArray(prev) || prev.length !== cols.length) {
+    return { ...empty, reason: "waiting for a second frame (position needs frame-to-frame change)" };
+  }
+  const delta = cols.map((c, i) => Math.abs((Number.isFinite(c) ? c : 0) - (Number.isFinite(prev[i]) ? prev[i] : 0)));
+  const energy = delta.reduce((a, b) => a + b, 0) / delta.length;
+  const thirds = thirdsOf(delta);
+  const total = thirds.left + thirds.center + thirds.right;
+  if (total <= 0 || energy < DEALER_POSITION_MIN_ENERGY) {
+    return {
+      ...empty,
+      energy: roundTo(energy, 5),
+      reason: `frame change too small (energy ${energy.toFixed(4)} < ${DEALER_POSITION_MIN_ENERGY}) — person/table not localisable in this sample`,
+    };
+  }
+  const ranked = ([
+    { key: "LEFT", value: thirds.left },
+    { key: "CENTER", value: thirds.center },
+    { key: "RIGHT", value: thirds.right },
+  ] as { key: DealerPosition; value: number }[]).sort((a, b) => b.value - a.value);
+  const share = ranked[0].value / total;
+  if (share < DEALER_POSITION_MIN_SHARE) {
+    return {
+      position: "UNKNOWN",
+      confidence: roundTo(share, 4),
+      method: "frame-change-localization",
+      share: roundTo(share, 4),
+      energy: roundTo(energy, 5),
+      thirds: { left: roundTo(thirds.left, 5), center: roundTo(thirds.center, 5), right: roundTo(thirds.right, 5) },
+      reason: `change is spread across the frame (best third holds only ${(share * 100).toFixed(0)}% < ${(DEALER_POSITION_MIN_SHARE * 100).toFixed(0)}%) — position UNKNOWN rather than guessed`,
+      timestamp: input.timestamp,
+    };
+  }
+  return {
+    position: ranked[0].key,
+    confidence: roundTo(Math.min(1, share * (0.6 + 0.4 * Math.min(1, energy / 0.1))), 4),
+    method: "frame-change-localization",
+    share: roundTo(share, 4),
+    energy: roundTo(energy, 5),
+    thirds: { left: roundTo(thirds.left, 5), center: roundTo(thirds.center, 5), right: roundTo(thirds.right, 5) },
+    reason: `change concentrated in the ${ranked[0].key.toLowerCase()} third (${(share * 100).toFixed(0)}% of frame change)`,
+    timestamp: input.timestamp,
+  };
+}
+
+// ============================================================
 // 2. DEALER PROFILE MODEL
 // ============================================================
 
@@ -170,6 +284,10 @@ export interface DealerObservation {
   spinId?: string | null;
   confidence: number;            // identification confidence 0..1 (never assumed 1)
   method: "appearance" | "public-name" | "manual" | "combined";
+  /** MEASURED screen position of the dominant moving subject (video thirds). */
+  position?: DealerPosition;
+  positionConfidence?: number;
+  positionReason?: string;
   physics?: {
     direction: WheelDirection;
     speed: number;
@@ -199,6 +317,13 @@ export interface DealerProfile {
   /** Outcomes of rounds confirmed under this dealer (roundId → outcome). */
   rounds: { roundId: string; spinId: string; outcome: string; settledAt: number }[];
   wheel: DealerWheelStats;
+  /** MEASURED position: latest confident estimate + how often each was seen. */
+  position: {
+    current: DealerPosition;
+    confidence: number;
+    counts: { LEFT: number; CENTER: number; RIGHT: number; UNKNOWN: number };
+    lastReason: string;
+  };
   /** Identification quality across observations. */
   identification: { meanConfidence: number; observations: number; appearances: number; names: number };
 }
@@ -255,6 +380,12 @@ function newProfile(dealerId: string, timestamp: number, name: string | null, ta
     rounds: [],
     wheel: emptyWheelStats(),
     identification: { meanConfidence: 0, observations: 0, appearances: descriptor ? 1 : 0, names: name ? 1 : 0 },
+    position: {
+      current: "UNKNOWN",
+      confidence: 0,
+      counts: { LEFT: 0, CENTER: 0, RIGHT: 0, UNKNOWN: 0 },
+      lastReason: "no position observation yet",
+    },
   };
 }
 
@@ -358,6 +489,19 @@ export function recordDealerObservation(input: {
 
   profile.observations = [...profile.observations, input.observation];
   profile.lastSeen = Math.max(profile.lastSeen, input.observation.timestamp);
+
+  // MEASURED screen position (video thirds). Only a confident estimate updates
+  // the "current" value; UNKNOWN observations are still counted and keep their
+  // reason so the UI can explain why the position is unknown.
+  const observedPosition: DealerPosition = input.observation.position ?? "UNKNOWN";
+  profile.position.counts[observedPosition]++;
+  if (observedPosition !== "UNKNOWN") {
+    profile.position.current = observedPosition;
+    profile.position.confidence = roundTo(input.observation.positionConfidence ?? 0, 4);
+    profile.position.lastReason = input.observation.positionReason ?? "measured from frame-change localization";
+  } else {
+    profile.position.lastReason = input.observation.positionReason ?? "no confident position estimate for this sample";
+  }
   touchSession(profile, input.observation.timestamp);
   const last = profile.sessions[profile.sessions.length - 1];
   last.observationCount++;
@@ -1097,4 +1241,53 @@ export function summarizeDealerSignal(): DealerSignalSummary {
     activeNow: profiles.filter((p) => p.rounds.length >= DEFAULT_DEALER_REGIME_OPTIONS.minDealerRounds).length,
     note: "Dealer statistics are only meaningful with real attributed rounds from the live UI; no synthetic dealer data is ever created.",
   };
+}
+
+// ============================================================
+// 8. PERSISTENCE (additive — coarse, non-sensitive data only)
+// ============================================================
+// Only the identity-safe parts of a profile are persisted: the minted dealerId,
+// the public-UI name (when the game showed one), the table id (when exposed),
+// timestamps/sessions/rounds and the COARSE 8-bin appearance descriptor. No
+// images and no biometric templates are ever stored.
+
+export const DEALER_PROFILES_VERSION = "dealer-profiles-persist-v1";
+
+export function exportDealerProfiles(): { version: string; profiles: DealerProfile[] } {
+  return { version: DEALER_PROFILES_VERSION, profiles };
+}
+
+/** Restore persisted profiles. Never overwrites a profile seen in this session. */
+export function importDealerProfiles(payload: unknown): { restored: number; skipped: number } {
+  const data = payload as { version?: string; profiles?: DealerProfile[] } | null;
+  if (!data || !Array.isArray(data.profiles)) return { restored: 0, skipped: 0 };
+  let restored = 0;
+  let skipped = 0;
+  for (const p of data.profiles) {
+    if (!p || typeof p.dealerId !== "string" || !Array.isArray(p.rounds) || !Array.isArray(p.sessions)) {
+      skipped++;
+      continue;
+    }
+    const existing = profiles.find((x) => x.dealerId === p.dealerId);
+    if (existing) {
+      // merge: keep the richer record, never shrink what we already have
+      existing.rounds = existing.rounds.length >= p.rounds.length ? existing.rounds : p.rounds;
+      existing.sessions = existing.sessions.length >= p.sessions.length ? existing.sessions : p.sessions;
+      existing.lastSeen = Math.max(existing.lastSeen, p.lastSeen ?? 0);
+      existing.descriptor = existing.descriptor ?? p.descriptor ?? null;
+      existing.name = existing.name ?? p.name ?? null;
+      if (existing.position.current === "UNKNOWN" && p.position && p.position.current !== "UNKNOWN") {
+        existing.position = p.position;
+      }
+      restored++;
+      continue;
+    }
+    profiles = [...profiles, {
+      ...p,
+      position: p.position ?? { current: "UNKNOWN", confidence: 0, counts: { LEFT: 0, CENTER: 0, RIGHT: 0, UNKNOWN: 0 }, lastReason: "restored from storage" },
+    }];
+    restored++;
+  }
+  if (restored > 0) notifyDealer();
+  return { restored, skipped };
 }

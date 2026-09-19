@@ -235,6 +235,202 @@ export function analyzeDirection(frames: MotionFrame[]): DirectionEstimate {
 }
 
 // ============================================================
+// 2b. LIVE ROTATION READOUT (for the UI + debug panel)
+// ============================================================
+// A single, explicitly-sourced answer to "which way is the wheel turning right
+// now and how fast". It NEVER guesses: when the measured motion is below the
+// direction threshold the answer is UNKNOWN/IDLE with the exact reason.
+//
+// Sources, in order of preference:
+//   1. video frames (per-frame unwrapped-angle deltas + signed velocities)
+//   2. the live sensor state (its own filtered velocity, when frames are sparse)
+//
+// Sign convention (project-wide): positive angular velocity = RIGHT/CW,
+// negative = LEFT/CCW. The convention is VERIFIED against the measured angle
+// delta of the same frames (`signAgreement`), so a wrong sensor sign is surfaced
+// instead of silently trusted.
+
+/** |velocity| below this is treated as "not rotating" → direction UNKNOWN. */
+export const ROTATION_DIRECTION_MIN_DEG_PER_SEC = 8;
+
+export interface RotationReadout {
+  direction: WheelDirection;
+  confidence: number;               // 0..1
+  filteredSpeedDegPerSec: number;   // |filtered velocity| of the latest sample
+  rawSpeedDegPerSec: number;        // |raw velocity| of the latest sample
+  signedVelocityDegPerSec: number;  // filtered, signed
+  acceleration: number;             // deg/s²
+  tracking: boolean;
+  thresholdDegPerSec: number;
+  frames: number;
+  movingFrames: number;
+  signAgreement: boolean | null;    // sensor sign vs measured angle delta
+  source: "video-frames" | "sensor-state" | "none";
+  reason: string;                   // exact reason when direction is UNKNOWN
+  /** Ready-to-render text, e.g. `RIGHT · 812 °/s (conf 91%)`. */
+  display: string;
+}
+
+function velocitySource(frames: MotionFrame[]): { signed: number; raw: number; acceleration: number; tracking: boolean } {
+  const last = frames[frames.length - 1];
+  return {
+    signed: last.velocity,
+    raw: typeof last.velocityRaw === "number" ? last.velocityRaw : Math.abs(last.velocity),
+    acceleration: last.acceleration,
+    tracking: last.isTracking,
+  };
+}
+
+/**
+ * Measure the CURRENT rotation direction/speed from real video motion.
+ *
+ * `frames` must be chronological; `sensor` (optional) is the live sensor state
+ * used only when there are not enough frames yet.
+ */
+export function rotationReadout(
+  frames: MotionFrame[],
+  sensor?: { velocity: number; velocityRaw?: number; acceleration: number; confidence: number; direction: 1 | -1; isTracking: boolean } | null,
+): RotationReadout {
+  const ordered = [...frames].sort((a, b) => a.timestamp - b.timestamp);
+  const threshold = ROTATION_DIRECTION_MIN_DEG_PER_SEC;
+
+  // --- 1. frame-based measurement (authoritative) ---
+  let rightFrames = 0;
+  let leftFrames = 0;
+  let movingFrames = 0;
+  let sensorAgrees = 0;
+  let sensorCompared = 0;
+  for (let i = 0; i < ordered.length; i++) {
+    const f = ordered[i];
+    const dt = i > 0 ? Math.max(1e-3, (f.timestamp - ordered[i - 1].timestamp) / 1000) : 0;
+    const delta = i > 0 ? f.angle - ordered[i - 1].angle : 0;
+    const effVel = typeof f.velocityRaw === "number" && Math.abs(f.velocityRaw) > 1 ? f.velocityRaw : f.velocity;
+    const measuredSign = Math.abs(delta) >= 0.01 ? Math.sign(delta) : Math.sign(effVel);
+    if (!f.isTracking) continue;
+    if (Math.abs(effVel) < threshold && dt === 0) continue;
+    if (Math.abs(effVel) < threshold && Math.abs(delta) < threshold * dt) continue;
+    movingFrames++;
+    if (measuredSign > 0) rightFrames++;
+    else if (measuredSign < 0) leftFrames++;
+    if (i > 0 && Math.abs(delta) >= 0.01 && Math.abs(effVel) >= threshold) {
+      sensorCompared++;
+      if (Math.sign(effVel) === Math.sign(delta)) sensorAgrees++;
+    }
+  }
+  const measuredTotal = rightFrames + leftFrames;
+  const measured: WheelDirection = measuredTotal === 0 ? "UNKNOWN" : rightFrames >= leftFrames ? "RIGHT" : "LEFT";
+  const measuredConfidence = measuredTotal === 0 ? 0 : Math.max(rightFrames, leftFrames) / measuredTotal;
+  const signAgreement = sensorCompared === 0 ? null : sensorAgrees / sensorCompared >= 0.5;
+
+  const latest = ordered.length > 0 ? velocitySource(ordered) : null;
+  const sensorSigned = latest ? latest.signed : (sensor?.velocity ?? 0);
+  const sensorRaw = latest ? latest.raw : (Math.abs(sensor?.velocityRaw ?? 0) || Math.abs(sensor?.velocity ?? 0));
+  const acceleration = latest ? latest.acceleration : (sensor?.acceleration ?? 0);
+  const tracking = latest ? latest.tracking : Boolean(sensor?.isTracking);
+  const speed = Math.abs(sensorSigned);
+
+  const sampleFactor = clamp01(measuredTotal / 5);
+  const confidence = clamp01(measuredConfidence * (0.4 + 0.6 * sampleFactor));
+
+  // Not moving (or not tracking) → UNKNOWN with the exact reason.
+  if (!tracking) {
+    return {
+      direction: "UNKNOWN",
+      confidence: 0,
+      filteredSpeedDegPerSec: speed,
+      rawSpeedDegPerSec: Math.abs(sensorRaw),
+      signedVelocityDegPerSec: sensorSigned,
+      acceleration,
+      tracking: false,
+      thresholdDegPerSec: threshold,
+      frames: ordered.length,
+      movingFrames,
+      signAgreement,
+      source: ordered.length > 0 ? "video-frames" : sensor ? "sensor-state" : "none",
+      reason:
+        ordered.length === 0 && !sensor
+          ? "no live sensor state and no frames — video pipeline not started"
+          : "sensor reports no tracking on the current frames (wheel idle or stream not calibrated)",
+      display: "UNKNOWN (no tracking)",
+    };
+  }
+  if (speed < threshold && measuredTotal === 0) {
+    return {
+      direction: "UNKNOWN",
+      confidence: 0,
+      filteredSpeedDegPerSec: speed,
+      rawSpeedDegPerSec: Math.abs(sensorRaw),
+      signedVelocityDegPerSec: sensorSigned,
+      acceleration,
+      tracking: true,
+      thresholdDegPerSec: threshold,
+      frames: ordered.length,
+      movingFrames,
+      signAgreement,
+      source: ordered.length > 0 ? "video-frames" : "sensor-state",
+      reason: `measured speed ${speed.toFixed(1)} °/s is below the direction threshold ${threshold} °/s — not rotating (IDLE)`,
+      display: `UNKNOWN (idle · ${speed.toFixed(1)} °/s)`,
+    };
+  }
+  if (measured === "UNKNOWN") {
+    // Frames exist but the newest samples are not usable → fall back to the
+    // sensor's own sign, clearly labelled, and only when it is above threshold.
+    if (sensor && Math.abs(sensor.velocity) >= threshold && sensor.isTracking) {
+      const dir: WheelDirection = sensor.velocity > 0 ? "RIGHT" : "LEFT";
+      return {
+        direction: dir,
+        confidence: clamp01(0.3 * sensor.confidence),
+        filteredSpeedDegPerSec: Math.abs(sensor.velocity),
+        rawSpeedDegPerSec: Math.abs(sensor.velocityRaw ?? sensor.velocity),
+        signedVelocityDegPerSec: sensor.velocity,
+        acceleration,
+        tracking: true,
+        thresholdDegPerSec: threshold,
+        frames: ordered.length,
+        movingFrames,
+        signAgreement,
+        source: "sensor-state",
+        reason: "no usable angle deltas in the frame window — using the sensor's own signed velocity",
+        display: `${dir} · ${Math.abs(sensor.velocity).toFixed(0)} °/s (sensor sign, low confidence)`,
+      };
+    }
+    return {
+      direction: "UNKNOWN",
+      confidence: 0,
+      filteredSpeedDegPerSec: speed,
+      rawSpeedDegPerSec: Math.abs(sensorRaw),
+      signedVelocityDegPerSec: sensorSigned,
+      acceleration,
+      tracking,
+      thresholdDegPerSec: threshold,
+      frames: ordered.length,
+      movingFrames,
+      signAgreement,
+      source: "video-frames",
+      reason: `no measurable angular movement in ${ordered.length} frame(s) (need ≥2 tracking frames above ${threshold} °/s)`,
+      display: "UNKNOWN (no measurable rotation)",
+    };
+  }
+
+  return {
+    direction: measured,
+    confidence,
+    filteredSpeedDegPerSec: speed,
+    rawSpeedDegPerSec: Math.abs(sensorRaw),
+    signedVelocityDegPerSec: sensorSigned,
+    acceleration,
+    tracking,
+    thresholdDegPerSec: threshold,
+    frames: ordered.length,
+    movingFrames,
+    signAgreement,
+    source: "video-frames",
+    reason: `measured from ${measuredTotal} moving frame(s) (${rightFrames}→ / ${leftFrames}←)`,
+    display: `${measured} · ${speed.toFixed(0)} °/s (conf ${(confidence * 100).toFixed(0)}%)`,
+  };
+}
+
+// ============================================================
 // 3. SPEED / ACCELERATION / DECELERATION PROFILE
 // ============================================================
 

@@ -71,7 +71,14 @@ function notifyPhysics() {
 // takes 8 samples per frame, and changes nothing in the existing processing
 // path. It is explicitly NOT facial recognition and never leaves the browser.
 export type DealerFrameSink = (coarseLuma: number[], timestampMs: number) => void;
+/** Richer additive sink: adds a coarse COLUMN grid used for position geometry. */
+export type DealerRegionSink = (
+  sample: { luma: number[]; columns: number[]; timestampMs: number },
+) => void;
 const dealerFrameSinks = new Set<DealerFrameSink>();
+const dealerRegionSinks = new Set<DealerRegionSink>();
+
+export const DEALER_GRID_COLUMNS = 12; // coarse horizontal resolution (position thirds)
 
 export function subscribeDealerFrames(cb: DealerFrameSink): () => void {
   dealerFrameSinks.add(cb);
@@ -79,11 +86,30 @@ export function subscribeDealerFrames(cb: DealerFrameSink): () => void {
     dealerFrameSinks.delete(cb);
   };
 }
+export function subscribeDealerRegionFrames(cb: DealerRegionSink): () => void {
+  dealerRegionSinks.add(cb);
+  return () => {
+    dealerRegionSinks.delete(cb);
+  };
+}
 
-/** 8-bin average-luminance signature of the frame (coarse by design). */
-function sampleCoarseLumaGrid(data: Uint8ClampedArray, width: number, height: number, bins = 8): number[] {
+/**
+ * Coarse average-luminance grid of the frame: `bins` horizontal bands (luma
+ * signature) and `columns` horizontal columns (used only to localise WHERE the
+ * frame change happens — the position thirds). Both are low-resolution, not
+ * reversible to an image, and are never compared against external data.
+ */
+function sampleCoarseLumaGrid(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  bins = 8,
+  columns = 0,
+): { luma: number[]; columns: number[] } {
   const out = new Array(bins).fill(0) as number[];
   const counts = new Array(bins).fill(0) as number[];
+  const colOut = columns > 0 ? (new Array(columns).fill(0) as number[]) : [];
+  const colCounts = columns > 0 ? (new Array(columns).fill(0) as number[]) : [];
   const stepX = Math.max(1, Math.floor(width / 32));
   const stepY = Math.max(1, Math.floor(height / 16));
   for (let y = 0; y < height; y += stepY) {
@@ -97,10 +123,87 @@ function sampleCoarseLumaGrid(data: Uint8ClampedArray, width: number, height: nu
       const bin = Math.min(bins - 1, Math.floor((x / width) * bins));
       out[bin] += luma;
       counts[bin]++;
+      if (columns > 0) {
+        const col = Math.min(columns - 1, Math.floor((x / width) * columns));
+        colOut[col] += luma;
+        colCounts[col]++;
+      }
     }
   }
   for (let i = 0; i < bins; i++) out[i] = counts[i] > 0 ? out[i] / counts[i] : 0;
-  return out;
+  for (let i = 0; i < columns; i++) colOut[i] = colCounts[i] > 0 ? colOut[i] / colCounts[i] : 0;
+  return { luma: out, columns: colOut };
+}
+
+// ---------------------------------------------------------------------------
+// ADDITIVE: sensor runtime status (read-only view of the REAL pipeline state)
+// ---------------------------------------------------------------------------
+// The diagnostic panels need to explain WHY live values are (or are not)
+// available: stream started, frames processed, fps, calibration locked,
+// tracking, profDiff, last error. This is a published view of the existing
+// sensor — it is NOT a second sensor and it never influences the processing.
+export interface SensorRuntimeStatus {
+  active: boolean;              // the CV loop is running
+  streamState: string;          // the sensor's own status string
+  frames: number;               // frames processed since start()
+  fps: number;
+  calibrationLocked: boolean;
+  tracking: boolean;
+  profDiff: number;
+  velocity: number;             // filtered deg/s
+  velocityRaw: number;          // raw deg/s
+  acceleration: number;
+  direction: 1 | -1;
+  directionLabel: "LEFT" | "RIGHT" | "UNKNOWN";
+  confidence: number;
+  lastFrameTimestamp: number | null;
+  lastError: string | null;
+  startedAt: number | null;
+}
+
+let sensorRuntime: SensorRuntimeStatus = {
+  active: false,
+  streamState: "not started",
+  frames: 0,
+  fps: 0,
+  calibrationLocked: false,
+  tracking: false,
+  profDiff: 0,
+  velocity: 0,
+  velocityRaw: 0,
+  acceleration: 0,
+  direction: 1,
+  directionLabel: "UNKNOWN",
+  confidence: 0,
+  lastFrameTimestamp: null,
+  lastError: null,
+  startedAt: null,
+};
+
+const runtimeListeners = new Set<() => void>();
+export function getSensorRuntime(): SensorRuntimeStatus {
+  return sensorRuntime;
+}
+export function subscribeSensorRuntime(cb: () => void): () => void {
+  runtimeListeners.add(cb);
+  return () => {
+    runtimeListeners.delete(cb);
+  };
+}
+function notifyRuntime(): void {
+  runtimeListeners.forEach((l) => l());
+}
+/** Called by the sensor itself (start/stop/frame/error) — additive, throttled. */
+function publishSensorRuntime(patch: Partial<SensorRuntimeStatus>, notify = true): void {
+  sensorRuntime = { ...sensorRuntime, ...patch };
+  if (notify) notifyRuntime();
+}
+let lastRuntimeNotify = 0;
+function publishSensorRuntimeThrottled(patch: Partial<SensorRuntimeStatus>): void {
+  const now = Date.now();
+  const shouldNotify = now - lastRuntimeNotify >= 500;
+  if (shouldNotify) lastRuntimeNotify = now;
+  publishSensorRuntime(patch, shouldNotify);
 }
 
 // ---------------------------------------------------------------------------
@@ -745,15 +848,22 @@ export function RevoVideoSensor() {
     ctx.drawImage(video, 0, 0, CVW, CVH);
     const imageData = ctx.getImageData(0, 0, CVW, CVH);
 
-    // ADDITIVE: coarse appearance signature for the experimental dealer layer.
-    // Runs ONLY when a sink is registered; 8 samples/frame; no existing
+    // ADDITIVE: coarse appearance + column signature for the experimental
+    // dealer layer. Runs ONLY when a sink is registered; no existing
     // computation is touched or reordered.
-    if (dealerFrameSinks.size > 0) {
-      const grid = sampleCoarseLumaGrid(imageData.data, CVW, CVH, 8);
+    if (dealerFrameSinks.size > 0 || dealerRegionSinks.size > 0) {
+      const grid = sampleCoarseLumaGrid(imageData.data, CVW, CVH, 8, DEALER_GRID_COLUMNS);
       const gridTs = Date.now();
       dealerFrameSinks.forEach((sink) => {
         try {
-          sink(grid, gridTs);
+          sink(grid.luma, gridTs);
+        } catch {
+          /* a failing sink must never break the video pipeline */
+        }
+      });
+      dealerRegionSinks.forEach((sink) => {
+        try {
+          sink({ luma: grid.luma, columns: grid.columns, timestampMs: gridTs });
         } catch {
           /* a failing sink must never break the video pipeline */
         }
@@ -864,6 +974,7 @@ export function RevoVideoSensor() {
           r: median(sorted.map((c) => c.r)),
         };
         calibrationLocked = true;
+        publishSensorRuntimeThrottled({ calibrationLocked });
         setStatus(
           `Calibration LOCKED: (${calibration.cx},${calibration.cy}) r=${calibration.r}`,
         );
@@ -983,6 +1094,7 @@ export function RevoVideoSensor() {
         const angleWrapped = ((cumulativeAngle % 360) + 360) % 360;
         const sector = estimateSector(cumulativeAngle);
         const stab = checkCalibrationStable();
+        publishSensorRuntimeThrottled({ calibrationLocked: calibrationLocked || stab.stable });
         // Tracking is ACTIVE when we detect real movement (raw vel > 5 OR
         // significant profile change) with acceptable confidence.
         const isTracking =
@@ -1012,6 +1124,24 @@ export function RevoVideoSensor() {
           profDiff,
         };
         notifyPhysics();
+
+        // ADDITIVE: publish the real pipeline state for the diagnostic panels.
+        publishSensorRuntimeThrottled({
+          active: true,
+          frames: frameCountRef.current,
+          fps: Math.round(currentFpsRef.current * 10) / 10,
+          calibrationLocked,
+          tracking: isTracking,
+          profDiff,
+          velocity: smoothedVel,
+          velocityRaw: rawVel,
+          acceleration: accel,
+          direction: stableDirection,
+          directionLabel: isTracking && Math.abs(smoothedVel) >= 8 ? (stableDirection > 0 ? "RIGHT" : "LEFT") : "UNKNOWN",
+          confidence: fusedConfidence,
+          lastFrameTimestamp: Date.now(),
+          lastError: null,
+        });
 
         // Record snapshot for Fusion V2 experiment (chronological history)
         recordPhysicsSnapshot(currentPhysics);
@@ -1225,6 +1355,23 @@ export function RevoVideoSensor() {
     if (!video) return;
     setActive(true);
     setStatus("Loading stream...");
+    publishSensorRuntime({
+      active: true,
+      streamState: "loading stream…",
+      frames: 0,
+      fps: 0,
+      calibrationLocked: false,
+      tracking: false,
+      profDiff: 0,
+      velocity: 0,
+      velocityRaw: 0,
+      acceleration: 0,
+      directionLabel: "UNKNOWN",
+      confidence: 0,
+      lastFrameTimestamp: null,
+      lastError: null,
+      startedAt: Date.now(),
+    });
     calibration = null;
     calibrationHistory = [];
     calibrationLocked = false;
@@ -1251,6 +1398,7 @@ export function RevoVideoSensor() {
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           video.play().catch(() => {});
           setStatus("Stream loaded — auto-calibrating...");
+          publishSensorRuntime({ active: true, streamState: "stream loaded — auto-calibrating", lastError: null });
           fpsTimerRef.current = Date.now() / 1000;
           fpsFramesRef.current = 0;
           rafRef.current = requestAnimationFrame(processFrame);
@@ -1259,18 +1407,22 @@ export function RevoVideoSensor() {
           if (data.fatal) {
             setStatus(`Stream error: ${data.type}`);
             setActive(false);
+            publishSensorRuntime({ active: false, streamState: `stream error: ${data.type}`, lastError: `HLS ${data.type}` });
           }
         });
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = "/api/video-proxy?type=master";
         video.play().catch(() => {});
         setStatus("Stream loaded (native) — auto-calibrating...");
+        publishSensorRuntime({ active: true, streamState: "stream loaded (native) — auto-calibrating", lastError: null });
         rafRef.current = requestAnimationFrame(processFrame);
       } else {
         setStatus("HLS not supported");
+        publishSensorRuntime({ active: false, streamState: "HLS not supported by this browser", lastError: "hls-unsupported" });
       }
     } catch (e) {
       setStatus(`Error: ${e}`);
+      publishSensorRuntime({ active: false, streamState: "stream failed to start", lastError: String(e) });
     }
   }, [processFrame]);
 
@@ -1292,6 +1444,7 @@ export function RevoVideoSensor() {
     setTelemetry(null);
     setDiagnosticRunning(false);
     setStatus("Stopped");
+    publishSensorRuntime({ active: false, streamState: "stopped by operator", tracking: false, directionLabel: "UNKNOWN", calibrationLocked: false });
   }, []);
 
   useEffect(() => {

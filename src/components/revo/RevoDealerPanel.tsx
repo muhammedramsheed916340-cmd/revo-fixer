@@ -35,7 +35,7 @@ import {
 import { OUTCOMES_8 } from "./timeSignal";
 import { OUTCOME_COLORS, OUTCOME_DISPLAY } from "./signalSectorMap";
 import { getSignalFlags } from "./signalFlags";
-import { getVideoPhysics } from "./RevoVideoSensor";
+import { getSensorRuntime, getVideoPhysics } from "./RevoVideoSensor";
 import { SignalPanelPlaceholder, useMounted } from "./SignalPanelFrame";
 
 function useDealerVersion(): number {
@@ -129,9 +129,25 @@ export function RevoDealerPanel() {
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              <Tile label="Current dealer" value={active.name ?? "(unnamed — UI did not show a name)"} sub={active.dealerId} />
-              <Tile label="Identification confidence" value={pct(active.identification.meanConfidence, 0)} sub={`${active.identification.observations} observation(s) · ${active.identification.appearances} appearance`} />
-              <Tile label="Rounds with dealer" value={String(stats?.totalRounds ?? 0)} sub={`sessions: ${active.sessions.length}`} />
+              <Tile
+                label="Dealer name"
+                value={active.name ?? "UNKNOWN"}
+                sub={active.name ? "public-UI name (shown by the game)" : "the game UI exposes no name — identity stays a local profile id"}
+                color={active.name ? "#fff" : "#ffa502"}
+              />
+              <Tile
+                label="Dealer profile"
+                value={active.dealerId}
+                sub={`${active.identification.observations} observation(s) · ${active.identification.appearances} visual · ${active.identification.names} named`}
+              />
+              <Tile
+                label="Dealer position"
+                value={active.position.current}
+                sub={`conf ${pct(active.position.confidence, 0)} · ${active.position.lastReason}`}
+                color={active.position.current === "UNKNOWN" ? "#5a6a99" : "#FFD700"}
+              />
+              <Tile label="Identification confidence" value={pct(active.identification.meanConfidence, 0)} sub={`position counts ${JSON.stringify(active.position.counts)}`} />
+              <Tile label="Rounds with dealer" value={String(stats?.totalRounds ?? 0)} sub={`sessions: ${active.sessions.length} · first seen ${new Date(active.firstSeen).toISOString().slice(11, 19)}Z`} />
               <Tile
                 label="Dealer hit rate"
                 value={
@@ -233,7 +249,9 @@ export function RevoDealerPanel() {
                 </span>
                 <span>→</span>
                 <span className="rounded px-2 py-1" style={{ background: "#00d4ff22", color: "#00d4ff" }}>
-                  {sensor ? `${sensor.direction > 0 ? "CW" : "CCW"} · ${Math.abs(sensor.velocityRaw).toFixed(0)} °/s · sector ${sensor.sectorEstimate ?? "—"}` : "video offline"}
+                  {sensor
+                    ? `${getSensorRuntime().directionLabel === "UNKNOWN" ? "direction UNKNOWN" : getSensorRuntime().directionLabel} · ${Math.abs(sensor.velocityRaw).toFixed(0)} °/s · sector ${sensor.sectorEstimate ?? "—"}`
+                    : "video offline — start the live sensor to measure the wheel"}
                 </span>
                 <span>→</span>
                 <span className="rounded px-2 py-1" style={{ background: "#a78bfa22", color: "#a78bfa" }}>

@@ -29,12 +29,17 @@ import {
 } from "./timeSignal";
 import {
   computeDealerSignal,
+  estimateDealerPosition,
+  exportDealerProfiles,
   getDealerProfiles,
   identifyDealer,
+  importDealerProfiles,
   recordDealerObservation,
   attachRoundToDealer,
+  type DealerPosition,
   type DealerSignalResult,
 } from "./dealerSignal";
+import { getPhysicsInRange } from "./videoPhysicsHistory";
 import {
   learnDeceleration,
   computePhysicsEvidence,
@@ -102,6 +107,9 @@ function load(): void {
     if (Array.isArray(parsed.rounds)) {
       state.rounds = normalizeRounds(parsed.rounds.filter((r) => r && r.verified !== false));
     }
+    // Dealer profiles live under their own key so a huge round history can never
+    // evict them; restoring here keeps the identity stable across reloads.
+    restoreDealerProfiles();
   } catch {
     state.rounds = [];
   }
@@ -167,11 +175,76 @@ export function recordSettledRound(input: SettledRoundInput): { accepted: boolea
 }
 
 /** Feed one wheel-telemetry frame (called from the video sensor). */
-export function recordMotionFrame(frame: MotionFrame): void {
+export function recordMotionFrame(frame: MotionFrame, opts: { silent?: boolean } = {}): void {
   if (!Number.isFinite(frame.timestamp) || frame.timestamp <= 0) return;
+  const last = state.frames[state.frames.length - 1];
+  // Dedupe by timestamp: the same sensor frame must never be stored twice
+  // (a duplicated frame would double-count in the physics window).
+  if (last && frame.timestamp <= last.timestamp) return;
   state.frames.push(frame);
   if (state.frames.length > MAX_FRAMES) state.frames = state.frames.slice(-MAX_FRAMES);
   // deceleration bookkeeping happens at spin completion (see recordSpinCompletion)
+  if (!opts.silent) notifyFrameThrottled();
+}
+
+// Frames arrive at up to ~25/s. Notifying on every frame would re-render the
+// panels 25x/s, so frame-driven notifications are coalesced to ~4/s while data
+// is always stored immediately. Spin completions / rounds / dealers notify
+// synchronously through notify().
+let lastFrameNotify = 0;
+let pendingFrameNotify: ReturnType<typeof setTimeout> | null = null;
+const FRAME_NOTIFY_MIN_INTERVAL_MS = 250;
+function notifyFrameThrottled(): void {
+  const now = Date.now();
+  if (now - lastFrameNotify >= FRAME_NOTIFY_MIN_INTERVAL_MS) {
+    lastFrameNotify = now;
+    notify();
+    return;
+  }
+  if (pendingFrameNotify !== null) return;
+  pendingFrameNotify = setTimeout(() => {
+    pendingFrameNotify = null;
+    lastFrameNotify = Date.now();
+    notify();
+  }, FRAME_NOTIFY_MIN_INTERVAL_MS - (now - lastFrameNotify));
+}
+
+/**
+ * Pull the frames the EXISTING video sensor already buffered for a time range
+ * (the "pre-result snapshot buffer" of the production pipeline) into this
+ * store. This guarantees the physics layer reads the real live telemetry even
+ * when the collector component is not mounted, and it is idempotent: frames
+ * already present are skipped by the timestamp dedupe in recordMotionFrame().
+ *
+ * Returns how many NEW frames were ingested.
+ */
+export function ingestLivePhysicsBuffer(fromMs: number, toMs: number): number {
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs) return 0;
+  const snapshots = getPhysicsInRange(fromMs, toMs);
+  let ingested = 0;
+  for (const snap of snapshots) {
+    const before = state.frames.length;
+    recordMotionFrame(
+      {
+        timestamp: snap.timestamp,
+        angle: snap.angle,
+        angleWrapped: ((snap.angle % 360) + 360) % 360,
+        velocity: snap.velocity,
+        velocityRaw: snap.velocityRaw,
+        acceleration: snap.acceleration,
+        confidence: snap.confidence,
+        direction: snap.direction,
+        isTracking: snap.isTracking,
+        calibrationStable: snap.calibrationStable,
+        profDiff: snap.profDiff,
+        phaseCorrelationStrength: snap.signalAgreement,
+      },
+      { silent: true },
+    );
+    if (state.frames.length > before) ingested++;
+  }
+  if (ingested > 0) notify();
+  return ingested;
 }
 
 /** Feed the sensor's own state object (convenience adapter). */
@@ -284,7 +357,19 @@ export function observeDealer(input: {
   tableId?: string | null;
   confidence?: number;
   physics?: { direction: "LEFT" | "RIGHT" | "UNKNOWN"; speed: number; deceleration: number } | null;
-}): { dealerId: string; matched: boolean; confidence: number; reason: string } {
+  /** Coarse column-luminance grid of the CURRENT frame (for position). */
+  columns?: number[] | null;
+  /** Coarse column-luminance grid of the PREVIOUS frame (position needs 2 frames). */
+  previousColumns?: number[] | null;
+}): {
+  dealerId: string;
+  matched: boolean;
+  confidence: number;
+  position: DealerPosition;
+  positionConfidence: number;
+  positionReason: string;
+  reason: string;
+} {
   const identified = identifyDealer({
     timestamp: input.timestamp,
     descriptor: input.descriptor ?? null,
@@ -292,18 +377,34 @@ export function observeDealer(input: {
     tableId: input.tableId ?? null,
     identificationConfidence: input.confidence,
   });
+
+  // MEASURED position from real frame geometry (video thirds). UNKNOWN is a
+  // first-class result carrying the exact reason — never a guessed side.
+  const positionEstimate = estimateDealerPosition({
+    columns: input.columns ?? null,
+    previousColumns: input.previousColumns ?? null,
+    timestamp: input.timestamp,
+  });
+
   const observation = {
     timestamp: input.timestamp,
     confidence: input.confidence ?? identified.confidence,
     method: identified.method,
     physics: input.physics ?? null,
+    position: positionEstimate.position,
+    positionConfidence: positionEstimate.confidence,
+    positionReason: positionEstimate.reason,
   };
   const recorded = recordDealerObservation({ dealerId: identified.dealerId, observation });
+  if (recorded.accepted) persistDealers();
   return {
     dealerId: identified.dealerId,
     matched: identified.matched,
     confidence: observation.confidence,
-    reason: `${identified.reason}${recorded.accepted ? "" : ` (observation rejected: ${recorded.reason})`}`,
+    position: positionEstimate.position,
+    positionConfidence: positionEstimate.confidence,
+    positionReason: positionEstimate.reason,
+    reason: `${identified.reason} ${recorded.accepted ? "" : `(observation rejected: ${recorded.reason})`}`.trim(),
   };
 }
 
@@ -311,6 +412,44 @@ export function observeDealer(input: {
 export function attributeRoundToDealer(dealerId: string | null, round: TimedRound, attributedAt: number): { accepted: boolean; reason: string } {
   if (!dealerId) return { accepted: false, reason: "no dealer id supplied" };
   return attachRoundToDealer({ dealerId, round, attributedAt });
+}
+
+
+// ============================================================
+// 4b. DEALER PERSISTENCE (session continuity across reloads)
+// ============================================================
+
+const DEALER_STORAGE_KEY = "revo_dealerProfiles_v1";
+
+function persistDealers(): void {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
+  try {
+    window.localStorage.setItem(DEALER_STORAGE_KEY, JSON.stringify(exportDealerProfiles()));
+  } catch {
+    /* storage unavailable — profiles stay in memory for this session */
+  }
+}
+
+/** Restore persisted dealer profiles (called by load()). */
+export function restoreDealerProfiles(): { restored: number; skipped: number } {
+  if (typeof window === "undefined" || typeof window.localStorage === "undefined") return { restored: 0, skipped: 0 };
+  try {
+    const raw = window.localStorage.getItem(DEALER_STORAGE_KEY);
+    if (!raw) return { restored: 0, skipped: 0 };
+    return importDealerProfiles(JSON.parse(raw));
+  } catch {
+    return { restored: 0, skipped: 0 };
+  }
+}
+
+/**
+ * Keep the frame store in sync with the live sensor's own pre-result buffer for
+ * the current time range, then return the merged frame window. Panels call this
+ * before computing physics evidence so they always work on REAL live frames.
+ */
+export function syncLiveFrames(windowMs = 15_000, now = Date.now()): { ingested: number; total: number } {
+  const ingested = ingestLivePhysicsBuffer(now - windowMs, now);
+  return { ingested, total: getMotionFrames().length };
 }
 
 // ============================================================

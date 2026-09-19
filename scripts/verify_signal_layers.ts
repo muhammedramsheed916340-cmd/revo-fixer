@@ -28,6 +28,8 @@ import {
   type TimedRound,
 } from "../src/components/revo/timeSignal";
 import {
+  rotationReadout,
+  ROTATION_DIRECTION_MIN_DEG_PER_SEC,
   analyzeDirection,
   analyzeSpeed,
   analyzeVibration,
@@ -52,6 +54,10 @@ import {
   upsertDossier,
 } from "../src/components/revo/physicsDossier";
 import {
+  estimateDealerPosition,
+  exportDealerProfiles,
+  getDealerProfiles,
+  importDealerProfiles,
   assertIdentitySafety,
   attachRoundToDealer,
   compareDealerToBaseline,
@@ -67,6 +73,10 @@ import { SIGNAL_FLAGS_OFF, __setFlagsForTest, canPromote, setSignalFlag, getSign
 import { runSignalValidation } from "../src/components/revo/signalValidation";
 import {
   auditSignalStore,
+  getMotionFrames,
+  observeDealer,
+  ingestLivePhysicsBuffer,
+  syncLiveFrames,
   buildLiveSignalBundle,
   clearSignalStore,
   getProductionPrediction,
@@ -486,6 +496,158 @@ recordMotionFrame({ spinId: "f1", timestamp: storeLock - 1_000, angle: 10, angle
 const live2 = buildLiveSignalBundle({ lockTimestamp: storeLock, historyProbabilities: getProductionPrediction()!.probabilities, historyTop4: getProductionPrediction()!.top4 });
 check("a single real frame is not enough for a physics prediction (refuses rather than invents)", !live2.physicsEvidence.evidence, live2.physicsEvidence.reason);
 check("store audit passes on real data", auditSignalStore().rounds.passed && auditSignalStore().timestamps.passed);
+__setFlagsForTest({ ...SIGNAL_FLAGS_OFF });
+
+
+// ---------------------------------------------------------------------------
+// 10. LIVE PIPELINE WIRING (direction/speed readout, position, ingest)
+// ---------------------------------------------------------------------------
+section("live pipeline wiring");
+
+// --- direction readout: measured, never guessed ---------------------------
+clearSignalStore();
+__setFlagsForTest({ ...SIGNAL_FLAGS_OFF });
+const noFrames = rotationReadout([], null);
+check("no frames + no sensor → direction UNKNOWN with reason", noFrames.direction === "UNKNOWN" && noFrames.reason.includes("not started"), noFrames.reason);
+
+const idleFrames = Array.from({ length: 12 }, (_, i) => ({
+  timestamp: t0 + i * 100,
+  angle: 42,
+  velocity: 0.4,
+  velocityRaw: 0.6,
+  acceleration: 0,
+  confidence: 0.8,
+  direction: 1 as const,
+  isTracking: true,
+}));
+const idle = rotationReadout(idleFrames, null);
+check("idle wheel → direction UNKNOWN (no guessed LEFT/RIGHT)", idle.direction === "UNKNOWN" && idle.reason.includes("below the direction threshold"), idle.reason);
+
+const cwFrames = Array.from({ length: 25 }, (_, i) => ({
+  timestamp: t0 + i * 100,
+  angle: i * 12,             // +120°/s
+  velocity: 120,
+  velocityRaw: 118,
+  acceleration: -5,
+  confidence: 0.9,
+  direction: 1 as const,
+  isTracking: true,
+}));
+const cw = rotationReadout(cwFrames, null);
+check("positive angular motion → RIGHT", cw.direction === "RIGHT", `${cw.direction} ${cw.reason}`);
+check("speed readout reflects the measured motion", Math.abs(cw.filteredSpeedDegPerSec - 120) < 1, String(cw.filteredSpeedDegPerSec));
+check("direction confidence scales with measured samples", cw.confidence > 0.3, String(cw.confidence));
+check("sign convention verified against Δangle", cw.signAgreement === true, String(cw.signAgreement));
+
+const ccwFrames = cwFrames.map((f, i) => ({ ...f, angle: -i * 12, velocity: -120, velocityRaw: -118, direction: -1 as const }));
+const ccw = rotationReadout(ccwFrames, null);
+check("negative angular motion → LEFT", ccw.direction === "LEFT", `${ccw.direction}`);
+
+// A contradicting sensor sign must be surfaced, not silently trusted.
+const contradicting = cwFrames.map((f) => ({ ...f, velocity: -120, velocityRaw: -118 }));
+check("contradicting sensor sign is reported (signAgreement=false)", rotationReadout(contradicting, null).signAgreement === false);
+check(
+  "direction threshold is a real constant (not hardcoded per spin)",
+  ROTATION_DIRECTION_MIN_DEG_PER_SEC > 0 && ROTATION_DIRECTION_MIN_DEG_PER_SEC < 50,
+  String(ROTATION_DIRECTION_MIN_DEG_PER_SEC),
+);
+
+// --- frames feed the physics evidence end-to-end --------------------------
+for (const f of cwFrames) recordMotionFrame(f);
+const wired = computePhysicsEvidence(getMotionFrames(), { windowMs: 5_000 });
+check("stored live frames feed the physics model (evidence VALID)", wired.evidence, wired.reason);
+check("physics Top-4 can be formed from real evidence (exactly 4)", Object.entries(wired.outcomeProbabilities).sort((a, b) => b[1] - a[1]).slice(0, 4).length === 4);
+check("duplicate frame timestamps are rejected (no double counting)", (() => {
+  const before = getMotionFrames().length;
+  recordMotionFrame({ ...cwFrames[0] });
+  return getMotionFrames().length === before;
+})());
+
+// --- ingest from the sensor's own pre-result buffer -----------------------
+const ingested = ingestLivePhysicsBuffer(t0 + 300, t0 + 400);
+check("live physics buffer ingest runs without a sensor (0 frames, no fabrication)", ingested === 0);
+const sync = syncLiveFrames(15_000, t0 + 5_000);
+check("syncLiveFrames reports the merged frame count", sync.total >= cwFrames.length, JSON.stringify(sync));
+
+// --- dealer position from frame geometry ----------------------------------
+const flat = new Array(12).fill(0.5);
+const leftShift = flat.map((v, i) => (i < 4 ? v + 0.4 : v));
+const estLeft = estimateDealerPosition({ columns: leftShift, previousColumns: flat, timestamp: t0 });
+check("frame change in the left third → LEFT", estLeft.position === "LEFT", `${estLeft.position} ${estLeft.reason}`);
+check("position confidence reported", estLeft.confidence > 0, String(estLeft.confidence));
+const rightShift = flat.map((v, i) => (i >= 8 ? v + 0.4 : v));
+check("frame change in the right third → RIGHT", estimateDealerPosition({ columns: rightShift, previousColumns: flat, timestamp: t0 }).position === "RIGHT");
+const centreShift = flat.map((v, i) => (i >= 4 && i < 8 ? v + 0.4 : v));
+check("frame change in the middle third → CENTER", estimateDealerPosition({ columns: centreShift, previousColumns: flat, timestamp: t0 }).position === "CENTER");
+const spreadShift = flat.map((v, i) => v + 0.1 * ((i % 3) + 1));
+const spread = estimateDealerPosition({ columns: spreadShift, previousColumns: flat, timestamp: t0 });
+check("diffuse change → position UNKNOWN (never guessed)", spread.position === "UNKNOWN" && spread.reason.includes("spread"), spread.reason);
+const noPrev = estimateDealerPosition({ columns: leftShift, previousColumns: null, timestamp: t0 });
+check("single frame → position UNKNOWN with the exact reason", noPrev.position === "UNKNOWN" && noPrev.reason.includes("second frame"), noPrev.reason);
+const noMotion = estimateDealerPosition({ columns: flat, previousColumns: flat, timestamp: t0 });
+check("no frame change → position UNKNOWN (insufficient evidence)", noMotion.position === "UNKNOWN", noMotion.reason);
+
+// observation carries the measured position into the profile
+resetDealerProfiles();
+const dObs = observeDealer({ timestamp: t0, descriptor: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2], columns: rightShift, previousColumns: flat });
+check("dealer observation records the measured position", dObs.position === "RIGHT", `${dObs.position} · ${dObs.positionReason}`);
+const profAfter = getDealerProfiles().slice(-1)[0];
+check("profile exposes the measured position", profAfter.position.current === "RIGHT" && profAfter.position.counts.RIGHT === 1, JSON.stringify(profAfter.position));
+check("profile keeps an UNKNOWN reason when geometry is insufficient", (() => {
+  const obs = observeDealer({ timestamp: t0 + 1_000, columns: flat, previousColumns: flat });
+  const p2 = getDealerProfiles().slice(-1)[0];
+  return obs.position === "UNKNOWN" && typeof p2.position.lastReason === "string" && p2.position.lastReason.length > 0;
+})());
+
+// dealer persistence round-trip (session continuity)
+const exported = exportDealerProfiles();
+resetDealerProfiles();
+const restored = importDealerProfiles(JSON.parse(JSON.stringify(exported)));
+check("dealer profiles survive a reload (persist round-trip)", restored.restored >= 1, JSON.stringify(restored));
+check("restored profile keeps its measured position", getDealerProfiles().some((p) => p.position.current === "RIGHT"));
+
+// --- channel availability is explicit -------------------------------------
+const bundle = buildLiveSignalBundle({
+  lockTimestamp: Date.now(),
+  historyProbabilities: null,
+  historyTop4: null,
+});
+const byKey = Object.fromEntries(bundle.ensemble.channels.map((c) => [c.key, c]));
+check("channel status is explicit (READY/INSUFFICIENT) for every channel", bundle.ensemble.channels.every((c) => c.status === "READY" || c.status === "INSUFFICIENT"));
+check("theoretical channel is always READY", byKey.theoretical.status === "READY");
+check("a channel without data is INSUFFICIENT and carries its reason", byKey.history.status === "INSUFFICIENT" && byKey.history.reason.length > 0, byKey.history.reason);
+check("INSUFFICIENT channels carry weight 0 (never counted as zero-quality evidence)", bundle.ensemble.channels.filter((c) => c.status === "INSUFFICIENT").every((c) => c.effectiveWeight === 0));
+
+// --- timestamp contract on the live path ----------------------------------
+__setFlagsForTest({ ...SIGNAL_FLAGS_OFF });
+const stopTs = Date.now() - 1_000;
+const lockTs = Date.now();
+const lateBundle = buildLiveSignalBundle({
+  lockTimestamp: lockTs,
+  historyProbabilities: null,
+  historyTop4: null,
+  spinId: "late-spin",
+  physicalStopTimestamp: stopTs, // stop BEFORE the lock → the lock must be rejected
+  recordPrediction: true,
+});
+const latePred = getPredictionsForTest().filter((p) => p.spinId === "late-spin");
+check("a lock taken at/after the physical stop is REJECTED (no post-stop prediction)", latePred.length === 0 && lateBundle.predictionRecord === null);
+const okStop = Date.now() + 5_000;
+const okBundle = buildLiveSignalBundle({
+  lockTimestamp: lockTs,
+  historyProbabilities: null,
+  historyTop4: null,
+  spinId: "ok-spin",
+  physicalStopTimestamp: okStop,
+  recordPrediction: true,
+});
+check("a lock before the physical stop is accepted", okBundle.predictionRecord !== null);
+check("accepted record satisfies latestUsed ≤ lock < physicalStop", (() => {
+  const r = okBundle.predictionRecord!;
+  return (r.latestUsedTimestamp === null || r.latestUsedTimestamp <= r.lockTimestamp) && r.lockTimestamp < (r.physicalStopTimestamp ?? Infinity);
+})());
+check("ledger audit still passes after the live-path checks", auditLedger().leakagePassed && auditLedger().timestampPassed);
+check("store audit still passes (no duplicates / no future stamps)", auditSignalStore().rounds.passed && auditSignalStore().timestamps.passed);
 __setFlagsForTest({ ...SIGNAL_FLAGS_OFF });
 
 // ---------------------------------------------------------------------------

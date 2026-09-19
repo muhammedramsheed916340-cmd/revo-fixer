@@ -28,6 +28,7 @@ import { RevoTimeSignalPanel } from "./RevoTimeSignalPanel";
 import { RevoPhysicsMotionPanel } from "./RevoPhysicsMotionPanel";
 import { RevoDealerPanel } from "./RevoDealerPanel";
 import { RevoSignalEnsemblePanel } from "./RevoSignalEnsemblePanel";
+import { RevoLiveSensorDebugPanel } from "./RevoLiveSensorDebugPanel";
 import { RevoComparison } from "./RevoComparison";
 import { RevoDeposit } from "./RevoDeposit";
 import { RevoScrollTop, RevoDivider } from "./RevoScrollTop";
@@ -232,6 +233,9 @@ export function RevoApp() {
               analysis · ensemble fusion. All four default to OFF; diagnostics
               and data collection run regardless. */}
           <RevoSignalCollector />
+          <RevoReveal>
+            <RevoLiveSensorDebugPanel />
+          </RevoReveal>
           <RevoReveal>
             <RevoTimeSignalPanel />
           </RevoReveal>

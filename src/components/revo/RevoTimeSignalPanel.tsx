@@ -59,6 +59,10 @@ export function RevoTimeSignalPanel() {
   const rounds = getTimedRounds();
   const flags = getSignalFlags();
   const mounted = useMounted();
+  // Simple, lint-friendly dependency values (the subscriptions above re-render
+  // this panel whenever the store changes).
+  const roundCount = rounds.length;
+  const latestSettledAt = rounds.length > 0 ? rounds[rounds.length - 1].settledAt : null;
   const [selectedWindow, setSelectedWindow] = useState<string>("");
 
   const signal: TimeSignalResult = useMemo(
@@ -67,10 +71,10 @@ export function RevoTimeSignalPanel() {
         rounds,
         lockTimestamp: Date.now(),
       }),
-    [rounds.length, rounds[rounds.length - 1]?.settledAt],
+    [roundCount, latestSettledAt],
   );
 
-  const audit = useMemo(() => auditSignalStore(), [rounds.length]);
+  const audit = useMemo(() => auditSignalStore(), [roundCount]);
   const ctx = classifyTimeContext(signal.lockTimestamp);
   const windows: WindowStats[] = signal.windows;
   const activeWindow = selectedWindow

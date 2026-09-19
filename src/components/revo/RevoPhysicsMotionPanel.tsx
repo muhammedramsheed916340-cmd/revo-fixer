@@ -21,11 +21,13 @@
  */
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { getVideoPhysics, subscribeVideoPhysics } from "./RevoVideoSensor";
+import { getSensorRuntime, getVideoPhysics, subscribeVideoPhysics } from "./RevoVideoSensor";
 import {
   computePhysicsEvidence,
   learnDeceleration,
+  rotationReadout,
   type PhysicsEvidence,
+  type RotationReadout,
 } from "./wheelPhysicsLayer";
 import {
   getDecelerationObservations,
@@ -33,6 +35,7 @@ import {
   getSignalStoreVersion,
   getTimedRounds,
   subscribeSignalStore,
+  syncLiveFrames,
 } from "./signalDataStore";
 import { getDossiers, subscribeLedger, getLedgerVersion, summarizeDossiers } from "./physicsDossier";
 import { OUTCOME_COLORS, OUTCOME_DISPLAY } from "./signalSectorMap";
@@ -81,15 +84,53 @@ export function RevoPhysicsMotionPanel() {
   const flags = getSignalFlags();
   const mounted = useMounted();
 
+  // Keep the store in sync with the live sensor's own pre-result buffer so the
+  // panel always evaluates the REAL live frames (never stale, never invented).
+  const [liveTick, setLiveTick] = useState(0);
+  useEffect(() => {
+    syncLiveFrames(20_000);
+    const id = setInterval(() => {
+      syncLiveFrames(20_000);
+      setLiveTick((t) => t + 1);
+    }, 1_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const frameCount = getMotionFrames().length;
+  const decelCount = getDecelerationObservations().length;
+  const liveSensorTs = getVideoPhysics()?.timestamp ?? 0;
+
   const evidence: PhysicsEvidence = useMemo(() => {
     const frames = getMotionFrames();
     const learned = learnDeceleration(getDecelerationObservations(), Date.now());
     return computePhysicsEvidence(frames, { learnedDeceleration: learned, windowMs: 4000 });
-  }, [getMotionFrames().length, getVideoPhysics()?.timestamp]);
+  }, [frameCount, liveSensorTs, liveTick]);
 
   const sensor = getVideoPhysics();
+  const runtime = getSensorRuntime();
+  const sensorTracking = sensor?.isTracking ?? false;
+
+  // MEASURED live rotation (never hardcoded): direction + speed + confidence.
+  const rotation: RotationReadout = useMemo(
+    () =>
+      rotationReadout(
+        getMotionFrames().filter((f) => f.timestamp >= Date.now() - 20_000),
+        sensor
+          ? {
+              velocity: sensor.velocity,
+              velocityRaw: sensor.velocityRaw,
+              acceleration: sensor.acceleration,
+              confidence: sensor.confidence,
+              direction: sensor.direction,
+              isTracking: sensor.isTracking,
+            }
+          : null,
+      ),
+    [liveSensorTs, sensorTracking, liveTick, frameCount, decelCount],
+  );
   const d = evidence.diagnostics;
-  const summary = useMemo(() => summarizeDossiers(), [getDossiers().length]);
+  const dossierCount = getDossiers().length;
+  const summary = useMemo(() => summarizeDossiers(), [dossierCount]);
   const dossiers = getDossiers().slice(-5).reverse();
   const rounds = getTimedRounds();
 
@@ -132,9 +173,38 @@ export function RevoPhysicsMotionPanel() {
       </div>
 
       <div className="space-y-4 p-4">
+        {/* ===== WHEEL ROTATION (measured from live video motion) ===== */}
+        <div className="rounded-lg border border-[#1e2240] bg-[#0d1020] p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-[#5a6a99]">Wheel rotation (measured from live video — never hardcoded)</span>
+            <span className="text-[9px] text-[#5a6a99]">source: {rotation.source} · threshold {rotation.thresholdDegPerSec} °/s</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-6">
+            <Row
+              label="Direction"
+              value={rotation.direction}
+              color={rotation.direction === "RIGHT" ? "#2ed573" : rotation.direction === "LEFT" ? "#448AFF" : "#5a6a99"}
+            />
+            <Row label="Speed" value={`${rotation.filteredSpeedDegPerSec.toFixed(1)} °/s`} />
+            <Row label="Raw speed" value={`${rotation.rawSpeedDegPerSec.toFixed(1)} °/s`} />
+            <Row label="Confidence" value={`${(rotation.confidence * 100).toFixed(0)}%`} />
+            <Row label="Tracking" value={rotation.tracking ? "ACTIVE" : "IDLE"} color={rotation.tracking ? "#2ed573" : "#5a6a99"} />
+            <Row label="Acceleration" value={`${rotation.acceleration.toFixed(1)} °/s²`} />
+          </div>
+          <div className="mt-2 text-[9px]" style={{ color: rotation.direction === "UNKNOWN" ? "#ffa502" : "#5a6a99" }}>
+            {rotation.direction === "UNKNOWN"
+              ? `DIRECTION UNKNOWN — ${rotation.reason}`
+              : `${rotation.reason}${rotation.signAgreement === false ? " · WARNING: the sensor's velocity sign contradicts the measured angle delta" : rotation.signAgreement === true ? " · sensor sign agrees with measured Δangle" : ""}`}
+          </div>
+          <div className="mt-1 text-[9px] text-[#5a6a99]">
+            video: {runtime.active ? (runtime.frames > 0 ? "ACTIVE" : "CONNECTING") : "INACTIVE"} · frames {runtime.frames} · {runtime.fps.toFixed(1)} fps · calibration{" "}
+            {runtime.calibrationLocked ? "LOCKED" : "UNLOCKED"} · profDiff {runtime.profDiff.toFixed(2)} · {runtime.streamState}
+          </div>
+        </div>
+
         {/* ===== Live debug tiles ===== */}
         <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-4">
-          <Row label="Direction" value={d.direction} color={d.direction === "RIGHT" ? "#2ed573" : d.direction === "LEFT" ? "#448AFF" : "#5a6a99"} />
+          <Row label="Direction (window)" value={d.direction} color={d.direction === "RIGHT" ? "#2ed573" : d.direction === "LEFT" ? "#448AFF" : "#5a6a99"} />
           <Row label="Direction confidence" value={`${(d.directionConfidence * 100).toFixed(0)}%`} />
           <Row label="Direction stability" value={`${(d.directionStability * 100).toFixed(0)}%`} title={`${d.directionChanges} direction change(s) detected`} />
           <Row label="Physics state" value={d.motionState} color={STATE_COLOR[d.motionState]} />

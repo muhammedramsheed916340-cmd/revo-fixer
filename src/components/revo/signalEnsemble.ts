@@ -79,6 +79,10 @@ export interface EnsembleChannel {
   flag: keyof SignalFeatureFlags | null; // which feature flag governs it (null = always-on base)
   enabled: boolean;
   available: boolean;
+  /** "READY" when the channel produced real evidence for this lock,
+   *  "INSUFFICIENT" when it has none — in which case `reason` says exactly why
+   *  and its weight is forced to 0 (never treated as zero-quality evidence). */
+  status: "READY" | "INSUFFICIENT";
   confidence: number;
   baseWeight: number;
   effectiveWeight: number;
@@ -226,6 +230,7 @@ export function buildChannels(input: EnsembleInput): EnsembleChannel[] {
     flag: null,
     enabled: true,
     available: true,
+    status: "READY",
     confidence: 1,
     baseWeight: DEFAULT_CHANNEL_WEIGHTS.theoretical,
     effectiveWeight: 0,
@@ -241,6 +246,7 @@ export function buildChannels(input: EnsembleInput): EnsembleChannel[] {
     flag: null,
     enabled: true,
     available: historyAvailable,
+    status: historyAvailable ? "READY" : "INSUFFICIENT",
     confidence: 0.9,
     baseWeight: DEFAULT_CHANNEL_WEIGHTS.history,
     effectiveWeight: 0,
@@ -260,6 +266,7 @@ export function buildChannels(input: EnsembleInput): EnsembleChannel[] {
     flag: "TIME_SIGNAL",
     enabled: timeEnabled,
     available: timeAvailable,
+    status: timeAvailable ? "READY" : "INSUFFICIENT",
     confidence: time?.confidence ?? 0,
     baseWeight: DEFAULT_CHANNEL_WEIGHTS.time,
     effectiveWeight: 0,
@@ -281,6 +288,7 @@ export function buildChannels(input: EnsembleInput): EnsembleChannel[] {
     flag: "DEALER_SIGNAL",
     enabled: dealerEnabled,
     available: dealerAvailable,
+    status: dealerAvailable ? "READY" : "INSUFFICIENT",
     confidence: dealer?.confidence ?? 0,
     baseWeight: DEFAULT_CHANNEL_WEIGHTS.dealer,
     effectiveWeight: 0,
@@ -302,6 +310,7 @@ export function buildChannels(input: EnsembleInput): EnsembleChannel[] {
     flag: "PHYSICS_SIGNAL",
     enabled: physicsEnabled,
     available: physicsAvailable,
+    status: physicsAvailable ? "READY" : "INSUFFICIENT",
     confidence: physics?.physicsConfidence ?? 0,
     baseWeight: DEFAULT_CHANNEL_WEIGHTS.physics,
     effectiveWeight: 0,
@@ -321,6 +330,7 @@ export function buildChannels(input: EnsembleInput): EnsembleChannel[] {
     flag: "FUSION",
     enabled: isEnabled("ml", flags),
     available: mlAvailable,
+    status: mlAvailable ? "READY" : "INSUFFICIENT",
     confidence: mlAvailable ? 0.5 : 0,
     baseWeight: DEFAULT_CHANNEL_WEIGHTS.ml,
     effectiveWeight: 0,

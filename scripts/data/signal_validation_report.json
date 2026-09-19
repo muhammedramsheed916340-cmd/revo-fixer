@@ -2,7 +2,7 @@
   "primary": {
     "version": "signal-validation-v1.0",
     "dataset": "final_benchmark_rounds.jsonl (500 rounds, production locks stored live)",
-    "generatedAt": 1789844255370,
+    "generatedAt": 1789846057396,
     "roundsEvaluated": 500,
     "roundsAvailable": 500,
     "roundRange": {
@@ -1361,7 +1361,7 @@
   "secondary": {
     "version": "signal-validation-v1.0",
     "dataset": "pass179_history.json (1279 rounds, live baseline ledger)",
-    "generatedAt": 1789844257786,
+    "generatedAt": 1789846060170,
     "roundsEvaluated": 1279,
     "roundsAvailable": 1279,
     "roundRange": {
@@ -2648,7 +2648,7 @@
     "disclaimer": "100% accuracy is a DEVELOPMENT TARGET, never a guarantee. Walk-forward results are out-of-sample for the model but come from a historical dataset; a genuine promotion additionally requires fresh live paired rounds. No signal is promoted on a small sample, and the production scorer is untouched until a promotion gate passes."
   },
   "meta": {
-    "generatedAt": 1789844257786,
+    "generatedAt": 1789846060171,
     "runner": "scripts/validate_signal_layers.ts",
     "nodeRuntime": "v22.22.3",
     "note": "Both datasets contain REAL settled rounds collected from the live game. No mock or synthetic rounds are used in any accuracy metric."
