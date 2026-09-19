@@ -40,6 +40,7 @@ import {
   type SignalFlagName,
 } from "./signalFlags";
 import { OUTCOME_COLORS, OUTCOME_DISPLAY } from "./signalSectorMap";
+import { SignalPanelPlaceholder, useMounted } from "./SignalPanelFrame";
 
 function useStoreVersion(): number {
   return useSyncExternalStore(subscribeSignalStore, getSignalStoreVersion, () => 0);
@@ -59,6 +60,7 @@ export function RevoSignalEnsemblePanel() {
   const ledger = getValidationLedger();
   const rounds = getTimedRounds();
   const [message, setMessage] = useState<string | null>(null);
+  const mounted = useMounted();
 
   // Build the live bundle from real data only. Production probabilities are
   // not supplied here (the panel is a diagnostic view); the bundle therefore
@@ -122,6 +124,14 @@ export function RevoSignalEnsemblePanel() {
       setMessage(res.reason);
     }
   };
+
+  // SSR/hydration guard (repo convention, see RevoGame.tsx): every value below
+  // comes from browser-only state (signal store, video telemetry, flags). The
+  // pre-mount render is a stable data-free shell so the server output and the
+  // first client render match — no hydration mismatch in the production build.
+  if (!mounted) {
+    return <SignalPanelPlaceholder icon="fa-layer-group" title="Signal ensemble (experimental)" note="Building the live and shadow bundles from real rounds, telemetry and the production prediction…" accent="#2ed573" />;
+  }
 
   return (
     <div className="revo-card overflow-hidden">

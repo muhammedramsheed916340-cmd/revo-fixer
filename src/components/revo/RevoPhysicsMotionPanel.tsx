@@ -37,6 +37,7 @@ import {
 import { getDossiers, subscribeLedger, getLedgerVersion, summarizeDossiers } from "./physicsDossier";
 import { OUTCOME_COLORS, OUTCOME_DISPLAY } from "./signalSectorMap";
 import { getSignalFlags } from "./signalFlags";
+import { SignalPanelPlaceholder, useMounted } from "./SignalPanelFrame";
 
 function useSensorTick(): number {
   const [tick, setTick] = useState(0);
@@ -78,6 +79,7 @@ export function RevoPhysicsMotionPanel() {
   useStoreVersion();
   useLedgerVersion();
   const flags = getSignalFlags();
+  const mounted = useMounted();
 
   const evidence: PhysicsEvidence = useMemo(() => {
     const frames = getMotionFrames();
@@ -102,6 +104,14 @@ export function RevoPhysicsMotionPanel() {
 
   const speedProfile = evidence.speed.profile.slice(-60);
   const maxSpeed = Math.max(1, ...speedProfile.map((p) => Math.abs(p.velocity)));
+
+  // SSR/hydration guard (repo convention, see RevoGame.tsx): every value below
+  // comes from browser-only state (signal store, video telemetry, flags). The
+  // pre-mount render is a stable data-free shell so the server output and the
+  // first client render match — no hydration mismatch in the production build.
+  if (!mounted) {
+    return <SignalPanelPlaceholder icon="fa-gauge-high" title="Wheel physics · motion signal" note="Waiting for live video telemetry before computing direction, speed and stop-angle evidence…" />;
+  }
 
   return (
     <div className="revo-card overflow-hidden">

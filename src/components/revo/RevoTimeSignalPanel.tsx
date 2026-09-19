@@ -32,6 +32,7 @@ import {
 } from "./timeSignal";
 import { OUTCOME_COLORS, OUTCOME_DISPLAY } from "./signalSectorMap";
 import { getSignalFlags } from "./signalFlags";
+import { SignalPanelPlaceholder, useMounted } from "./SignalPanelFrame";
 
 function useStoreVersion(): number {
   return useSyncExternalStore(subscribeSignalStore, getSignalStoreVersion, () => 0);
@@ -57,6 +58,7 @@ export function RevoTimeSignalPanel() {
   useStoreVersion();
   const rounds = getTimedRounds();
   const flags = getSignalFlags();
+  const mounted = useMounted();
   const [selectedWindow, setSelectedWindow] = useState<string>("");
 
   const signal: TimeSignalResult = useMemo(
@@ -74,6 +76,14 @@ export function RevoTimeSignalPanel() {
   const activeWindow = selectedWindow
     ? windows.find((w) => w.key === selectedWindow) ?? signal.primaryWindow
     : signal.primaryWindow;
+
+  // SSR/hydration guard (repo convention, see RevoGame.tsx): every value below
+  // comes from browser-only state (signal store, video telemetry, flags). The
+  // pre-mount render is a stable data-free shell so the server output and the
+  // first client render match — no hydration mismatch in the production build.
+  if (!mounted) {
+    return <SignalPanelPlaceholder icon="fa-clock-rotate-left" title="Time-based wheel analysis" note="Reading the real settlement timestamps of stored rounds to build the rolling and time-of-day windows…" accent="#a78bfa" />;
+  }
 
   return (
     <div className="revo-card overflow-hidden">

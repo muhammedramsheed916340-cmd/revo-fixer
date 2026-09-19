@@ -36,6 +36,7 @@ import { OUTCOMES_8 } from "./timeSignal";
 import { OUTCOME_COLORS, OUTCOME_DISPLAY } from "./signalSectorMap";
 import { getSignalFlags } from "./signalFlags";
 import { getVideoPhysics } from "./RevoVideoSensor";
+import { SignalPanelPlaceholder, useMounted } from "./SignalPanelFrame";
 
 function useDealerVersion(): number {
   return useSyncExternalStore(subscribeDealers, getDealerVersion, () => 0);
@@ -58,6 +59,7 @@ export function RevoDealerPanel() {
   useDealerVersion();
   useStoreVersion();
   const flags = getSignalFlags();
+  const mounted = useMounted();
   const rounds = getTimedRounds();
   const profiles = getDealerProfiles();
   const active: DealerProfile | null = profiles.length > 0 ? profiles[profiles.length - 1] : null;
@@ -90,6 +92,14 @@ export function RevoDealerPanel() {
 
   const wheel = active?.wheel;
   const sensor = getVideoPhysics();
+
+  // SSR/hydration guard (repo convention, see RevoGame.tsx): every value below
+  // comes from browser-only state (signal store, video telemetry, flags). The
+  // pre-mount render is a stable data-free shell so the server output and the
+  // first client render match — no hydration mismatch in the production build.
+  if (!mounted) {
+    return <SignalPanelPlaceholder icon="fa-user-tie" title="Dealer / agent analysis" note="Waiting for the first real dealer observation captured before a prediction lock…" accent="#FFD700" />;
+  }
 
   return (
     <div className="revo-card overflow-hidden">
