@@ -9113,3 +9113,38 @@ Date: 2026-09-19. Scope: purely additive; no existing file's behaviour removed, 
   generated), scripts/data/signal_validation_report.json.
 - Next actions: accumulate real dealer/video observations through the collector, then re-run the
   walk-forward harness; only a validated delta vs the theoretical baseline may flip a flag.
+
+---
+
+## Stage: Live pipeline wiring — dealer + wheel physics + prediction UI (additive debugging)
+
+Goal: find why the new Dealer / Physics / Ensemble panels showed no live values, and wire the real
+video → motion → timeline → dealer → physics → dynamic Top-4 path. No fabrication anywhere.
+
+- ROOT CAUSES (six, each sufficient on its own):
+    1. `RevoSignalCollector` was never mounted in RevoApp → the experimental store stayed empty.
+    2. UNIT MISMATCH (decisive): the sensor stamps telemetry with `Date.now()/1000` (epoch SECONDS)
+       while every window/dedupe/threshold is milliseconds → every "last 20 s" query was empty →
+       physics always INSUFFICIENT → no physics Top-4. Fixed centrally with `toEpochMs()` in
+       wheelPhysicsLayer + normalisation on write in signalDataStore.
+    3. No visibility into the video pipeline (running? calibrated? tracking? stream error?).
+    4. Dealer position did not exist as a measurement.
+    5. The new layers never read the production pre-result snapshot buffer.
+    6. Channel availability was implicit ("real/none") instead of READY/INSUFFICIENT + reason.
+- ADDITIVE WIRING: collector mount + live-buffer ingest (`syncLiveFrames`/`ingestLivePhysicsBuffer`,
+  idempotent by timestamp), frame dedupe, throttled frame notifications (~4/s) so panels update
+  without reload, dealer-profile persistence (`revo_dealerProfiles_v1`), sensor region sink (12 coarse
+  luminance columns) + published `SensorRuntimeStatus`, `rotationReadout()` (measured LEFT/RIGHT with
+  sign-agreement check and explicit UNKNOWN reasons), `estimateDealerPosition()` (frame-change
+  localisation over screen thirds, confidence-gated), explicit ensemble channel status, and a new
+  expandable `RevoLiveSensorDebugPanel`.
+- TESTS ADDED: scripts/bun-test-shim.mjs (runs the repo's existing bun:test suites under Node),
+  scripts/render_signal_panels.ts (jsdom + real React 19 render of the panels).
+- RESULTS: 147/147 mechanism checks, 15/15 render checks, 81/81 existing tests, typecheck + eslint
+  clean on all new files, walk-forward validation unchanged (audits PASS, nothing promotable),
+  3/3 Vercel projects built successfully.
+- HONEST LIMITATION: no browser and no route to the stream host in this environment, so the live
+  casino feed was not watched; the render test proves the cold-start refusal to invent data and the
+  live update path. Press Start on the Live Video Sensor panel; the debug panel then shows
+  video/frames/fps/calibration/tracking or the exact stream error.
+- REPORT: LIVE_PIPELINE_FIX_REPORT.md (12 items as requested).

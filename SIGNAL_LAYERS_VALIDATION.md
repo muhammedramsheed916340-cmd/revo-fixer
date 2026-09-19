@@ -1,6 +1,6 @@
 # Signal Layers — Walk-Forward Validation Report
 
-Generated: 2026-09-19T18:57:35.370Z
+Generated: 2026-09-19T19:28:47.568Z
 Harness version: signal-validation-v1.0
 Dataset(s): final_benchmark_rounds.jsonl (500 rounds, production locks stored live)
 Rounds evaluated: **500** real settled rounds
@@ -82,7 +82,7 @@ Window: 2026-09-13T23:39:26.841Z → 2026-09-14T07:10:36.940Z
 
 # Secondary dataset
 
-Generated: 2026-09-19T18:57:37.786Z
+Generated: 2026-09-19T19:28:49.693Z
 Harness version: signal-validation-v1.0
 Dataset(s): pass179_history.json (1279 rounds, live baseline ledger)
 Rounds evaluated: **1279** real settled rounds
