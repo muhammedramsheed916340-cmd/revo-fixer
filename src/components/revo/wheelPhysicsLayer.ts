@@ -75,6 +75,22 @@ export interface MotionFrame {
   centerDisplacement?: number;    // px (optional; sensor may not provide)
 }
 
+/**
+ * Normalise a telemetry timestamp to MILLISECONDS.
+ *
+ * The existing video sensor stamps `WheelPhysicsState.timestamp` with
+ * `Date.now() / 1000` (EPOCH SECONDS) while every window/threshold in this
+ * layer (and in the production snapshot buffer, which multiplies by 1000) is in
+ * milliseconds. Feeding seconds straight into a ms window silently produced
+ * "no frames in the analysis window" → PHYSICS INSUFFICIENT forever. Values are
+ * therefore normalised HERE, in one place, for every caller.
+ */
+export function toEpochMs(timestamp: number): number {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return timestamp;
+  // 1e11 ms ≈ 1973; anything below that is a seconds-scale stamp.
+  return timestamp < 1e11 ? timestamp * 1000 : timestamp;
+}
+
 /** Adapter: existing sensor state → MotionFrame (extra fields preserved when present). */
 export function frameFromSensorState(p: {
   timestamp: number;
@@ -95,7 +111,7 @@ export function frameFromSensorState(p: {
   profDiff?: number;
 }): MotionFrame {
   return {
-    timestamp: p.timestamp,
+    timestamp: toEpochMs(p.timestamp),
     angle: p.angle,
     angleWrapped: p.angleWrapped,
     velocity: p.velocity,

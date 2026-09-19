@@ -30,12 +30,14 @@ import {
 import {
   rotationReadout,
   ROTATION_DIRECTION_MIN_DEG_PER_SEC,
+  toEpochMs,
   analyzeDirection,
   analyzeSpeed,
   analyzeVibration,
   buildSyntheticSpinFrames,
   classifyMotionState,
   computePhysicsEvidence,
+  frameFromSensorState,
   learnDeceleration,
   lockPhysicsPrediction,
 } from "../src/components/revo/wheelPhysicsLayer";
@@ -498,6 +500,33 @@ check("a single real frame is not enough for a physics prediction (refuses rathe
 check("store audit passes on real data", auditSignalStore().rounds.passed && auditSignalStore().timestamps.passed);
 __setFlagsForTest({ ...SIGNAL_FLAGS_OFF });
 
+
+
+// --- timestamp UNIT handling (the bug that made physics永远 INSUFFICIENT) ---
+section("telemetry timestamp units");
+const secondsNow = Date.now() / 1000;                       // what RevoVideoSensor publishes
+const msNow = toEpochMs(secondsNow);
+check("epoch-seconds telemetry is normalised to milliseconds", Math.abs(msNow - Date.now()) < 1000, `${secondsNow} → ${msNow}`);
+check("millisecond telemetry passes through unchanged", toEpochMs(1_700_000_000_000) === 1_700_000_000_000);
+check("invalid timestamps are left untouched (and rejected by writers)", toEpochMs(0) === 0 && toEpochMs(Number.NaN) !== toEpochMs(Number.NaN));
+
+const sensorFrame = frameFromSensorState({
+  timestamp: secondsNow,
+  angle: 10,
+  velocity: 120,
+  velocityRaw: 118,
+  acceleration: -4,
+  confidence: 0.9,
+  direction: 1,
+  isTracking: true,
+} as never);
+check("frameFromSensorState emits milliseconds", Math.abs(sensorFrame.timestamp - Date.now()) < 1_000, String(sensorFrame.timestamp));
+
+clearSignalStore();
+recordMotionFrame(sensorFrame);
+check("a seconds-stamped sensor frame survives the 20 s live window", getMotionFrames().filter((f) => f.timestamp >= Date.now() - 20_000).length === 1);
+const msRotation = rotationReadout(getMotionFrames(), null);
+check("physics sees the live frame (not an empty window)", msRotation.frames === 1 && msRotation.reason.length > 0);
 
 // ---------------------------------------------------------------------------
 // 10. LIVE PIPELINE WIRING (direction/speed readout, position, ingest)

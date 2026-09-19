@@ -155,11 +155,13 @@ for (let i = 0; i < 60; i++) {
   });
 }
 
-// 2) telemetry: a signed rotation (positive angular velocity = RIGHT/CW)
+// 2) telemetry: a signed rotation (positive angular velocity = RIGHT/CW).
+//    NOTE: timestamps are EPOCH SECONDS here — exactly what the live video
+//    sensor publishes — so this also proves the unit normalisation path.
 const now = Date.now();
 for (let i = 0; i < 30; i++) {
   store.recordMotionFrame({
-    timestamp: now - (30 - i) * 100,
+    timestamp: (now - (30 - i) * 100) / 1000,
     angle: i * 12,             // +120 °/s
     velocity: 120,
     velocityRaw: 118,

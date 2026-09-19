@@ -44,6 +44,7 @@ import {
   learnDeceleration,
   computePhysicsEvidence,
   frameFromSensorState,
+  toEpochMs,
   type MotionFrame,
   type PhysicsEvidence,
   type DecelerationObservation,
@@ -177,6 +178,8 @@ export function recordSettledRound(input: SettledRoundInput): { accepted: boolea
 /** Feed one wheel-telemetry frame (called from the video sensor). */
 export function recordMotionFrame(frame: MotionFrame, opts: { silent?: boolean } = {}): void {
   if (!Number.isFinite(frame.timestamp) || frame.timestamp <= 0) return;
+  // Every stored frame is in MILLISECONDS, whatever the producer used.
+  frame = { ...frame, timestamp: toEpochMs(frame.timestamp) };
   const last = state.frames[state.frames.length - 1];
   // Dedupe by timestamp: the same sensor frame must never be stored twice
   // (a duplicated frame would double-count in the physics window).
@@ -226,7 +229,7 @@ export function ingestLivePhysicsBuffer(fromMs: number, toMs: number): number {
     const before = state.frames.length;
     recordMotionFrame(
       {
-        timestamp: snap.timestamp,
+        timestamp: toEpochMs(snap.timestamp),
         angle: snap.angle,
         angleWrapped: ((snap.angle % 360) + 360) % 360,
         velocity: snap.velocity,
