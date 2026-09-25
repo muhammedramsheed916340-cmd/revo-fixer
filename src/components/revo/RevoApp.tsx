@@ -31,6 +31,7 @@ import { RevoReveal } from "./RevoReveal";
 import { RevoTestimonials } from "./RevoTestimonials";
 import { RevoCommandPalette } from "./RevoCommandPalette";
 import { RevoGame } from "./RevoGame";
+import { RevoNextResult } from "./RevoNextResult";
 import { RevoLiveResults } from "./RevoLiveResults";
 
 import type {
@@ -194,6 +195,10 @@ export function RevoApp() {
 
           <RevoReveal>
             <RevoGame />
+          </RevoReveal>
+
+          <RevoReveal>
+            <RevoNextResult />
           </RevoReveal>
 
           <RevoReveal>

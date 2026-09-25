@@ -8,6 +8,7 @@ import { RevoOnlineBadge } from "./RevoOnlineBadge";
 const NAV = [
   { id: "home", label: "Home", icon: "fa-house" },
   { id: "game", label: "Live Game", icon: "fa-gamepad" },
+  { id: "next-result", label: "Next Result", icon: "fa-bullseye" },
   { id: "live-results", label: "Live Results", icon: "fa-tower-broadcast" },
   { id: "streak-tracker", label: "Streaks", icon: "fa-chart-line" },
   { id: "prediction-timeline", label: "Backtest", icon: "fa-bullseye" },
